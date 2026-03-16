@@ -1,0 +1,215 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">
+    <i class="bi bi-box-seam me-2"></i>
+    <%= item ? `Edit Item — ${item.SerialNumber}` : 'Add Inventory Item' %>
+  </h1>
+  <a href="<%= item ? `/inventory/${item.ItemID}` : '/inventory' %>" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Cancel
+  </a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="POST" action="<%= action %>" novalidate>
+
+      <%
+        const isBulkItem = item && item.TrackingType === 'bulk';
+      %>
+
+      <!-- Tracking Type -->
+      <div class="row g-3 mb-3 pb-3 border-bottom">
+        <div class="col-12">
+          <label class="form-label fw-semibold">Item Type</label>
+          <div class="d-flex gap-4">
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="trackingType" id="typeSerial"
+                     value="serialized" <%= !isBulkItem ? 'checked' : '' %> />
+              <label class="form-check-label" for="typeSerial">
+                <strong>Serialized / Asset-Tracked</strong>
+                <div class="small text-muted">Tracked individually by serial number and asset tag</div>
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="trackingType" id="typeBulk"
+                     value="bulk" <%= isBulkItem ? 'checked' : '' %> />
+              <label class="form-check-label" for="typeBulk">
+                <strong>Bulk / FRU</strong>
+                <div class="small text-muted">Field Replaceable Unit — tracked by quantity, not individual serial numbers</div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+
+        <!-- Serial Number (serialized only) -->
+        <div class="col-md-4" id="fieldSerialNumber">
+          <label for="serialNumber" class="form-label">
+            Serial Number <span class="text-danger" id="serialRequired">*</span>
+          </label>
+          <input type="text" id="serialNumber" name="serialNumber"
+                 class="form-control"
+                 value="<%= item ? (item.SerialNumber || '') : '' %>"
+                 maxlength="100" />
+        </div>
+
+        <!-- Quantity Total (bulk only) -->
+        <div class="col-md-4" id="fieldQuantity" style="display: none;">
+          <label for="quantityTotal" class="form-label">
+            Quantity in Stock <span class="text-danger">*</span>
+          </label>
+          <input type="number" id="quantityTotal" name="quantityTotal"
+                 class="form-control" min="1"
+                 value="<%= item && item.QuantityTotal ? item.QuantityTotal : 1 %>" />
+          <div class="form-text">Total units owned. Available = Total − Deployed.</div>
+        </div>
+
+        <!-- Model Number -->
+        <div class="col-md-4">
+          <label for="modelNumber" class="form-label">Model Number</label>
+          <input type="text" id="modelNumber" name="modelNumber"
+                 class="form-control"
+                 value="<%= item && item.ModelNumber ? item.ModelNumber : '' %>"
+                 maxlength="100" />
+        </div>
+
+        <!-- Manufacturer -->
+        <div class="col-md-4">
+          <label for="manufacturer" class="form-label">Manufacturer</label>
+          <input type="text" id="manufacturer" name="manufacturer"
+                 class="form-control"
+                 value="<%= item && item.Manufacturer ? item.Manufacturer : '' %>"
+                 maxlength="150" />
+        </div>
+
+        <!-- Category -->
+        <div class="col-md-4">
+          <label for="categoryID" class="form-label">
+            Category <span class="text-danger">*</span>
+          </label>
+          <select id="categoryID" name="categoryID" class="form-select" required>
+            <option value="">— Select Category —</option>
+            <% categories.forEach(c => { %>
+              <option value="<%= c.CategoryID %>"
+                <%= (item && item.CategoryID == c.CategoryID) ? 'selected' : '' %>>
+                <%= c.CategoryName %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Status -->
+        <div class="col-md-4">
+          <label for="statusID" class="form-label">
+            Status <span class="text-danger">*</span>
+          </label>
+          <select id="statusID" name="statusID" class="form-select" required>
+            <option value="">— Select Status —</option>
+            <% statuses.forEach(s => { %>
+              <option value="<%= s.StatusID %>"
+                data-name="<%= s.StatusName %>"
+                <%= (item && item.StatusID == s.StatusID) ? 'selected' : '' %>>
+                <%= s.StatusName %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Stock Location (shown when In-Stock, serialized only) -->
+        <div class="col-md-4" id="stockLocationGroup"
+             style="display: <%= (item && item.StatusName === 'In-Stock' && !isBulkItem) ? 'block' : 'none' %>">
+          <label for="stockLocationID" class="form-label">Stock Location</label>
+          <select id="stockLocationID" name="stockLocationID" class="form-select">
+            <option value="">— Select Location —</option>
+            <% locations.forEach(l => { %>
+              <option value="<%= l.LocationID %>"
+                <%= (item && item.StockLocationID == l.LocationID) ? 'selected' : '' %>>
+                <%= l.LocationName %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Purchase Date -->
+        <div class="col-md-3">
+          <label for="purchaseDate" class="form-label">Purchase Date</label>
+          <input type="date" id="purchaseDate" name="purchaseDate"
+                 class="form-control"
+                 value="<%= item && item.PurchaseDate ? new Date(item.PurchaseDate).toISOString().split('T')[0] : '' %>" />
+        </div>
+
+        <!-- Warranty Expires -->
+        <div class="col-md-3">
+          <label for="warrantyExpires" class="form-label">Warranty Expires</label>
+          <input type="date" id="warrantyExpires" name="warrantyExpires"
+                 class="form-control"
+                 value="<%= item && item.WarrantyExpires ? new Date(item.WarrantyExpires).toISOString().split('T')[0] : '' %>" />
+        </div>
+
+        <!-- Description -->
+        <div class="col-12">
+          <label for="description" class="form-label">Description</label>
+          <textarea id="description" name="description"
+                    class="form-control" rows="3"
+                    maxlength="2000"><%= item && item.Description ? item.Description : '' %></textarea>
+        </div>
+
+        <!-- Notes -->
+        <div class="col-12">
+          <label for="notes" class="form-label">Notes</label>
+          <textarea id="notes" name="notes"
+                    class="form-control" rows="3"
+                    maxlength="2000"><%= item && item.Notes ? item.Notes : '' %></textarea>
+        </div>
+
+      </div><!-- /.row -->
+
+      <hr class="my-4" />
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-floppy me-1"></i>
+          <%= item ? 'Save Changes' : 'Add Item' %>
+        </button>
+        <a href="<%= item ? `/inventory/${item.ItemID}` : '/inventory' %>"
+           class="btn btn-outline-secondary">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var typeBulk    = document.getElementById('typeBulk');
+  var typeSerial  = document.getElementById('typeSerial');
+  var fieldSN     = document.getElementById('fieldSerialNumber');
+  var fieldQty    = document.getElementById('fieldQuantity');
+  var inputSN     = document.getElementById('serialNumber');
+  var inputQty    = document.getElementById('quantityTotal');
+  var statusSel   = document.getElementById('statusID');
+  var locGroup    = document.getElementById('stockLocationGroup');
+
+  function updateForm() {
+    var bulk = typeBulk && typeBulk.checked;
+
+    if (fieldSN)  fieldSN.style.display  = bulk ? 'none' : 'block';
+    if (fieldQty) fieldQty.style.display = bulk ? 'block' : 'none';
+    if (inputSN)  inputSN.required       = !bulk;
+    if (inputQty) inputQty.required      = bulk;
+
+    if (locGroup && statusSel) {
+      var chosen = statusSel.options[statusSel.selectedIndex];
+      var statusName = chosen ? chosen.getAttribute('data-name') : '';
+      locGroup.style.display = (!bulk && statusName === 'In-Stock') ? 'block' : 'none';
+    }
+  }
+
+  if (typeSerial) typeSerial.addEventListener('change', updateForm);
+  if (typeBulk)   typeBulk.addEventListener('change', updateForm);
+  if (statusSel)  statusSel.addEventListener('change', updateForm);
+
+  updateForm();
+});
+</script>

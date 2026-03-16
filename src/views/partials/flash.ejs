@@ -1,0 +1,34 @@
+<% if (flash) { %>
+  <% if (flash.success && flash.success.length) { %>
+    <% flash.success.forEach(msg => { %>
+      <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i><%= msg %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% }) %>
+  <% } %>
+  <% if (flash.error && flash.error.length) { %>
+    <% flash.error.forEach(msg => { %>
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= msg %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% }) %>
+  <% } %>
+  <% if (flash.warning && flash.warning.length) { %>
+    <% flash.warning.forEach(msg => { %>
+      <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle-fill me-2"></i><%= msg %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% }) %>
+  <% } %>
+  <% if (flash.info && flash.info.length) { %>
+    <% flash.info.forEach(msg => { %>
+      <div class="alert alert-info alert-dismissible fade show" role="alert">
+        <i class="bi bi-info-circle-fill me-2"></i><%= msg %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% }) %>
+  <% } %>
+<% } %>

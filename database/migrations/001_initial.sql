@@ -1,0 +1,4 @@
+-- Migration 001: Initial schema
+-- This migration is represented by schema.sql + seed.sql.
+-- Future schema changes should be added as 002_description.sql, etc.
+-- Track which migrations have been applied manually or via a migration tool.

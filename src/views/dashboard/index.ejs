@@ -1,0 +1,140 @@
+<h1 class="h3 mb-4"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h1>
+
+<!-- Summary cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center">
+        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+          <i class="bi bi-building fs-4 text-primary"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold"><%= counts.sites %></div>
+          <div class="text-muted small">Active Sites</div>
+        </div>
+      </div>
+      <a href="/sites" class="card-footer text-decoration-none small text-muted">View all &rarr;</a>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center">
+        <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
+          <i class="bi bi-box-seam fs-4 text-success"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold"><%= counts.inventoryInStock %></div>
+          <div class="text-muted small">Items In Stock</div>
+        </div>
+      </div>
+      <a href="/inventory?status=In-Stock" class="card-footer text-decoration-none small text-muted">View all &rarr;</a>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center">
+        <div class="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
+          <i class="bi bi-wrench-adjustable fs-4 text-warning"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold"><%= counts.openRepairs %></div>
+          <div class="text-muted small">Open Repairs</div>
+        </div>
+      </div>
+      <a href="/repairs?status=open" class="card-footer text-decoration-none small text-muted">View all &rarr;</a>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center">
+        <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
+          <i class="bi bi-calendar-x fs-4 text-danger"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold"><%= counts.pmsDue %></div>
+          <div class="text-muted small">PMs Due / Overdue</div>
+        </div>
+      </div>
+      <a href="/sites?pmDue=1" class="card-footer text-decoration-none small text-muted">View all &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Recent log entries -->
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-journal-text me-2"></i>Recent Log Entries</span>
+      </div>
+      <% if (recentLogs.length === 0) { %>
+        <div class="card-body text-muted small">No log entries yet.</div>
+      <% } else { %>
+      <div class="list-group list-group-flush">
+        <% recentLogs.forEach(log => { %>
+        <a href="/sites/<%= log.SiteID %>/logs/<%= log.LogEntryID %>" class="list-group-item list-group-item-action py-2">
+          <div class="d-flex justify-content-between">
+            <span class="fw-semibold"><%= log.Subject || log.TypeName %></span>
+            <small class="text-muted"><%= new Date(log.EntryDate).toLocaleDateString() %></small>
+          </div>
+          <div class="text-muted small">
+            <i class="bi bi-building me-1"></i><%= log.SiteName %> &bull;
+            <span class="badge bg-secondary"><%= log.TypeName %></span>
+          </div>
+        </a>
+        <% }) %>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Upcoming PMs -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-header">
+        <i class="bi bi-calendar-check me-2"></i>Upcoming PMs
+      </div>
+      <% if (upcomingPMs.length === 0) { %>
+        <div class="card-body text-muted small">No upcoming PMs.</div>
+      <% } else { %>
+      <ul class="list-group list-group-flush">
+        <% upcomingPMs.forEach(pm => { %>
+        <li class="list-group-item py-2">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="small fw-semibold"><%= pm.Title %></div>
+              <div class="text-muted" style="font-size:.75rem">
+                <i class="bi bi-building me-1"></i><%= pm.SiteName %>
+              </div>
+            </div>
+            <% const daysLeft = pm.DaysUntilDue; %>
+            <span class="badge <%= daysLeft < 0 ? 'bg-danger' : daysLeft <= 7 ? 'bg-warning text-dark' : 'bg-info text-dark' %> ms-2">
+              <%= daysLeft < 0 ? Math.abs(daysLeft) + 'd overdue' : daysLeft === 0 ? 'Due today' : daysLeft + 'd' %>
+            </span>
+          </div>
+        </li>
+        <% }) %>
+      </ul>
+      <% } %>
+    </div>
+
+    <!-- Open repairs with follow-up due -->
+    <% if (repairsFollowUp.length > 0) { %>
+    <div class="card shadow-sm mt-3">
+      <div class="card-header text-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>Repair Follow-Ups Due
+      </div>
+      <ul class="list-group list-group-flush">
+        <% repairsFollowUp.forEach(r => { %>
+        <li class="list-group-item py-2">
+          <a href="/repairs/<%= r.RepairID %>" class="text-decoration-none">
+            <div class="small fw-semibold"><%= r.SerialNumber %></div>
+            <div class="text-muted" style="font-size:.75rem">Follow-up: <%= new Date(r.FollowUpDate).toLocaleDateString() %></div>
+          </a>
+        </li>
+        <% }) %>
+      </ul>
+    </div>
+    <% } %>
+  </div>
+</div>

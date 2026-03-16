@@ -1,0 +1,174 @@
+'use strict';
+
+const { getPool, sql } = require('../config/database');
+const { writeAudit }   = require('./auditModel');
+
+// NextDueDate: DATEADD(day, FrequencyDays, LastPerformedAt)
+// When LastPerformedAt IS NULL the schedule is immediately overdue — use GETUTCDATE() as the base.
+const NEXT_DUE_EXPR = `
+  DATEADD(day, pm.FrequencyDays,
+    ISNULL(pm.LastPerformedAt, GETUTCDATE()))
+`;
+
+const DAYS_UNTIL_DUE_EXPR = `
+  DATEDIFF(day, GETUTCDATE(),
+    DATEADD(day, pm.FrequencyDays,
+      ISNULL(pm.LastPerformedAt, GETUTCDATE())))
+`;
+
+async function getBySite(siteID) {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('SiteID', sql.Int, siteID)
+    .query(`
+      SELECT
+        pm.ScheduleID, pm.SiteID, pm.Title, pm.FrequencyDays,
+        pm.LastPerformedAt, pm.AssignedUserID, pm.Notes, pm.CreatedAt,
+        u.DisplayName AS AssignedUserName,
+        ${NEXT_DUE_EXPR}      AS NextDueDate,
+        ${DAYS_UNTIL_DUE_EXPR} AS DaysUntilDue
+      FROM PMSchedules pm
+      LEFT JOIN Users u ON u.UserID = pm.AssignedUserID
+      WHERE pm.SiteID = @SiteID
+      ORDER BY NextDueDate
+    `);
+  return result.recordset;
+}
+
+async function getByID(scheduleID) {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('ScheduleID', sql.Int, scheduleID)
+    .query(`
+      SELECT
+        pm.ScheduleID, pm.SiteID, pm.Title, pm.FrequencyDays,
+        pm.LastPerformedAt, pm.AssignedUserID, pm.Notes, pm.CreatedAt,
+        u.DisplayName AS AssignedUserName,
+        ${NEXT_DUE_EXPR}      AS NextDueDate,
+        ${DAYS_UNTIL_DUE_EXPR} AS DaysUntilDue
+      FROM PMSchedules pm
+      LEFT JOIN Users u ON u.UserID = pm.AssignedUserID
+      WHERE pm.ScheduleID = @ScheduleID
+    `);
+  return result.recordset[0] || null;
+}
+
+async function create(data, auditContext = {}) {
+  const { siteID, title, frequencyDays, lastPerformedAt, assignedUserID, notes } = data;
+
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('SiteID',          sql.Int,            siteID)
+    .input('Title',           sql.NVarChar(300),  title)
+    .input('FrequencyDays',   sql.Int,            frequencyDays)
+    .input('LastPerformedAt', sql.DateTime2,      lastPerformedAt ? new Date(lastPerformedAt) : null)
+    .input('AssignedUserID',  sql.Int,            assignedUserID || null)
+    .input('Notes',           sql.NVarChar(sql.MAX), notes       || null)
+    .query(`
+      INSERT INTO PMSchedules (SiteID, Title, FrequencyDays, LastPerformedAt, AssignedUserID, Notes)
+      VALUES (@SiteID, @Title, @FrequencyDays, @LastPerformedAt, @AssignedUserID, @Notes);
+      SELECT SCOPE_IDENTITY() AS NewID
+    `);
+
+  const newID = result.recordset[0].NewID;
+  await writeAudit({
+    tableName: 'PMSchedules', recordID: newID, action: 'INSERT',
+    newValues: data,
+    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent,
+  });
+  return getByID(newID);
+}
+
+async function update(scheduleID, data, auditContext = {}) {
+  const { siteID, title, frequencyDays, lastPerformedAt, assignedUserID, notes } = data;
+
+  const pool = await getPool();
+  const old  = await getByID(scheduleID);
+
+  await pool.request()
+    .input('ScheduleID',      sql.Int,            scheduleID)
+    .input('SiteID',          sql.Int,            siteID            || null)
+    .input('Title',           sql.NVarChar(300),  title)
+    .input('FrequencyDays',   sql.Int,            frequencyDays)
+    .input('LastPerformedAt', sql.DateTime2,      lastPerformedAt ? new Date(lastPerformedAt) : null)
+    .input('AssignedUserID',  sql.Int,            assignedUserID    || null)
+    .input('Notes',           sql.NVarChar(sql.MAX), notes          || null)
+    .query(`
+      UPDATE PMSchedules SET
+        SiteID          = @SiteID,
+        Title           = @Title,
+        FrequencyDays   = @FrequencyDays,
+        LastPerformedAt = @LastPerformedAt,
+        AssignedUserID  = @AssignedUserID,
+        Notes           = @Notes
+      WHERE ScheduleID = @ScheduleID
+    `);
+
+  await writeAudit({
+    tableName: 'PMSchedules', recordID: scheduleID, action: 'UPDATE',
+    oldValues: old, newValues: data,
+    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent,
+  });
+  return getByID(scheduleID);
+}
+
+async function markCompleted(scheduleID, performedDate, auditContext = {}) {
+  const pool = await getPool();
+  const old  = await getByID(scheduleID);
+  const date = performedDate ? new Date(performedDate) : new Date();
+
+  await pool.request()
+    .input('ScheduleID',      sql.Int,       scheduleID)
+    .input('LastPerformedAt', sql.DateTime2, date)
+    .query('UPDATE PMSchedules SET LastPerformedAt = @LastPerformedAt WHERE ScheduleID = @ScheduleID');
+
+  await writeAudit({
+    tableName: 'PMSchedules', recordID: scheduleID, action: 'COMPLETED',
+    oldValues: { lastPerformedAt: old ? old.LastPerformedAt : null },
+    newValues: { lastPerformedAt: date },
+    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent,
+  });
+  return getByID(scheduleID);
+}
+
+async function hardDelete(scheduleID, auditContext = {}) {
+  const pool = await getPool();
+  const old  = await getByID(scheduleID);
+
+  await pool.request()
+    .input('ScheduleID', sql.Int, scheduleID)
+    .query('DELETE FROM PMSchedules WHERE ScheduleID = @ScheduleID');
+
+  await writeAudit({
+    tableName: 'PMSchedules', recordID: scheduleID, action: 'DELETE',
+    oldValues: old,
+    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent,
+  });
+}
+
+async function getUpcomingDue(daysAhead = 7) {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('DaysAhead', sql.Int, daysAhead)
+    .query(`
+      SELECT
+        pm.ScheduleID, pm.SiteID, pm.Title, pm.FrequencyDays,
+        pm.LastPerformedAt, pm.AssignedUserID, pm.Notes,
+        s.SiteName, s.City, s.State,
+        u.DisplayName AS AssignedUserName,
+        ${NEXT_DUE_EXPR}      AS NextDueDate,
+        ${DAYS_UNTIL_DUE_EXPR} AS DaysUntilDue
+      FROM PMSchedules pm
+      LEFT JOIN Sites s ON s.SiteID   = pm.SiteID
+      LEFT JOIN Users u ON u.UserID   = pm.AssignedUserID
+      WHERE ${NEXT_DUE_EXPR} <= DATEADD(day, @DaysAhead, GETUTCDATE())
+      ORDER BY NextDueDate
+    `);
+  return result.recordset;
+}
+
+module.exports = {
+  getBySite, getByID, create, update,
+  markCompleted, delete: hardDelete,
+  getUpcomingDue,
+};

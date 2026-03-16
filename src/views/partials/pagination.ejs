@@ -1,0 +1,21 @@
+<% if (typeof pagination !== 'undefined' && pagination.totalPages > 1) { %>
+<nav aria-label="Pagination">
+  <ul class="pagination pagination-sm mb-0">
+    <li class="page-item <%= pagination.page <= 1 ? 'disabled' : '' %>">
+      <a class="page-link" href="?<%= pagination.queryString %>&page=<%= pagination.page - 1 %>">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+    </li>
+    <% for (let i = Math.max(1, pagination.page - 2); i <= Math.min(pagination.totalPages, pagination.page + 2); i++) { %>
+      <li class="page-item <%= i === pagination.page ? 'active' : '' %>">
+        <a class="page-link" href="?<%= pagination.queryString %>&page=<%= i %>"><%= i %></a>
+      </li>
+    <% } %>
+    <li class="page-item <%= pagination.page >= pagination.totalPages ? 'disabled' : '' %>">
+      <a class="page-link" href="?<%= pagination.queryString %>&page=<%= pagination.page + 1 %>">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </li>
+  </ul>
+</nav>
+<% } %>

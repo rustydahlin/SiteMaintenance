@@ -1,0 +1,133 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">
+    <i class="bi bi-wrench-adjustable me-2"></i>
+    <%= repair ? `Edit Repair — ${repair.SerialNumber}` : 'New Repair / RMA' %>
+  </h1>
+  <a href="<%= repair ? `/repairs/${repair.RepairID}` : '/repairs' %>"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Cancel
+  </a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="POST" action="<%= action %>" novalidate>
+
+      <div class="row g-3">
+
+        <!-- Item / Serial Number -->
+        <div class="col-md-6">
+          <label for="itemID" class="form-label">
+            Inventory Item <span class="text-danger">*</span>
+          </label>
+          <% if (prefilledItem) { %>
+            <input type="hidden" name="itemID" value="<%= prefilledItem.ItemID %>" />
+            <div class="form-control bg-light">
+              <i class="bi bi-box-seam me-1 text-muted"></i>
+              <strong><%= prefilledItem.SerialNumber %></strong>
+              <% if (prefilledItem.ModelNumber) { %>
+                <span class="text-muted ms-1">— <%= prefilledItem.ModelNumber %></span>
+              <% } %>
+            </div>
+          <% } else { %>
+            <input type="text" id="itemID" name="itemID"
+                   class="form-control"
+                   placeholder="Enter Inventory Item ID or Serial Number"
+                   value="<%= repair && repair.ItemID ? repair.ItemID : '' %>"
+                   required />
+            <div class="form-text">Enter the Inventory Item ID number.</div>
+          <% } %>
+        </div>
+
+        <!-- Sent Date -->
+        <div class="col-md-3">
+          <label for="sentDate" class="form-label">
+            Sent Date <span class="text-danger">*</span>
+          </label>
+          <input type="date" id="sentDate" name="sentDate"
+                 class="form-control" required
+                 value="<%= repair && repair.SentDate
+                   ? new Date(repair.SentDate).toISOString().split('T')[0]
+                   : new Date().toISOString().split('T')[0] %>" />
+        </div>
+
+        <!-- RMA Number -->
+        <div class="col-md-3">
+          <label for="rmaNumber" class="form-label">RMA Number</label>
+          <input type="text" id="rmaNumber" name="rmaNumber"
+                 class="form-control"
+                 value="<%= repair && repair.RMANumber ? repair.RMANumber : '' %>"
+                 maxlength="100" />
+        </div>
+
+        <!-- Manufacturer Contact -->
+        <div class="col-md-6">
+          <label for="manufacturerContact" class="form-label">Manufacturer Contact</label>
+          <input type="text" id="manufacturerContact" name="manufacturerContact"
+                 class="form-control"
+                 placeholder="Contact name, email, or phone"
+                 value="<%= repair && repair.ManufacturerContact ? repair.ManufacturerContact : '' %>"
+                 maxlength="500" />
+        </div>
+
+        <!-- Sent By -->
+        <div class="col-md-3">
+          <label for="sentByUserID" class="form-label">Sent By</label>
+          <select id="sentByUserID" name="sentByUserID" class="form-select">
+            <option value="">— Select User —</option>
+            <% users.forEach(u => { %>
+              <option value="<%= u.UserID %>"
+                <%= (repair && repair.SentByUserID == u.UserID) ? 'selected' : '' %>>
+                <%= u.DisplayName %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Expected Return Date -->
+        <div class="col-md-3">
+          <label for="expectedReturnDate" class="form-label">Expected Return Date</label>
+          <input type="date" id="expectedReturnDate" name="expectedReturnDate"
+                 class="form-control"
+                 value="<%= repair && repair.ExpectedReturnDate
+                   ? new Date(repair.ExpectedReturnDate).toISOString().split('T')[0]
+                   : '' %>" />
+        </div>
+
+        <!-- Follow-Up Date -->
+        <div class="col-md-3">
+          <label for="followUpDate" class="form-label">Follow-Up Date</label>
+          <input type="date" id="followUpDate" name="followUpDate"
+                 class="form-control"
+                 value="<%= repair && repair.FollowUpDate
+                   ? new Date(repair.FollowUpDate).toISOString().split('T')[0]
+                   : '' %>" />
+        </div>
+
+        <!-- Reason -->
+        <div class="col-12">
+          <label for="reason" class="form-label">
+            Reason for Repair <span class="text-danger">*</span>
+          </label>
+          <textarea id="reason" name="reason"
+                    class="form-control" rows="4" required
+                    placeholder="Describe the issue or reason for sending for repair/RMA…"
+                    maxlength="4000"><%= repair && repair.Reason ? repair.Reason : '' %></textarea>
+        </div>
+
+      </div><!-- /.row -->
+
+      <hr class="my-4" />
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-floppy me-1"></i>
+          <%= repair ? 'Save Changes' : 'Create Repair Record' %>
+        </button>
+        <a href="<%= repair ? `/repairs/${repair.RepairID}` : '/repairs' %>"
+           class="btn btn-outline-secondary">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+</div>

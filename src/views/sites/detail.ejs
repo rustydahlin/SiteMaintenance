@@ -1,0 +1,547 @@
+<%
+  const isAdminUser = user && user.roles && user.roles.includes('Admin');
+  const canWriteUser = user && user.roles &&
+    (user.roles.includes('Admin') || user.roles.includes('Technician') || user.roles.includes('Contractor'));
+
+  function warrantyBadge(dateStr) {
+    if (!dateStr) return '<span class="badge bg-secondary">N/A</span>';
+    const now = new Date();
+    const exp = new Date(dateStr);
+    const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0)   return '<span class="badge bg-danger">Expired</span>';
+    if (daysLeft <= 90) return '<span class="badge bg-warning text-dark">Expiring Soon</span>';
+    return '<span class="badge bg-success">In Warranty</span>';
+  }
+
+  function statusBadge(name) {
+    const map = { 'Active': 'bg-success', 'Inactive': 'bg-secondary', 'Maintenance': 'bg-warning text-dark', 'Decommissioned': 'bg-danger' };
+    const cls = map[name] || 'bg-secondary';
+    return `<span class="badge ${cls}">${name || 'Unknown'}</span>`;
+  }
+
+  function logTypeBadge(typeName) {
+    const map = { 'Maintenance': 'bg-warning text-dark', 'Repair': 'bg-danger', 'Inspection': 'bg-info text-dark', 'Installation': 'bg-primary', 'Note': 'bg-secondary' };
+    const cls = map[typeName] || 'bg-secondary';
+    return `<span class="badge ${cls}">${typeName || ''}</span>`;
+  }
+
+  function pmDueBadge(nextDue) {
+    if (!nextDue) return '<span class="text-muted">—</span>';
+    const now = new Date();
+    const due = new Date(nextDue);
+    const daysLeft = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0)   return `<span class="badge bg-danger">${Math.abs(daysLeft)}d overdue</span>`;
+    if (daysLeft === 0) return `<span class="badge bg-warning text-dark">Due today</span>`;
+    if (daysLeft <= 7)  return `<span class="badge bg-warning text-dark">${daysLeft}d</span>`;
+    return `<span class="text-muted small">${due.toLocaleDateString()}</span>`;
+  }
+%>
+
+<!-- Page header -->
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h2 mb-1"><i class="bi bi-building me-2"></i><%= site.SiteName %></h1>
+    <div class="d-flex gap-2 flex-wrap">
+      <%- statusBadge(site.SiteStatusName) %>
+      <%- warrantyBadge(site.WarrantyExpires) %>
+      <% if (site.SiteTypeName) { %>
+        <span class="badge bg-light text-dark border"><%= site.SiteTypeName %></span>
+      <% } %>
+    </div>
+  </div>
+  <% if (isAdminUser) { %>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="/sites/<%= site.SiteID %>/edit" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-pencil me-1"></i>Edit
+    </a>
+    <form method="POST" action="/sites/<%= site.SiteID %>/delete"
+          onsubmit="return confirm('Delete this site? This action cannot be undone.')">
+      <button type="submit" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-trash me-1"></i>Delete
+      </button>
+    </form>
+  </div>
+  <% } %>
+</div>
+
+<a href="/sites" class="text-decoration-none text-muted small">
+  <i class="bi bi-arrow-left me-1"></i>Back to Sites
+</a>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mt-3" id="siteTab" role="tablist">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#overview">Overview</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#logs" id="logs-tab">Log Entries</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#equipment">Installed Equipment</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#pm">PM Schedules</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#docs">Documents & Photos</a></li>
+</ul>
+
+<div class="tab-content border border-top-0 rounded-bottom p-3 bg-white shadow-sm">
+
+  <!-- ── Overview ─────────────────────────────────────────────────────────── -->
+  <div class="tab-pane fade show active" id="overview">
+    <div class="row g-3 mt-1">
+
+      <!-- Address / Location -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header small fw-semibold">
+            <i class="bi bi-geo-alt me-1"></i>Location
+          </div>
+          <div class="card-body small">
+            <% if (site.Address || site.City || site.State) { %>
+              <div><%= site.Address || '' %></div>
+              <div><%= [site.City, site.State, site.ZipCode].filter(Boolean).join(', ') %></div>
+            <% } else { %>
+              <span class="text-muted">No address on record.</span>
+            <% } %>
+            <% if (site.Latitude && site.Longitude) { %>
+              <div class="mt-2 text-muted">
+                GPS: <%= site.Latitude %>, <%= site.Longitude %>
+                <a href="https://maps.google.com/?q=<%= site.Latitude %>,<%= site.Longitude %>"
+                   target="_blank" class="ms-1">
+                  <i class="bi bi-box-arrow-up-right"></i>
+                </a>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status / Warranty -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header small fw-semibold">
+            <i class="bi bi-info-circle me-1"></i>Details
+          </div>
+          <div class="card-body small">
+            <dl class="row mb-0">
+              <dt class="col-sm-5 text-muted">Status</dt>
+              <dd class="col-sm-7"><%- statusBadge(site.SiteStatusName) %></dd>
+
+              <dt class="col-sm-5 text-muted">Type</dt>
+              <dd class="col-sm-7"><%= site.SiteTypeName || '—' %></dd>
+
+              <dt class="col-sm-5 text-muted">Warranty</dt>
+              <dd class="col-sm-7">
+                <%- warrantyBadge(site.WarrantyExpires) %>
+                <% if (site.WarrantyExpires) { %>
+                  <span class="ms-1 text-muted">(<%= new Date(site.WarrantyExpires).toLocaleDateString() %>)</span>
+                <% } %>
+              </dd>
+
+              <dt class="col-sm-5 text-muted">Created</dt>
+              <dd class="col-sm-7"><%= site.CreatedAt ? new Date(site.CreatedAt).toLocaleDateString() : '—' %></dd>
+
+              <% if (site.CreatedByName) { %>
+              <dt class="col-sm-5 text-muted">Created By</dt>
+              <dd class="col-sm-7"><%= site.CreatedByName %></dd>
+              <% } %>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <% if (site.Description) { %>
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header small fw-semibold">
+            <i class="bi bi-text-left me-1"></i>Description
+          </div>
+          <div class="card-body small" style="white-space: pre-wrap;"><%= site.Description %></div>
+        </div>
+      </div>
+      <% } %>
+
+    </div>
+  </div>
+
+  <!-- ── Log Entries ──────────────────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="logs">
+    <div class="d-flex justify-content-between align-items-center mt-2 mb-3">
+      <h6 class="mb-0">Recent Log Entries</h6>
+      <% if (canWriteUser) { %>
+        <a href="/sites/<%= site.SiteID %>/logs/new" class="btn btn-sm btn-primary">
+          <i class="bi bi-plus-lg me-1"></i>New Log Entry
+        </a>
+      <% } %>
+    </div>
+
+    <% if (!recentLogs || recentLogs.length === 0) { %>
+      <p class="text-muted">No log entries yet.</p>
+    <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Subject</th>
+            <th>Performed By</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% recentLogs.forEach(log => { %>
+          <tr>
+            <td><%- logTypeBadge(log.TypeName) %></td>
+            <td class="small text-muted text-nowrap">
+              <%= log.EntryDate ? new Date(log.EntryDate).toLocaleDateString() : '—' %>
+            </td>
+            <td class="small"><%= log.Subject || '—' %></td>
+            <td class="small text-muted"><%= log.PerformedBy || '—' %></td>
+            <td>
+              <a href="/sites/<%= site.SiteID %>/logs/<%= log.LogEntryID %>"
+                 class="btn btn-xs btn-outline-secondary btn-sm">View</a>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- ── Installed Equipment ──────────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="equipment">
+    <div class="d-flex justify-content-between align-items-center mt-2 mb-3">
+      <h6 class="mb-0">Currently Installed Equipment</h6>
+      <% if (isAdminUser) { %>
+        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#installModal">
+          <i class="bi bi-plus-lg me-1"></i>Install Item
+        </button>
+      <% } %>
+    </div>
+
+    <% if (!inventory || inventory.length === 0) { %>
+      <p class="text-muted">No equipment currently installed at this site.</p>
+    <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Item</th>
+            <th>Category</th>
+            <th class="text-center">Qty</th>
+            <th>Installed</th>
+            <th>Installed By</th>
+            <% if (isAdminUser) { %><th></th><% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% inventory.forEach(item => { %>
+          <tr>
+            <td>
+              <% if (item.TrackingType === 'bulk') { %>
+                <a href="/inventory/<%= item.ItemID %>" class="text-decoration-none fw-semibold">
+                  <%= item.ModelNumber || '(no model)' %>
+                </a>
+                <% if (item.Manufacturer) { %><div class="small text-muted"><%= item.Manufacturer %></div><% } %>
+                <span class="badge bg-info text-dark small">FRU</span>
+              <% } else { %>
+                <a href="/inventory/<%= item.ItemID %>" class="text-decoration-none fw-semibold">
+                  <%= item.SerialNumber %>
+                </a>
+                <% if (item.ModelNumber) { %><div class="small text-muted"><%= item.ModelNumber %></div><% } %>
+              <% } %>
+            </td>
+            <td class="small"><%= item.CategoryName || '—' %></td>
+            <td class="text-center small fw-semibold"><%= item.Quantity || 1 %></td>
+            <td class="small text-muted text-nowrap">
+              <%= item.InstalledAt ? new Date(item.InstalledAt).toLocaleDateString() : '—' %>
+            </td>
+            <td class="small text-muted"><%= item.InstalledByName || '—' %></td>
+            <% if (isAdminUser) { %>
+            <td>
+              <%
+                const removeMsg = item.TrackingType === 'bulk'
+                  ? 'Remove ' + item.Quantity + ' unit(s) of this item from the site?'
+                  : 'Remove this item from the site?';
+              %>
+              <form method="POST" action="/sites/<%= site.SiteID %>/inventory/<%= item.SiteInventoryID %>/remove"
+                    onsubmit="return confirm('<%= removeMsg %>')">
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                  <i class="bi bi-dash-circle me-1"></i>Remove
+                </button>
+              </form>
+            </td>
+            <% } %>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- ── PM Schedules ─────────────────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="pm">
+    <div class="d-flex justify-content-between align-items-center mt-2 mb-3">
+      <h6 class="mb-0">Preventive Maintenance Schedules</h6>
+      <% if (isAdminUser) { %>
+        <a href="/pm/new?siteID=<%= site.SiteID %>" class="btn btn-sm btn-primary">
+          <i class="bi bi-plus-lg me-1"></i>Add Schedule
+        </a>
+      <% } %>
+    </div>
+
+    <% if (!pmSchedules || pmSchedules.length === 0) { %>
+      <p class="text-muted">No PM schedules configured for this site.</p>
+    <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Title</th>
+            <th>Frequency</th>
+            <th>Last Performed</th>
+            <th>Next Due</th>
+            <th>Assigned To</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% pmSchedules.forEach(pm => { %>
+          <%
+            const lastPerf = pm.LastPerformedAt ? new Date(pm.LastPerformedAt) : null;
+            const nextDue  = lastPerf && pm.FrequencyDays
+              ? new Date(lastPerf.getTime() + pm.FrequencyDays * 86400000)
+              : null;
+          %>
+          <tr>
+            <td class="fw-semibold small"><%= pm.Title %></td>
+            <td class="small text-muted"><%= pm.FrequencyDays ? `Every ${pm.FrequencyDays} days` : '—' %></td>
+            <td class="small text-muted text-nowrap">
+              <%= lastPerf ? lastPerf.toLocaleDateString() : 'Never' %>
+            </td>
+            <td><%- pmDueBadge(nextDue) %></td>
+            <td class="small text-muted"><%= pm.AssignedToName || '—' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- ── Documents & Photos ───────────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="docs">
+    <div class="mt-2">
+      <%- include('../partials/fileList', {
+        documents:  documents,
+        uploadUrl:  `/documents/upload`,
+        canUpload:  canWriteUser,
+        entityType: 'site',
+        entityId:   site.SiteID
+      }) %>
+    </div>
+  </div>
+
+</div><!-- /.tab-content -->
+
+<!-- ── Install Item Modal ──────────────────────────────────────────────────── -->
+<% if (isAdminUser) { %>
+<div class="modal fade" id="installModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Install Equipment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="nav nav-tabs mb-3">
+          <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#tabExisting">Select In-Stock Item</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#tabNew">Create New Item</a>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+
+          <!-- Tab: Select Existing -->
+          <div class="tab-pane fade show active" id="tabExisting">
+            <%
+              const serializedItems = (inStockItems || []).filter(i => i.TrackingType !== 'bulk');
+              const bulkItems       = (inStockItems || []).filter(i => i.TrackingType === 'bulk');
+            %>
+            <% if (!inStockItems || inStockItems.length === 0) { %>
+              <p class="text-muted mb-0">No items currently in stock. Use the <strong>Create New Item</strong> tab to add and install a new item.</p>
+            <% } else { %>
+
+            <!-- Serialized items -->
+            <% if (serializedItems.length > 0) { %>
+            <form method="POST" action="/sites/<%= site.SiteID %>/inventory/install" class="mb-4">
+              <input type="hidden" name="mode" value="existing" />
+              <h6 class="text-muted small text-uppercase mb-2">Serialized / Asset-Tracked Items</h6>
+              <div class="mb-2">
+                <input type="text" id="stockSearch" class="form-control form-control-sm"
+                       placeholder="Filter by serial, model, manufacturer..." autocomplete="off" />
+              </div>
+              <select name="itemID" id="stockSelect" class="form-select mb-2" required size="6">
+                <% serializedItems.forEach(si => { %>
+                <option value="<%= si.ItemID %>"
+                  data-search="<%= ((si.SerialNumber||'') + ' ' + (si.ModelNumber||'') + ' ' + (si.Manufacturer||'')).toLowerCase() %>">
+                  <%= si.SerialNumber || '(no serial)' %>
+                  <% if (si.ModelNumber) { %> — <%= si.ModelNumber %><% } %>
+                  <% if (si.Manufacturer) { %> / <%= si.Manufacturer %><% } %>
+                  <% if (si.StockLocationName) { %> [<%= si.StockLocationName %>]<% } %>
+                </option>
+                <% }) %>
+              </select>
+              <div class="mb-2">
+                <textarea name="installNotes" class="form-control form-control-sm" rows="2"
+                          placeholder="Install notes (optional)"></textarea>
+              </div>
+              <button type="submit" class="btn btn-sm btn-primary">
+                <i class="bi bi-box-arrow-in-down-right me-1"></i>Install Selected Item
+              </button>
+            </form>
+            <% } %>
+
+            <!-- Bulk / FRU items -->
+            <% if (bulkItems.length > 0) { %>
+            <h6 class="text-muted small text-uppercase mb-2">Bulk / FRU Items</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Item</th>
+                    <th class="text-center">Available</th>
+                    <th>Pull From / Qty / Install</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% bulkItems.forEach(bi => { %>
+                  <% var biStock = (stockByItem && stockByItem[bi.ItemID]) ? stockByItem[bi.ItemID] : []; %>
+                  <tr>
+                    <td>
+                      <div class="fw-semibold small"><%= bi.ModelNumber || '(no model)' %></div>
+                      <% if (bi.Manufacturer) { %><div class="small text-muted"><%= bi.Manufacturer %></div><% } %>
+                      <% if (bi.CategoryName) { %><span class="badge bg-light text-dark border small"><%= bi.CategoryName %></span><% } %>
+                    </td>
+                    <td class="text-center">
+                      <span class="badge <%= bi.QuantityAvailable > 0 ? 'bg-success' : 'bg-secondary' %>">
+                        <%= bi.QuantityAvailable %> / <%= bi.QuantityTotal %>
+                      </span>
+                    </td>
+                    <td>
+                      <form method="POST" action="/sites/<%= site.SiteID %>/inventory/install"
+                            class="d-flex gap-2 align-items-center flex-wrap">
+                        <input type="hidden" name="mode" value="existing" />
+                        <input type="hidden" name="itemID" value="<%= bi.ItemID %>" />
+                        <select name="pulledFrom" class="form-select form-select-sm" style="min-width:170px">
+                          <option value="">— Unallocated —</option>
+                          <% biStock.forEach(function(s) { %>
+                            <% if (s.LocationID) { %>
+                              <option value="location:<%= s.LocationID %>">
+                                <%= s.LocationName %> (<%= s.Quantity %> avail)
+                              </option>
+                            <% } else if (s.UserID) { %>
+                              <option value="user:<%= s.UserID %>">
+                                <%= s.UserName %> (<%= s.Quantity %> avail)
+                              </option>
+                            <% } %>
+                          <% }); %>
+                        </select>
+                        <input type="number" name="quantity" class="form-control form-control-sm"
+                               value="1" min="1" max="<%= bi.QuantityAvailable %>"
+                               style="width:70px" required />
+                        <button type="submit" class="btn btn-sm btn-primary"
+                                <%= bi.QuantityAvailable < 1 ? 'disabled' : '' %>>
+                          Install
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <% } %>
+
+            <% } %>
+          </div>
+
+          <!-- Tab: Create New Item & Install -->
+          <div class="tab-pane fade" id="tabNew">
+            <form method="POST" action="/sites/<%= site.SiteID %>/inventory/install">
+              <input type="hidden" name="mode" value="new" />
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">Serial Number <span class="text-danger">*</span></label>
+                  <input type="text" name="serialNumber" class="form-control" required maxlength="100" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Model Number</label>
+                  <input type="text" name="modelNumber" class="form-control" maxlength="100" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Manufacturer</label>
+                  <input type="text" name="manufacturer" class="form-control" maxlength="150" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Category</label>
+                  <select name="categoryID" class="form-select">
+                    <option value="">— None —</option>
+                    <% categories.forEach(cat => { %>
+                    <option value="<%= cat.CategoryID %>"><%= cat.CategoryName %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Purchase Date</label>
+                  <input type="date" name="purchaseDate" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Warranty Expires</label>
+                  <input type="date" name="warrantyExpires" class="form-control" />
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Install Notes</label>
+                  <textarea name="installNotes" class="form-control" rows="2" placeholder="Optional notes about this installation"></textarea>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary mt-3">
+                <i class="bi bi-plus-circle me-1"></i>Create & Install
+              </button>
+            </form>
+          </div>
+
+        </div><!-- /.tab-content -->
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<script>
+  // Activate the correct tab if the URL hash matches
+  (function () {
+    const hash = window.location.hash;
+    if (hash) {
+      const tab = document.querySelector(`[href="${hash}"]`);
+      if (tab) {
+        new bootstrap.Tab(tab).show();
+      }
+    }
+  })();
+
+  // Filter in-stock items list
+  const stockSearch = document.getElementById('stockSearch');
+  if (stockSearch) {
+    stockSearch.addEventListener('input', function () {
+      const q = this.value.toLowerCase();
+      document.querySelectorAll('#stockSelect option').forEach(opt => {
+        opt.hidden = q.length > 0 && !opt.dataset.search.includes(q);
+      });
+      // Deselect hidden option if it's currently selected
+      const sel = document.getElementById('stockSelect');
+      if (sel.selectedOptions.length && sel.selectedOptions[0].hidden) {
+        sel.value = '';
+      }
+    });
+  }
+</script>

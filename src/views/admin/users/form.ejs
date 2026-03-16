@@ -1,0 +1,72 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">
+    <i class="bi bi-person-plus me-2"></i><%= editUser ? 'Edit User' : 'New User' %>
+  </h1>
+  <a href="/admin/users" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form action="<%= editUser ? '/admin/users/' + editUser.UserID : '/admin/users' %>" method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Username <span class="text-danger">*</span></label>
+          <input type="text" name="username" class="form-control"
+                 value="<%= editUser ? editUser.Username : '' %>"
+                 <%= editUser ? 'readonly' : 'required' %> maxlength="100" />
+          <% if (editUser) { %><div class="form-text">Username cannot be changed.</div><% } %>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Display Name <span class="text-danger">*</span></label>
+          <input type="text" name="displayName" class="form-control"
+                 value="<%= editUser ? editUser.DisplayName : '' %>" required maxlength="150" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control"
+                 value="<%= editUser ? (editUser.Email || '') : '' %>" maxlength="255" />
+        </div>
+        <% if (!editUser) { %>
+        <div class="col-md-6">
+          <label class="form-label">Auth Provider</label>
+          <select name="authProvider" class="form-select" id="authProviderSelect">
+            <option value="local">Local (username + password)</option>
+          </select>
+        </div>
+        <div class="col-md-6" id="passwordField">
+          <label class="form-label">Password <span class="text-danger">*</span></label>
+          <input type="password" name="password" class="form-control" autocomplete="new-password" minlength="8" />
+          <div class="form-text">Minimum 8 characters.</div>
+        </div>
+        <% } else { %>
+        <div class="col-md-6">
+          <label class="form-label">New Password</label>
+          <input type="password" name="newPassword" class="form-control" autocomplete="new-password" minlength="8" />
+          <div class="form-text">Leave blank to keep existing password. Only applies to local accounts.</div>
+        </div>
+        <% } %>
+        <div class="col-12">
+          <label class="form-label">Roles</label>
+          <div class="d-flex flex-wrap gap-3">
+            <% roles.forEach(r => { %>
+              <div class="form-check">
+                <input type="checkbox" name="roles" value="<%= r.RoleName %>"
+                       id="role_<%= r.RoleID %>" class="form-check-input"
+                       <%= editUser && editUser.roles && editUser.roles.includes(r.RoleName) ? 'checked' : '' %> />
+                <label class="form-check-label" for="role_<%= r.RoleID %>">
+                  <%= r.RoleName %>
+                  <% if (r.Description) { %><span class="text-muted small">— <%= r.Description %></span><% } %>
+                </label>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-2"></i><%= editUser ? 'Save Changes' : 'Create User' %></button>
+        <a href="/admin/users" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>

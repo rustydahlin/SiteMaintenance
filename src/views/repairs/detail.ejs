@@ -1,0 +1,216 @@
+<%
+  const isAdminUser = user && user.roles && user.roles.includes('Admin');
+  const isClosed    = !!repair.ReceivedDate;
+
+  function statusBadge() {
+    if (isClosed) return '<span class="badge bg-success">Closed</span>';
+    const now = new Date();
+    const fu  = repair.FollowUpDate ? new Date(repair.FollowUpDate) : null;
+    if (fu && fu <= now) return '<span class="badge bg-danger">Follow-Up Due</span>';
+    return '<span class="badge bg-warning text-dark">Open</span>';
+  }
+%>
+
+<!-- Back link -->
+<a href="/repairs" class="text-decoration-none text-muted small">
+  <i class="bi bi-arrow-left me-1"></i>Back to Repairs
+</a>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-start mt-3 mb-4 flex-wrap gap-2">
+  <div>
+    <h1 class="h2 mb-1">
+      <i class="bi bi-wrench-adjustable me-2"></i>Repair — <%= repair.SerialNumber %>
+    </h1>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <%- statusBadge() %>
+      <% if (repair.RMANumber) { %>
+        <span class="badge bg-light text-dark border">RMA: <%= repair.RMANumber %></span>
+      <% } %>
+      <a href="/inventory/<%= repair.ItemID %>" class="small text-decoration-none text-muted">
+        <i class="bi bi-box-seam me-1"></i><%= repair.SerialNumber %>
+        <% if (repair.ModelNumber) { %>(<%=repair.ModelNumber%>)<% } %>
+      </a>
+    </div>
+  </div>
+  <% if (isAdminUser) { %>
+  <div class="d-flex gap-2">
+    <a href="/repairs/<%= repair.RepairID %>/edit" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-pencil me-1"></i>Edit
+    </a>
+    <% if (!isClosed) { %>
+      <button class="btn btn-sm btn-success" type="button"
+              data-bs-toggle="collapse" data-bs-target="#receiveForm">
+        <i class="bi bi-box-arrow-in-down me-1"></i>Receive Back
+      </button>
+    <% } %>
+  </div>
+  <% } %>
+</div>
+
+<div class="row g-3">
+
+  <!-- Left: details -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header small fw-semibold">
+        <i class="bi bi-file-earmark-text me-1"></i>Repair Details
+      </div>
+      <div class="card-body small">
+        <dl class="row mb-0">
+          <dt class="col-sm-5 text-muted">Status</dt>
+          <dd class="col-sm-7"><%- statusBadge() %></dd>
+
+          <dt class="col-sm-5 text-muted">Item</dt>
+          <dd class="col-sm-7">
+            <a href="/inventory/<%= repair.ItemID %>" class="text-decoration-none">
+              <%= repair.SerialNumber %>
+            </a>
+            <% if (repair.ModelNumber) { %>
+              <span class="text-muted"> — <%= repair.ModelNumber %></span>
+            <% } %>
+          </dd>
+
+          <dt class="col-sm-5 text-muted">Manufacturer</dt>
+          <dd class="col-sm-7"><%= repair.Manufacturer || '—' %></dd>
+
+          <dt class="col-sm-5 text-muted">RMA #</dt>
+          <dd class="col-sm-7"><%= repair.RMANumber || '—' %></dd>
+
+          <dt class="col-sm-5 text-muted">Sent Date</dt>
+          <dd class="col-sm-7 text-nowrap">
+            <%= repair.SentDate ? new Date(repair.SentDate).toLocaleDateString() : '—' %>
+          </dd>
+
+          <dt class="col-sm-5 text-muted">Sent By</dt>
+          <dd class="col-sm-7"><%= repair.SentByName || '—' %></dd>
+
+          <dt class="col-sm-5 text-muted">Mfr. Contact</dt>
+          <dd class="col-sm-7"><%= repair.ManufacturerContact || '—' %></dd>
+
+          <dt class="col-sm-5 text-muted">Expected Return</dt>
+          <dd class="col-sm-7 text-nowrap">
+            <%= repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate).toLocaleDateString() : '—' %>
+          </dd>
+
+          <dt class="col-sm-5 text-muted">Follow-Up Date</dt>
+          <dd class="col-sm-7 text-nowrap">
+            <%
+              const fu = repair.FollowUpDate ? new Date(repair.FollowUpDate) : null;
+              const fuOverdue = fu && fu <= new Date() && !isClosed;
+            %>
+            <% if (fu) { %>
+              <span class="<%= fuOverdue ? 'text-danger fw-semibold' : '' %>">
+                <%= fu.toLocaleDateString() %>
+                <% if (fuOverdue) { %><i class="bi bi-exclamation-triangle ms-1"></i><% } %>
+              </span>
+            <% } else { %>—<% } %>
+          </dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: reason + return info -->
+  <div class="col-md-6">
+    <div class="card mb-3">
+      <div class="card-header small fw-semibold">
+        <i class="bi bi-chat-text me-1"></i>Reason for Repair
+      </div>
+      <div class="card-body small" style="white-space: pre-wrap;"><%= repair.Reason || '—' %></div>
+    </div>
+
+    <% if (isClosed) { %>
+    <div class="card border-success">
+      <div class="card-header small fw-semibold text-success">
+        <i class="bi bi-check-circle me-1"></i>Return Information
+      </div>
+      <div class="card-body small">
+        <dl class="row mb-0">
+          <dt class="col-sm-5 text-muted">Received Date</dt>
+          <dd class="col-sm-7 text-nowrap">
+            <%= new Date(repair.ReceivedDate).toLocaleDateString() %>
+          </dd>
+
+          <dt class="col-sm-5 text-muted">Condition</dt>
+          <dd class="col-sm-7"><%= repair.ReturnCondition || '—' %></dd>
+
+          <dt class="col-sm-5 text-muted">Returned To</dt>
+          <dd class="col-sm-7"><%= repair.ReturnLocationName || '—' %></dd>
+
+          <% if (repair.ReturnNotes) { %>
+          <dt class="col-sm-5 text-muted">Notes</dt>
+          <dd class="col-sm-7" style="white-space:pre-wrap;"><%= repair.ReturnNotes %></dd>
+          <% } %>
+        </dl>
+      </div>
+    </div>
+    <% } %>
+  </div>
+
+</div><!-- /.row -->
+
+<!-- Receive Back collapse form -->
+<% if (isAdminUser && !isClosed) { %>
+<div class="collapse mt-4" id="receiveForm">
+  <div class="card border-success shadow-sm">
+    <div class="card-header small fw-semibold text-success">
+      <i class="bi bi-box-arrow-in-down me-1"></i>Receive Item Back
+    </div>
+    <div class="card-body">
+      <form method="POST" action="/repairs/<%= repair.RepairID %>/receive" novalidate>
+        <div class="row g-3">
+
+          <div class="col-md-3">
+            <label for="receivedDate" class="form-label">
+              Received Date <span class="text-danger">*</span>
+            </label>
+            <input type="date" id="receivedDate" name="receivedDate"
+                   class="form-control" required
+                   value="<%= new Date().toISOString().split('T')[0] %>" />
+          </div>
+
+          <div class="col-md-3">
+            <label for="returnCondition" class="form-label">Return Condition</label>
+            <select id="returnCondition" name="returnCondition" class="form-select">
+              <option value="">— Select —</option>
+              <option>Good</option>
+              <option>Fair</option>
+              <option>Damaged</option>
+              <option>Unrepairable</option>
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label for="stockLocationID" class="form-label">Return to Stock Location</label>
+            <select id="stockLocationID" name="stockLocationID" class="form-select">
+              <option value="">— Select Location —</option>
+              <% locations.forEach(l => { %>
+                <option value="<%= l.LocationID %>"><%= l.LocationName %></option>
+              <% }) %>
+            </select>
+          </div>
+
+          <div class="col-12">
+            <label for="returnNotes" class="form-label">Notes</label>
+            <textarea id="returnNotes" name="returnNotes"
+                      class="form-control" rows="3" maxlength="2000"
+                      placeholder="Notes about the return condition, repairs made, etc."></textarea>
+          </div>
+
+          <div class="col-12">
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-check-circle me-1"></i>Mark Received
+            </button>
+            <button type="button" class="btn btn-outline-secondary ms-2"
+                    data-bs-toggle="collapse" data-bs-target="#receiveForm">
+              Cancel
+            </button>
+          </div>
+
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<% } %>

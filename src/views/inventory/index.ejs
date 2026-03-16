@@ -1,0 +1,155 @@
+<%
+  function statusBadge(statusName) {
+    const map = {
+      'In-Stock':   'bg-success',
+      'Deployed':   'bg-primary',
+      'Checked-Out':'bg-warning text-dark',
+      'In-Repair':  'bg-danger',
+      'Retired':    'bg-secondary',
+    };
+    const cls = map[statusName] || 'bg-secondary';
+    return `<span class="badge ${cls}">${statusName || '—'}</span>`;
+  }
+
+  function warrantyBadge(dateStr) {
+    if (!dateStr) return '<span class="badge bg-secondary">N/A</span>';
+    const now = new Date();
+    const exp = new Date(dateStr);
+    const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0)   return '<span class="badge bg-danger">Expired</span>';
+    if (daysLeft <= 90) return '<span class="badge bg-warning text-dark">Expiring Soon</span>';
+    return '<span class="badge bg-success">In Warranty</span>';
+  }
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-box-seam me-2"></i>Inventory</h1>
+  <% if (user && user.roles && user.roles.includes('Admin')) { %>
+    <a href="/inventory/new" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Add Item
+    </a>
+  <% } %>
+</div>
+
+<!-- Filter form -->
+<div class="card mb-3 shadow-sm">
+  <div class="card-body py-2">
+    <form method="GET" action="/inventory" class="row g-2 align-items-end">
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label small mb-1">Search</label>
+        <input type="text" name="search" class="form-control form-control-sm"
+               placeholder="Serial #, model, manufacturer…"
+               value="<%= typeof filters !== 'undefined' && filters.search ? filters.search : '' %>" />
+      </div>
+      <div class="col-sm-3 col-lg-2">
+        <label class="form-label small mb-1">Category</label>
+        <select name="categoryID" class="form-select form-select-sm">
+          <option value="">All Categories</option>
+          <% categories.forEach(c => { %>
+            <option value="<%= c.CategoryID %>"
+              <%= (typeof filters !== 'undefined' && filters.categoryID == c.CategoryID) ? 'selected' : '' %>>
+              <%= c.CategoryName %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-sm-3 col-lg-2">
+        <label class="form-label small mb-1">Status</label>
+        <select name="statusID" class="form-select form-select-sm">
+          <option value="">All Statuses</option>
+          <% statuses.forEach(s => { %>
+            <option value="<%= s.StatusID %>"
+              <%= (typeof filters !== 'undefined' && filters.statusID == s.StatusID) ? 'selected' : '' %>>
+              <%= s.StatusName %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-sm-3 col-lg-2">
+        <label class="form-label small mb-1">Location</label>
+        <select name="locationID" class="form-select form-select-sm">
+          <option value="">All Locations</option>
+          <% locations.forEach(l => { %>
+            <option value="<%= l.LocationID %>"
+              <%= (typeof filters !== 'undefined' && filters.locationID == l.LocationID) ? 'selected' : '' %>>
+              <%= l.LocationName %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-search me-1"></i>Filter
+        </button>
+        <a href="/inventory" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Results -->
+<% if (items.length === 0) { %>
+  <div class="alert alert-info">No inventory items found matching your filters.</div>
+<% } else { %>
+<div class="table-responsive">
+  <table class="table table-hover table-sm align-middle mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>Item</th>
+        <th>Category</th>
+        <th>Status</th>
+        <th class="text-center">In Stock</th>
+        <th>Location / Assigned To</th>
+        <th>Warranty</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% items.forEach(item => { %>
+      <tr>
+        <td>
+          <a href="/inventory/<%= item.ItemID %>" class="fw-semibold text-decoration-none">
+            <% if (item.TrackingType === 'bulk') { %>
+              <%= item.ModelNumber || item.Manufacturer || ('Item #' + item.ItemID) %>
+            <% } else { %>
+              <%= item.SerialNumber || ('Item #' + item.ItemID) %>
+            <% } %>
+          </a>
+          <% if (item.TrackingType === 'bulk') { %>
+            <span class="badge bg-info text-dark ms-1 small">FRU</span>
+            <% if (item.ModelNumber && item.Manufacturer) { %>
+              <div class="small text-muted"><%= item.Manufacturer %></div>
+            <% } %>
+          <% } else { %>
+            <% if (item.ModelNumber) { %><div class="small text-muted"><%= item.ModelNumber %><% if (item.Manufacturer) { %> / <%= item.Manufacturer %><% } %></div><% } %>
+          <% } %>
+        </td>
+        <td class="small"><%= item.CategoryName || '—' %></td>
+        <td><%- statusBadge(item.StatusName) %></td>
+        <td class="text-center small">
+          <% if (item.TrackingType === 'bulk') { %>
+            <span class="fw-semibold"><%= item.QuantityAvailable %></span>
+            <span class="text-muted">/ <%= item.QuantityTotal %></span>
+          <% } else if (item.StatusName === 'In-Stock') { %>
+            <span class="badge bg-success">1</span>
+          <% } else { %>
+            <span class="text-muted">—</span>
+          <% } %>
+        </td>
+        <td class="small text-muted">
+          <%= item.StockLocationName || item.AssignedToUserName || '—' %>
+        </td>
+        <td><%- warrantyBadge(item.WarrantyExpires) %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+<div class="d-flex justify-content-between align-items-center mt-3">
+  <small class="text-muted">
+    Showing <%= items.length %> of <%= pagination.total %> item<%= pagination.total !== 1 ? 's' : '' %>
+  </small>
+  <%- include('../partials/pagination') %>
+</div>
+<% } %>

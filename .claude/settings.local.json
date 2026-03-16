@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /c/SiteMaintenance/*.json /c/SiteMaintenance/*.js /c/SiteMaintenance/.env*)",
+      "Bash(while read:*)",
+      "Bash(do sed:*)",
+      "Bash(done)",
+      "Bash(node -e \":*)",
+      "Bash(for f:*)",
+      "Bash(do node:*)",
+      "Bash(grep -v \"^$\")",
+      "Bash(npm show:*)",
+      "Bash(python3 -c \"import sys,json; v=json.load\\(sys.stdin\\); print\\([x for x in v if x.startswith\\(''''11''''\\)]\\)\")",
+      "Bash(node -e \"const d=require\\(''''fs''''\\).readFileSync\\(''''/dev/stdin'''',''''utf8''''\\); const v=JSON.parse\\(d\\); console.log\\(v.filter\\(x=>x.startsWith\\(''''11''''\\) || x.startsWith\\(''''12''''\\)\\).slice\\(-10\\).join\\(''''\\\\n''''\\)\\)\")",
+      "Bash(npm install:*)",
+      "Bash(npm audit:*)",
+      "Bash(node -e \"const s = require\\(''fs''\\).readFileSync\\(''C:/SiteMaintenance/src/node_modules/connect-mssql-v2/dist/src/store.js'',''utf8''\\); console.log\\(s.slice\\(0,2000\\)\\)\")",
+      "Bash(node -e \"const s = require\\(''fs''\\).readFileSync\\(''C:/SiteMaintenance/src/node_modules/connect-mssql-v2/dist/src/store.js'',''utf8''\\); console.log\\(s.slice\\(2000,3500\\)\\)\")",
+      "Bash(node -e \"const s = require\\(''fs''\\).readFileSync\\(''C:/SiteMaintenance/src/node_modules/connect-mssql-v2/dist/src/store.js'',''utf8''\\); const m = s.match\\(/SELECT.*?FROM|INSERT.*?INTO|UPDATE.*?SET|DELETE.*?FROM/g\\); console.log\\(m ? m.join\\(''\\\\n''\\) : ''none''\\)\")",
+      "Bash(node -e \"const s = require\\(''fs''\\).readFileSync\\(''C:/SiteMaintenance/src/node_modules/connect-mssql-v2/dist/src/store.js'',''utf8''\\); const m = s.match\\(/\\\\`[^$][^]+?\\\\`/g\\); if\\(m\\) m.forEach\\(q => console.log\\(q.trim\\(\\).slice\\(0,300\\), ''\\\\n---''\\)\\)\")",
+      "Bash(node -e \"const b = require\\(''C:/SiteMaintenance/src/node_modules/bcryptjs''\\); b.compare\\(''Admin@1234'', ''$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/lek4X5eXm5hSy.q3C''\\).then\\(r => console.log\\(''match:'', r\\)\\)\")",
+      "Bash(node -e \"const b = require\\(''C:/SiteMaintenance/src/node_modules/bcryptjs''\\); b.hash\\(''Admin@1234'', 12\\).then\\(h => console.log\\(h\\)\\)\")",
+      "Bash(node --check \"c:/SiteMaintenance/src/models/inventoryModel.js\")",
+      "Bash(node --check \"c:/SiteMaintenance/src/models/siteInventoryModel.js\")",
+      "Bash(node --check \"c:/SiteMaintenance/src/routes/inventoryRoutes.js\")",
+      "Bash(node --check \"c:/SiteMaintenance/src/routes/siteRoutes.js\")"
+    ]
+  }
+}

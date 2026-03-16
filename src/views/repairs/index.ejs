@@ -1,0 +1,109 @@
+<%
+  function statusBadge(repair) {
+    if (repair.ReceivedDate) return '<span class="badge bg-success">Closed</span>';
+    const now = new Date();
+    const fu  = repair.FollowUpDate ? new Date(repair.FollowUpDate) : null;
+    if (fu && fu <= now) return '<span class="badge bg-danger">Follow-Up Due</span>';
+    return '<span class="badge bg-warning text-dark">Open</span>';
+  }
+
+  function daysOpen(sentDate) {
+    if (!sentDate) return '—';
+    const days = Math.ceil((new Date() - new Date(sentDate)) / (1000 * 60 * 60 * 24));
+    return days + 'd';
+  }
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-wrench-adjustable me-2"></i>Repairs & RMAs</h1>
+  <% if (user && user.roles && user.roles.includes('Admin')) { %>
+    <a href="/repairs/new" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>New Repair
+    </a>
+  <% } %>
+</div>
+
+<!-- Status tabs -->
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link <%= filters.status === 'open' ? 'active' : '' %>"
+       href="/repairs?status=open">Open</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link <%= filters.status === 'all' ? 'active' : '' %>"
+       href="/repairs?status=all">All</a>
+  </li>
+</ul>
+
+<% if (repairs.length === 0) { %>
+  <div class="alert alert-info">
+    No <%= filters.status === 'open' ? 'open' : '' %> repairs found.
+  </div>
+<% } else { %>
+<div class="table-responsive">
+  <table class="table table-hover table-sm align-middle mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>Serial Number</th>
+        <th>Model</th>
+        <th>Manufacturer</th>
+        <th>Sent Date</th>
+        <th>RMA #</th>
+        <th>Expected Return</th>
+        <th>Follow-Up</th>
+        <th>Status</th>
+        <th>Days Open</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% repairs.forEach(repair => { %>
+      <tr>
+        <td>
+          <a href="/inventory/<%= repair.ItemID %>" class="text-decoration-none fw-semibold">
+            <%= repair.SerialNumber %>
+          </a>
+        </td>
+        <td class="small text-muted"><%= repair.ModelNumber || '—' %></td>
+        <td class="small text-muted"><%= repair.Manufacturer || '—' %></td>
+        <td class="small text-muted text-nowrap">
+          <%= repair.SentDate ? new Date(repair.SentDate).toLocaleDateString() : '—' %>
+        </td>
+        <td class="small"><%= repair.RMANumber || '—' %></td>
+        <td class="small text-muted text-nowrap">
+          <%= repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate).toLocaleDateString() : '—' %>
+        </td>
+        <td class="small text-nowrap">
+          <%
+            const fu = repair.FollowUpDate ? new Date(repair.FollowUpDate) : null;
+            const fuOverdue = fu && fu <= new Date() && !repair.ReceivedDate;
+          %>
+          <% if (fu) { %>
+            <span class="<%= fuOverdue ? 'text-danger fw-semibold' : 'text-muted' %>">
+              <%= fu.toLocaleDateString() %>
+            </span>
+          <% } else { %>
+            <span class="text-muted">—</span>
+          <% } %>
+        </td>
+        <td><%- statusBadge(repair) %></td>
+        <td class="small text-muted">
+          <% if (!repair.ReceivedDate) { %>
+            <%= daysOpen(repair.SentDate) %>
+          <% } else { %>
+            <span class="text-success">Closed</span>
+          <% } %>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+<div class="d-flex justify-content-between align-items-center mt-3">
+  <small class="text-muted">
+    Showing <%= repairs.length %> of <%= pagination.total %> record<%= pagination.total !== 1 ? 's' : '' %>
+  </small>
+  <%- include('../partials/pagination') %>
+</div>
+<% } %>

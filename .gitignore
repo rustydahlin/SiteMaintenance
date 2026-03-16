@@ -1,3 +1,9 @@
+# Environment / secrets — NEVER commit these
+src/.env
+
+# Application log files
+src/logs/
+
 # Logs
 logs
 *.log

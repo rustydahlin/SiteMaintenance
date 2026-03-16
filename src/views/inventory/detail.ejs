@@ -1,0 +1,398 @@
+<%
+  const isAdminUser  = user && user.roles && user.roles.includes('Admin');
+  const canWriteUser = user && user.roles &&
+    (user.roles.includes('Admin') || user.roles.includes('Technician') || user.roles.includes('Contractor'));
+
+  function statusBadge(statusName) {
+    const map = {
+      'In-Stock':    'bg-success',
+      'Deployed':    'bg-primary',
+      'Checked-Out': 'bg-warning text-dark',
+      'In-Repair':   'bg-danger',
+      'Retired':     'bg-secondary',
+    };
+    const cls = map[statusName] || 'bg-secondary';
+    return `<span class="badge ${cls}">${statusName || '—'}</span>`;
+  }
+
+  function warrantyBadge(dateStr) {
+    if (!dateStr) return '<span class="badge bg-secondary">N/A</span>';
+    const now = new Date();
+    const exp = new Date(dateStr);
+    const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0)   return '<span class="badge bg-danger">Expired</span>';
+    if (daysLeft <= 90) return '<span class="badge bg-warning text-dark">Expiring Soon</span>';
+    return '<span class="badge bg-success">In Warranty</span>';
+  }
+%>
+
+<!-- Page header -->
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h2 mb-1">
+      <i class="bi bi-box-seam me-2"></i>
+      <% if (item.TrackingType === 'bulk') { %>
+        <%= item.ModelNumber || item.Manufacturer || ('Item #' + item.ItemID) %>
+        <span class="badge bg-info text-dark fs-6 ms-1">FRU / Bulk</span>
+      <% } else { %>
+        <%= item.SerialNumber %>
+      <% } %>
+    </h1>
+    <div class="d-flex gap-2 flex-wrap">
+      <%- statusBadge(item.StatusName) %>
+      <%- warrantyBadge(item.WarrantyExpires) %>
+      <% if (item.CategoryName) { %>
+        <span class="badge bg-light text-dark border"><%= item.CategoryName %></span>
+      <% } %>
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <% if (isAdminUser) { %>
+      <a href="/inventory/<%= item.ItemID %>/edit" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-pencil me-1"></i>Edit
+      </a>
+      <form method="POST" action="/inventory/<%= item.ItemID %>/delete"
+            onsubmit="return confirm('Delete this item? This cannot be undone.')">
+        <button type="submit" class="btn btn-sm btn-outline-danger">
+          <i class="bi bi-trash me-1"></i>Delete
+        </button>
+      </form>
+      <% if (item.StatusName === 'In-Stock') { %>
+        <a href="/inventory/<%= item.ItemID %>/checkout" class="btn btn-sm btn-outline-warning">
+          <i class="bi bi-box-arrow-right me-1"></i>Check Out
+        </a>
+      <% } %>
+      <% if (item.StatusName === 'Checked-Out') { %>
+        <form method="POST" action="/inventory/<%= item.ItemID %>/checkin"
+              onsubmit="return confirm('Check this item back in to stock?')">
+          <button type="submit" class="btn btn-sm btn-outline-success">
+            <i class="bi bi-box-arrow-in-left me-1"></i>Check In
+          </button>
+        </form>
+      <% } %>
+    <% } %>
+  </div>
+</div>
+
+<a href="/inventory" class="text-decoration-none text-muted small">
+  <i class="bi bi-arrow-left me-1"></i>Back to Inventory
+</a>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mt-3" id="invTab" role="tablist">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#overview">Overview</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#history">History</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#repairs">Repairs</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#docs">Documents</a></li>
+</ul>
+
+<div class="tab-content border border-top-0 rounded-bottom p-3 bg-white shadow-sm">
+
+  <!-- ── Overview ─────────────────────────────────────────────────────────── -->
+  <div class="tab-pane fade show active" id="overview">
+    <div class="row g-3 mt-1">
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header small fw-semibold">
+            <i class="bi bi-tag me-1"></i>Item Details
+          </div>
+          <div class="card-body small">
+            <dl class="row mb-0">
+              <dt class="col-sm-5 text-muted">Serial Number</dt>
+              <dd class="col-sm-7 fw-semibold"><%= item.SerialNumber %></dd>
+
+              <dt class="col-sm-5 text-muted">Model Number</dt>
+              <dd class="col-sm-7"><%= item.ModelNumber || '—' %></dd>
+
+              <dt class="col-sm-5 text-muted">Manufacturer</dt>
+              <dd class="col-sm-7"><%= item.Manufacturer || '—' %></dd>
+
+              <dt class="col-sm-5 text-muted">Category</dt>
+              <dd class="col-sm-7"><%= item.CategoryName || '—' %></dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header small fw-semibold">
+            <i class="bi bi-info-circle me-1"></i>Status & Location
+          </div>
+          <div class="card-body small">
+            <dl class="row mb-0">
+              <dt class="col-sm-5 text-muted">Status</dt>
+              <dd class="col-sm-7"><%- statusBadge(item.StatusName) %></dd>
+
+              <dt class="col-sm-5 text-muted">Location</dt>
+              <dd class="col-sm-7"><%= item.LocationName || '—' %></dd>
+
+              <dt class="col-sm-5 text-muted">Assigned To</dt>
+              <dd class="col-sm-7"><%= item.AssignedToName || '—' %></dd>
+
+              <dt class="col-sm-5 text-muted">Warranty</dt>
+              <dd class="col-sm-7">
+                <%- warrantyBadge(item.WarrantyExpires) %>
+                <% if (item.WarrantyExpires) { %>
+                  <span class="ms-1 text-muted">(<%= new Date(item.WarrantyExpires).toLocaleDateString() %>)</span>
+                <% } %>
+              </dd>
+
+              <dt class="col-sm-5 text-muted">Purchase Date</dt>
+              <dd class="col-sm-7">
+                <%= item.PurchaseDate ? new Date(item.PurchaseDate).toLocaleDateString() : '—' %>
+              </dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      <% if (item.Description || item.Notes) { %>
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header small fw-semibold">Notes</div>
+          <div class="card-body small">
+            <% if (item.Description) { %>
+              <p class="mb-1" style="white-space:pre-wrap;"><%= item.Description %></p>
+            <% } %>
+            <% if (item.Notes) { %>
+              <p class="mb-0 text-muted" style="white-space:pre-wrap;"><%= item.Notes %></p>
+            <% } %>
+          </div>
+        </div>
+      </div>
+      <% } %>
+
+      <!-- Stock Distribution (bulk items only) -->
+      <% if (item.TrackingType === 'bulk') { %>
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header small fw-semibold d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-diagram-3 me-1"></i>Stock Distribution</span>
+            <span class="text-muted fw-normal">
+              Total: <%= item.QuantityTotal %> &nbsp;|&nbsp;
+              Available: <%= item.QuantityAvailable %>
+            </span>
+          </div>
+          <div class="card-body">
+            <!-- Current distribution table -->
+            <% if (stockDistribution && stockDistribution.length > 0) { %>
+            <div class="table-responsive mb-3">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr><th>Location / Person</th><th class="text-center">Qty</th><th>Notes</th><% if (isAdminUser) { %><th></th><% } %></tr>
+                </thead>
+                <tbody>
+                  <% stockDistribution.forEach(row => { %>
+                  <tr>
+                    <td class="small">
+                      <% if (row.LocationName) { %>
+                        <i class="bi bi-geo-alt text-muted me-1"></i><%= row.LocationName %>
+                      <% } else { %>
+                        <i class="bi bi-person text-muted me-1"></i><%= row.UserDisplayName %>
+                      <% } %>
+                    </td>
+                    <td class="text-center fw-semibold"><%= row.Quantity %></td>
+                    <td class="small text-muted"><%= row.Notes || '—' %></td>
+                    <% if (isAdminUser) { %>
+                    <td>
+                      <form method="POST" action="/inventory/<%= item.ItemID %>/stock/<%= row.StockID %>/delete"
+                            onsubmit="return confirm('Remove this stock entry?')">
+                        <button type="submit" class="btn btn-sm btn-outline-danger py-0">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </form>
+                    </td>
+                    <% } %>
+                  </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <% } else { %>
+              <p class="text-muted small mb-3">No stock locations assigned yet. Add entries below to track where units are.</p>
+            <% } %>
+
+            <!-- Add / update stock entry form -->
+            <% if (isAdminUser) { %>
+            <form method="POST" action="/inventory/<%= item.ItemID %>/stock" class="border rounded p-3 bg-light">
+              <div class="row g-2 align-items-end">
+                <div class="col-sm-3">
+                  <label class="form-label small mb-1">Holder Type</label>
+                  <select name="holderType" id="holderType" class="form-select form-select-sm">
+                    <option value="location">Stock Location</option>
+                    <option value="user">Person</option>
+                  </select>
+                </div>
+                <div class="col-sm-3" id="stockLocGroup">
+                  <label class="form-label small mb-1">Location</label>
+                  <select name="locationID" class="form-select form-select-sm">
+                    <option value="">— Select —</option>
+                    <% stockLocations.forEach(l => { %>
+                    <option value="<%= l.LocationID %>"><%= l.LocationName %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-sm-3" id="stockUserGroup" style="display:none">
+                  <label class="form-label small mb-1">Person</label>
+                  <select name="userID" class="form-select form-select-sm">
+                    <option value="">— Select —</option>
+                    <% allUsers.forEach(u => { %>
+                    <option value="<%= u.UserID %>"><%= u.DisplayName %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-sm-2">
+                  <label class="form-label small mb-1">Quantity</label>
+                  <input type="number" name="quantity" class="form-control form-control-sm" min="0" value="1" required />
+                </div>
+                <div class="col-sm-3">
+                  <label class="form-label small mb-1">Notes (optional)</label>
+                  <input type="text" name="notes" class="form-control form-control-sm" maxlength="255" />
+                </div>
+                <div class="col-auto">
+                  <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                </div>
+              </div>
+              <div class="form-text mt-1">Setting quantity to 0 on an existing entry will remove it from the list.</div>
+            </form>
+            <% } %>
+          </div>
+        </div>
+      </div>
+      <% } %>
+
+    </div>
+  </div>
+
+  <!-- ── History ───────────────────────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="history">
+    <h6 class="mt-2 mb-3">Combined Timeline</h6>
+
+    <%
+      // Merge and sort site history + possession history by date descending
+      const timeline = [];
+      if (siteHistory) siteHistory.forEach(h => timeline.push({ ...h, _kind: 'site' }));
+      if (possessionHistory) possessionHistory.forEach(h => timeline.push({ ...h, _kind: 'possession' }));
+      timeline.sort((a, b) => {
+        const da = new Date(a.StartDate || a.InstalledAt || a.CheckedOutAt || 0);
+        const db = new Date(b.StartDate || b.InstalledAt || b.CheckedOutAt || 0);
+        return db - da;
+      });
+    %>
+
+    <% if (timeline.length === 0) { %>
+      <p class="text-muted">No history on record for this item.</p>
+    <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Details</th>
+            <th>End Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% timeline.forEach(entry => { %>
+          <tr>
+            <% if (entry._kind === 'site') { %>
+              <td><span class="badge bg-primary">Site Install</span></td>
+              <td class="small text-muted text-nowrap">
+                <%= entry.InstalledAt ? new Date(entry.InstalledAt).toLocaleDateString() : '—' %>
+              </td>
+              <td class="small">
+                <a href="/sites/<%= entry.SiteID %>" class="text-decoration-none">
+                  <%= entry.SiteName || `Site #${entry.SiteID}` %>
+                </a>
+                <% if (entry.InstalledByName) { %>
+                  <span class="text-muted"> — by <%= entry.InstalledByName %></span>
+                <% } %>
+              </td>
+              <td class="small text-muted text-nowrap">
+                <%= entry.RemovedAt ? new Date(entry.RemovedAt).toLocaleDateString() : (entry.IsActive ? 'Present' : '—') %>
+              </td>
+            <% } else { %>
+              <td><span class="badge bg-warning text-dark">Checkout</span></td>
+              <td class="small text-muted text-nowrap">
+                <%= entry.CheckedOutAt ? new Date(entry.CheckedOutAt).toLocaleDateString() : '—' %>
+              </td>
+              <td class="small">
+                <%= entry.CheckedOutToName || `User #${entry.CheckedOutToUserID}` %>
+              </td>
+              <td class="small text-muted text-nowrap">
+                <%= entry.ReturnedAt ? new Date(entry.ReturnedAt).toLocaleDateString() : 'Still Out' %>
+              </td>
+            <% } %>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- ── Repairs ───────────────────────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="repairs">
+    <div class="d-flex justify-content-between align-items-center mt-2 mb-3">
+      <h6 class="mb-0">Repair / RMA Records</h6>
+      <% if (isAdminUser) { %>
+        <a href="/repairs/new?itemID=<%= item.ItemID %>" class="btn btn-sm btn-primary">
+          <i class="bi bi-plus-lg me-1"></i>New Repair
+        </a>
+      <% } %>
+    </div>
+
+    <% if (!item.repairs || item.repairs.length === 0) { %>
+      <p class="text-muted">No repair records for this item.</p>
+    <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Sent Date</th>
+            <th>RMA #</th>
+            <th>Reason</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% item.repairs.forEach(repair => { %>
+          <tr>
+            <td class="small text-muted text-nowrap">
+              <%= repair.SentDate ? new Date(repair.SentDate).toLocaleDateString() : '—' %>
+            </td>
+            <td class="small"><%= repair.RMANumber || '—' %></td>
+            <td class="small"><%= repair.Reason || '—' %></td>
+            <td>
+              <span class="badge <%= repair.ReceivedDate ? 'bg-success' : 'bg-warning text-dark' %>">
+                <%= repair.ReceivedDate ? 'Closed' : 'Open' %>
+              </span>
+            </td>
+            <td>
+              <a href="/repairs/<%= repair.RepairID %>" class="btn btn-sm btn-outline-secondary">View</a>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- ── Documents ─────────────────────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="docs">
+    <div class="mt-2">
+      <%- include('../partials/fileList', {
+        documents:  documents,
+        uploadUrl:  `/documents/upload`,
+        canUpload:  canWriteUser,
+        entityType: 'item',
+        entityId:   item.ItemID
+      }) %>
+    </div>
+  </div>
+
+</div><!-- /.tab-content -->

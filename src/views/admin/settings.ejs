@@ -1,0 +1,185 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-gear me-2"></i>Settings</h1>
+  <a href="/admin" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<form action="/admin/settings" method="POST">
+  <!-- OIDC / Entra ID -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-microsoft me-2"></i>OIDC / Entra ID Authentication</div>
+    <div class="card-body row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Enable OIDC Login</label>
+        <select name="oidc.enabled" class="form-select">
+          <option value="0" <%= settings['oidc.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+          <option value="1" <%= settings['oidc.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+        </select>
+      </div>
+      <div class="col-md-9">
+        <label class="form-label">Redirect URI</label>
+        <input type="text" name="oidc.redirectUri" class="form-control" value="<%= settings['oidc.redirectUri'] || '' %>" placeholder="https://yourapp.example.com/auth/oidc/callback" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Tenant ID</label>
+        <input type="text" name="oidc.tenantId" class="form-control" value="<%= settings['oidc.tenantId'] || '' %>" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Client ID</label>
+        <input type="text" name="oidc.clientId" class="form-control" value="<%= settings['oidc.clientId'] || '' %>" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Client Secret</label>
+        <input type="password" name="oidc.clientSecret" class="form-control" placeholder="<%= settings['oidc.clientSecret'] ? '••••••' : 'Not set' %>" autocomplete="new-password" />
+        <div class="form-text">Leave blank to keep existing secret.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LDAP -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-diagram-3 me-2"></i>LDAP / Active Directory Authentication</div>
+    <div class="card-body row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Enable LDAP Login</label>
+        <select name="ldap.enabled" class="form-select">
+          <option value="0" <%= settings['ldap.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+          <option value="1" <%= settings['ldap.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+        </select>
+      </div>
+      <div class="col-md-9">
+        <label class="form-label">LDAP URL</label>
+        <input type="text" name="ldap.url" class="form-control" value="<%= settings['ldap.url'] || '' %>" placeholder="ldap://dc.example.com:389" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Bind DN</label>
+        <input type="text" name="ldap.bindDn" class="form-control" value="<%= settings['ldap.bindDn'] || '' %>" placeholder="CN=svc-app,DC=example,DC=com" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Bind Password</label>
+        <input type="password" name="ldap.bindCredentials" class="form-control" placeholder="<%= settings['ldap.bindCredentials'] ? '••••••' : 'Not set' %>" autocomplete="new-password" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Search Base</label>
+        <input type="text" name="ldap.searchBase" class="form-control" value="<%= settings['ldap.searchBase'] || '' %>" placeholder="OU=Users,DC=example,DC=com" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Search Filter</label>
+        <input type="text" name="ldap.searchFilter" class="form-control" value="<%= settings['ldap.searchFilter'] || '' %>" placeholder="(sAMAccountName={{username}})" />
+      </div>
+      <div class="col-12">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="testLdapBtn">
+          <i class="bi bi-plug me-1"></i>Test LDAP Connection
+        </button>
+        <span id="ldapTestResult" class="ms-3 small"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Email -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-envelope me-2"></i>Email / SMTP Notifications</div>
+    <div class="card-body row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Enable Email</label>
+        <select name="email.enabled" class="form-select">
+          <option value="0" <%= settings['email.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+          <option value="1" <%= settings['email.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+        </select>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">SMTP Host</label>
+        <input type="text" name="email.host" class="form-control" value="<%= settings['email.host'] || '' %>" placeholder="smtp.office365.com" />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Port</label>
+        <input type="number" name="email.port" class="form-control" value="<%= settings['email.port'] || '587' %>" />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Use TLS</label>
+        <select name="email.secure" class="form-select">
+          <option value="none" <%= settings['email.secure'] === 'none' ? 'selected' : '' %>>None (port 25)</option>
+          <option value="0" <%= (!settings['email.secure'] || settings['email.secure'] === '0') ? 'selected' : '' %>>STARTTLS (port 587)</option>
+          <option value="1" <%= settings['email.secure'] === '1' ? 'selected' : '' %>>TLS/SSL (port 465)</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">SMTP Username</label>
+        <input type="text" name="email.user" class="form-control" value="<%= settings['email.user'] || '' %>" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">SMTP Password</label>
+        <input type="password" name="email.password" class="form-control" placeholder="<%= settings['email.password'] ? '••••••' : 'Not set' %>" autocomplete="new-password" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">From Address</label>
+        <input type="email" name="email.fromAddress" class="form-control" value="<%= settings['email.fromAddress'] || '' %>" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">From Name</label>
+        <input type="text" name="email.fromName" class="form-control" value="<%= settings['email.fromName'] || 'SiteMaintenance' %>" />
+      </div>
+      <div class="col-12">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="testEmailBtn">
+          <i class="bi bi-send me-1"></i>Send Test Email
+        </button>
+        <span id="emailTestResult" class="ms-3 small"></span>
+      </div>
+      <div class="col-12"><hr class="my-1" /><strong class="small text-muted">Reminder Thresholds</strong></div>
+      <div class="col-md-4">
+        <label class="form-label">PM Reminder (days before due)</label>
+        <input type="number" name="email.pmReminderDays" class="form-control" value="<%= settings['email.pmReminderDays'] || '14' %>" min="1" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Warranty Reminder (days before expiry)</label>
+        <input type="number" name="email.warrantyReminderDays" class="form-control" value="<%= settings['email.warrantyReminderDays'] || '30' %>" min="1" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Checkout Reminder (days before alert)</label>
+        <input type="number" name="email.checkoutReminderDays" class="form-control" value="<%= settings['email.checkoutReminderDays'] || '30' %>" min="1" />
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-2"></i>Save All Settings</button>
+    <a href="/admin" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+
+<script>
+document.getElementById('testEmailBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('testEmailBtn');
+  const result = document.getElementById('emailTestResult');
+  btn.disabled = true;
+  result.textContent = 'Sending...';
+  try {
+    const res = await fetch('/admin/settings/email/test', { method: 'POST' });
+    const data = await res.json();
+    result.textContent = data.message;
+    result.className = 'ms-3 small ' + (data.success ? 'text-success' : 'text-danger');
+  } catch (e) {
+    result.textContent = 'Request failed.';
+    result.className = 'ms-3 small text-danger';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('testLdapBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('testLdapBtn');
+  const result = document.getElementById('ldapTestResult');
+  btn.disabled = true;
+  result.textContent = 'Testing...';
+  try {
+    const res = await fetch('/admin/settings/ldap/test', { method: 'POST' });
+    const data = await res.json();
+    result.textContent = data.message;
+    result.className = 'ms-3 small ' + (data.success ? 'text-success' : 'text-danger');
+  } catch (e) {
+    result.textContent = 'Request failed.';
+    result.className = 'ms-3 small text-danger';
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>

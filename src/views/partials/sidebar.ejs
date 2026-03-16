@@ -1,0 +1,46 @@
+<% if (user) { %>
+<nav id="sidebar" class="col-md-2 col-lg-2 d-md-block bg-light sidebar collapse">
+  <div class="position-sticky pt-4">
+    <ul class="nav flex-column">
+      <li class="nav-item">
+        <a class="nav-link <%= currentPath === '/' ? 'active' : '' %>" href="/">
+          <i class="bi bi-speedometer2 me-2"></i>Dashboard
+        </a>
+      </li>
+
+      <li class="nav-item mt-2">
+        <span class="nav-link text-muted text-uppercase small fw-bold ps-3">Field</span>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link <%= currentPath.startsWith('/sites') ? 'active' : '' %>" href="/sites">
+          <i class="bi bi-building me-2"></i>Sites
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link <%= currentPath.startsWith('/inventory') ? 'active' : '' %>" href="/inventory">
+          <i class="bi bi-box-seam me-2"></i>Inventory
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link <%= currentPath.startsWith('/repairs') ? 'active' : '' %>" href="/repairs">
+          <i class="bi bi-wrench-adjustable me-2"></i>Repairs / RMA
+        </a>
+      </li>
+
+      <% if (user.roles && (user.roles.includes('Admin') || user.roles.includes('Technician'))) { %>
+      <li class="nav-item mt-2">
+        <span class="nav-link text-muted text-uppercase small fw-bold ps-3">Admin</span>
+      </li>
+      <% } %>
+
+      <% if (user.roles && user.roles.includes('Admin')) { %>
+      <li class="nav-item">
+        <a class="nav-link <%= currentPath.startsWith('/admin') ? 'active' : '' %>" href="/admin">
+          <i class="bi bi-sliders me-2"></i>Administration
+        </a>
+      </li>
+      <% } %>
+    </ul>
+  </div>
+</nav>
+<% } %>

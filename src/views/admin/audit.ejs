@@ -1,0 +1,114 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-journal-check me-2"></i>Audit Log</h1>
+  <a href="/admin" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<!-- Filters -->
+<form method="GET" class="card shadow-sm mb-4">
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-md-2">
+      <label class="form-label small">Table</label>
+      <input type="text" name="tableName" class="form-control form-control-sm" value="<%= filters.tableName || '' %>" placeholder="e.g. Sites" />
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">Action</label>
+      <input type="text" name="action" class="form-control form-control-sm" value="<%= filters.action || '' %>" placeholder="e.g. UPDATE" />
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small">User</label>
+      <select name="userID" class="form-select form-select-sm">
+        <option value="">All Users</option>
+        <% users.forEach(u => { %>
+          <option value="<%= u.UserID %>" <%= parseInt(filters.userID) === u.UserID ? 'selected' : '' %>><%= u.DisplayName %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">Date From</label>
+      <input type="date" name="dateFrom" class="form-control form-control-sm" value="<%= filters.dateFrom || '' %>" />
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">Date To</label>
+      <input type="date" name="dateTo" class="form-control form-control-sm" value="<%= filters.dateTo || '' %>" />
+    </div>
+    <div class="col-md-1">
+      <button type="submit" class="btn btn-primary btn-sm w-100">Filter</button>
+    </div>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between">
+    <span>Results: <%= total %></span>
+    <%- include('../partials/pagination') %>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Table</th>
+          <th>Record ID</th>
+          <th>Action</th>
+          <th>User</th>
+          <th>IP</th>
+          <th>Notes</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (rows.length === 0) { %>
+          <tr><td colspan="8" class="text-muted text-center py-3">No audit records found.</td></tr>
+        <% } %>
+        <% rows.forEach(row => { %>
+        <tr>
+          <td class="text-nowrap small"><%= new Date(row.ChangedAt).toLocaleString() %></td>
+          <td><span class="badge bg-light text-dark border"><%= row.TableName %></span></td>
+          <td class="text-muted small"><%= row.RecordID || '—' %></td>
+          <td>
+            <span class="badge <%=
+              row.Action === 'INSERT' ? 'bg-success' :
+              row.Action === 'DELETE' || row.Action === 'DEACTIVATE' ? 'bg-danger' :
+              row.Action === 'LOGIN'  ? 'bg-info text-dark' :
+              row.Action === 'LOGOUT' ? 'bg-secondary' :
+              'bg-warning text-dark'
+            %>"><%= row.Action %></span>
+          </td>
+          <td class="small"><%= row.ChangedByName || '<em class="text-muted">System</em>' %></td>
+          <td class="small text-muted"><%= row.IPAddress || '—' %></td>
+          <td class="small text-muted"><%= row.Notes || '' %></td>
+          <td>
+            <% if (row.OldValues || row.NewValues) { %>
+              <button class="btn btn-sm btn-outline-secondary py-0"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#detail-<%= row.AuditID %>">
+                <i class="bi bi-chevron-down"></i>
+              </button>
+            <% } %>
+          </td>
+        </tr>
+        <% if (row.OldValues || row.NewValues) { %>
+        <tr class="collapse" id="detail-<%= row.AuditID %>">
+          <td colspan="8" class="bg-light">
+            <div class="row g-2 p-2">
+              <% if (row.OldValues) { %>
+              <div class="col-md-6">
+                <div class="small text-muted fw-bold mb-1">Before</div>
+                <pre class="small mb-0" style="white-space:pre-wrap"><%= row.OldValues %></pre>
+              </div>
+              <% } %>
+              <% if (row.NewValues) { %>
+              <div class="col-md-6">
+                <div class="small text-muted fw-bold mb-1">After</div>
+                <pre class="small mb-0" style="white-space:pre-wrap"><%= row.NewValues %></pre>
+              </div>
+              <% } %>
+            </div>
+          </td>
+        </tr>
+        <% } %>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

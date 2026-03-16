@@ -1,0 +1,146 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">
+    <i class="bi bi-building me-2"></i>
+    <%= site ? `Edit Site — ${site.SiteName}` : 'New Site' %>
+  </h1>
+  <a href="<%= site ? `/sites/${site.SiteID}` : '/sites' %>" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Cancel
+  </a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="POST" action="<%= action %>" novalidate>
+
+      <div class="row g-3">
+
+        <!-- Site Name -->
+        <div class="col-md-6">
+          <label for="siteName" class="form-label">
+            Site Name <span class="text-danger">*</span>
+          </label>
+          <input type="text" id="siteName" name="siteName"
+                 class="form-control"
+                 value="<%= site ? site.SiteName : '' %>"
+                 maxlength="200" required />
+        </div>
+
+        <!-- Site Type -->
+        <div class="col-md-3">
+          <label for="siteTypeID" class="form-label">
+            Site Type <span class="text-danger">*</span>
+          </label>
+          <select id="siteTypeID" name="siteTypeID" class="form-select" required>
+            <option value="">— Select Type —</option>
+            <% siteTypes.forEach(t => { %>
+              <option value="<%= t.SiteTypeID %>"
+                <%= (site && site.SiteTypeID == t.SiteTypeID) ? 'selected' : '' %>>
+                <%= t.TypeName %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Status -->
+        <div class="col-md-3">
+          <label for="siteStatusID" class="form-label">
+            Status <span class="text-danger">*</span>
+          </label>
+          <select id="siteStatusID" name="siteStatusID" class="form-select" required>
+            <option value="">— Select Status —</option>
+            <% siteStatuses.forEach(s => { %>
+              <option value="<%= s.SiteStatusID %>"
+                <%= (site && site.SiteStatusID == s.SiteStatusID) ? 'selected' : '' %>>
+                <%= s.StatusName %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Address -->
+        <div class="col-md-6">
+          <label for="address" class="form-label">Address</label>
+          <input type="text" id="address" name="address"
+                 class="form-control"
+                 value="<%= site && site.Address ? site.Address : '' %>"
+                 maxlength="255" />
+        </div>
+
+        <!-- City -->
+        <div class="col-md-3">
+          <label for="city" class="form-label">City</label>
+          <input type="text" id="city" name="city"
+                 class="form-control"
+                 value="<%= site && site.City ? site.City : '' %>"
+                 maxlength="100" />
+        </div>
+
+        <!-- State -->
+        <div class="col-md-2">
+          <label for="state" class="form-label">State</label>
+          <input type="text" id="state" name="state"
+                 class="form-control"
+                 value="<%= site && site.State ? site.State : '' %>"
+                 maxlength="50" />
+        </div>
+
+        <!-- Zip -->
+        <div class="col-md-1">
+          <label for="zipCode" class="form-label">Zip</label>
+          <input type="text" id="zipCode" name="zipCode"
+                 class="form-control"
+                 value="<%= site && site.ZipCode ? site.ZipCode : '' %>"
+                 maxlength="20" />
+        </div>
+
+        <!-- Latitude -->
+        <div class="col-md-3">
+          <label for="latitude" class="form-label">Latitude</label>
+          <input type="number" id="latitude" name="latitude"
+                 class="form-control"
+                 value="<%= site && site.Latitude != null ? site.Latitude : '' %>"
+                 step="0.0000001" min="-90" max="90" />
+        </div>
+
+        <!-- Longitude -->
+        <div class="col-md-3">
+          <label for="longitude" class="form-label">Longitude</label>
+          <input type="number" id="longitude" name="longitude"
+                 class="form-control"
+                 value="<%= site && site.Longitude != null ? site.Longitude : '' %>"
+                 step="0.0000001" min="-180" max="180" />
+        </div>
+
+        <!-- Warranty Expires -->
+        <div class="col-md-3">
+          <label for="warrantyExpires" class="form-label">Warranty Expires</label>
+          <input type="date" id="warrantyExpires" name="warrantyExpires"
+                 class="form-control"
+                 value="<%= site && site.WarrantyExpires ? new Date(site.WarrantyExpires).toISOString().split('T')[0] : '' %>" />
+        </div>
+
+        <!-- Description -->
+        <div class="col-12">
+          <label for="description" class="form-label">Description</label>
+          <textarea id="description" name="description"
+                    class="form-control" rows="4"
+                    maxlength="4000"><%= site && site.Description ? site.Description : '' %></textarea>
+        </div>
+
+      </div><!-- /.row -->
+
+      <hr class="my-4" />
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-floppy me-1"></i>
+          <%= site ? 'Save Changes' : 'Create Site' %>
+        </button>
+        <a href="<%= site ? `/sites/${site.SiteID}` : '/sites' %>" class="btn btn-outline-secondary">
+          Cancel
+        </a>
+      </div>
+
+    </form>
+  </div>
+</div>

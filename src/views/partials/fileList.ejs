@@ -1,0 +1,79 @@
+<%
+  // Required locals: documents (array), uploadUrl (string), canUpload (bool)
+  // Optional: entityType ('log'|'site'|'item'), entityId (int)
+%>
+<div class="card mt-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-paperclip me-2"></i>Attachments
+      <span class="badge bg-secondary ms-1"><%= documents.length %></span>
+    </span>
+    <% if (canUpload) { %>
+      <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#uploadForm">
+        <i class="bi bi-upload me-1"></i>Upload
+      </button>
+    <% } %>
+  </div>
+
+  <% if (canUpload) { %>
+  <div class="collapse" id="uploadForm">
+    <div class="card-body border-bottom">
+      <form action="<%= uploadUrl %>" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" />
+        <% if (typeof entityType !== 'undefined') { %>
+          <input type="hidden" name="entityType" value="<%= entityType %>" />
+          <input type="hidden" name="entityId"   value="<%= entityId %>" />
+        <% } %>
+        <div class="row g-2 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label small">File <span class="text-danger">*</span></label>
+            <input type="file" name="file" class="form-control form-control-sm" required />
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">Description</label>
+            <input type="text" name="description" class="form-control form-control-sm" maxlength="500" />
+          </div>
+          <div class="col-md-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">Upload</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (documents.length === 0) { %>
+    <div class="card-body text-muted small">No attachments yet.</div>
+  <% } else { %>
+  <ul class="list-group list-group-flush">
+    <% documents.forEach(doc => { %>
+    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+      <div>
+        <% const isImage = doc.MimeType && doc.MimeType.startsWith('image/'); %>
+        <i class="bi <%= isImage ? 'bi-image' : 'bi-file-earmark' %> me-2 text-secondary"></i>
+        <a href="/documents/<%= doc.DocumentID %>/download" target="_blank" class="text-decoration-none">
+          <%= doc.OriginalFilename %>
+        </a>
+        <% if (doc.Description) { %>
+          <span class="text-muted small ms-2">— <%= doc.Description %></span>
+        <% } %>
+        <br />
+        <span class="text-muted small">
+          <%= (doc.FileSizeBytes / 1024).toFixed(1) %> KB &bull;
+          Uploaded <%= new Date(doc.UploadedAt).toLocaleDateString() %>
+          <% if (doc.UploadedByName) { %> by <%= doc.UploadedByName %><% } %>
+        </span>
+      </div>
+      <% if (canUpload) { %>
+      <form action="/documents/<%= doc.DocumentID %>/delete" method="POST" class="ms-2"
+            onsubmit="return confirm('Delete this attachment?')">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" />
+        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+          <i class="bi bi-trash"></i>
+        </button>
+      </form>
+      <% } %>
+    </li>
+    <% }) %>
+  </ul>
+  <% } %>
+</div>
