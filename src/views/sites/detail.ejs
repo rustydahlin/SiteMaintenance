@@ -546,10 +546,10 @@
               <select name="itemID" id="stockSelect" class="form-select mb-2" required size="6">
                 <% serializedItems.forEach(si => { %>
                 <option value="<%= si.ItemID %>"
-                  data-search="<%= ((si.SerialNumber||'') + ' ' + (si.ModelNumber||'') + ' ' + (si.Manufacturer||'')).toLowerCase() %>">
+                  data-search="<%= ((si.CommonName||'') + ' ' + (si.SerialNumber||'') + ' ' + (si.ModelNumber||'') + ' ' + (si.Manufacturer||'')).toLowerCase() %>">
                   <%= si.SerialNumber || '(no serial)' %>
-                  <% if (si.ModelNumber) { %> — <%= si.ModelNumber %><% } %>
-                  <% if (si.Manufacturer) { %> / <%= si.Manufacturer %><% } %>
+                  <% if (si.CommonName) { %> — <%= si.CommonName %><% } %>
+                  <% if (si.ModelNumber) { %> (<%= si.ModelNumber %><% if (si.Manufacturer) { %>/<%= si.Manufacturer %><% } %>)<% } else if (si.Manufacturer) { %> (<%= si.Manufacturer %>)<% } %>
                   <% if (si.StockLocationName) { %> [<%= si.StockLocationName %>]<% } %>
                 </option>
                 <% }) %>
@@ -581,7 +581,7 @@
                   <% var biStock = (stockByItem && stockByItem[bi.ItemID]) ? stockByItem[bi.ItemID] : []; %>
                   <tr>
                     <td>
-                      <div class="fw-semibold small"><%= bi.ModelNumber || '(no model)' %></div>
+                      <div class="fw-semibold small"><%= bi.CommonName || bi.ModelNumber || '(no name)' %></div>
                       <% if (bi.Manufacturer) { %><div class="small text-muted"><%= bi.Manufacturer %></div><% } %>
                       <% if (bi.CategoryName) { %><span class="badge bg-body-secondary text-body border small"><%= bi.CategoryName %></span><% } %>
                     </td>
@@ -596,7 +596,9 @@
                         <input type="hidden" name="mode" value="existing" />
                         <input type="hidden" name="itemID" value="<%= bi.ItemID %>" />
                         <select name="pulledFrom" class="form-select form-select-sm" style="min-width:170px">
-                          <option value="">— Unallocated —</option>
+                          <% var allocatedQty = biStock.reduce(function(sum, s) { return sum + (s.Quantity || 0); }, 0); %>
+                          <% var unallocatedQty = (bi.QuantityAvailable || 0) - allocatedQty; %>
+                          <option value="">— Unallocated (<%= unallocatedQty %> avail) —</option>
                           <% biStock.forEach(function(s) { %>
                             <% if (s.LocationID) { %>
                               <option value="location:<%= s.LocationID %>">
@@ -923,10 +925,10 @@
               <select name="replacementItemID" id="replaceSelect" class="form-select" required size="5">
                 <% replaceableItems.forEach(ri => { %>
                 <option value="<%= ri.ItemID %>"
-                  data-search="<%= ((ri.SerialNumber||'') + ' ' + (ri.ModelNumber||'') + ' ' + (ri.Manufacturer||'')).toLowerCase() %>">
+                  data-search="<%= ((ri.CommonName||'') + ' ' + (ri.SerialNumber||'') + ' ' + (ri.ModelNumber||'') + ' ' + (ri.Manufacturer||'')).toLowerCase() %>">
                   <%= ri.SerialNumber || '(no serial)' %>
-                  <% if (ri.ModelNumber)  { %> — <%= ri.ModelNumber %><% } %>
-                  <% if (ri.Manufacturer) { %> / <%= ri.Manufacturer %><% } %>
+                  <% if (ri.CommonName) { %> — <%= ri.CommonName %><% } %>
+                  <% if (ri.ModelNumber) { %> (<%= ri.ModelNumber %><% if (ri.Manufacturer) { %>/<%= ri.Manufacturer %><% } %>)<% } else if (ri.Manufacturer) { %> (<%= ri.Manufacturer %>)<% } %>
                   <% if (ri.StockLocationName) { %> [<%= ri.StockLocationName %>]<% } %>
                 </option>
                 <% }) %>
@@ -1034,7 +1036,8 @@
   var replaceBulkModal = document.getElementById('replaceBulkModal');
   if (replaceBulkModal) {
     // Stock data from server for pull-from options
-    var stockByItem = <%- JSON.stringify(stockByItem || {}) %>;
+    var stockByItem  = <%- JSON.stringify(stockByItem || {}) %>;
+    var availByItem  = <%- JSON.stringify(Object.fromEntries((inStockItems||[]).filter(i=>i.TrackingType==='bulk').map(i=>[i.ItemID, i.QuantityAvailable||0]))) %>;
 
     replaceBulkModal.addEventListener('show.bs.modal', function (e) {
       var btn    = e.relatedTarget;
@@ -1055,8 +1058,10 @@
 
       // Populate pull-from select
       var sel = document.getElementById('replaceBulkPullFrom');
-      sel.innerHTML = '<option value="">— Unallocated / General Stock —</option>';
       var rows = stockByItem[itemID] || [];
+      var totalAllocated = rows.reduce(function(sum, s) { return sum + (s.Quantity || 0); }, 0);
+      var unallocQty = (availByItem[itemID] || 0) - totalAllocated;
+      sel.innerHTML = '<option value="">— Unallocated (' + unallocQty + ' avail) —</option>';
       rows.forEach(function (s) {
         var opt = document.createElement('option');
         if (s.LocationID) {

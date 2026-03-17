@@ -439,7 +439,7 @@ async function getInStock() {
   const pool = await getPool();
   const result = await pool.request().query(`
     SELECT
-      i.ItemID, i.TrackingType, i.SerialNumber, i.ModelNumber, i.Manufacturer,
+      i.ItemID, i.TrackingType, i.SerialNumber, i.CommonName, i.ModelNumber, i.Manufacturer,
       i.QuantityTotal,
       i.QuantityTotal - ISNULL((
         SELECT SUM(si.Quantity) FROM SiteInventory si
