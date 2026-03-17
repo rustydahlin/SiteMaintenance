@@ -1,22 +1,49 @@
 /* SiteMaintenance — Global JS */
 'use strict';
 
-// Auto-dismiss flash alerts after 6 seconds
-// Dark mode
+// Apply theme + sidebar collapse state before first paint to avoid flash
 (function () {
-  const toggle = document.getElementById('darkModeToggle');
-  if (!toggle) return;
-  const isDark = localStorage.getItem('theme') === 'dark';
-  toggle.checked = isDark;
-  document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
-  toggle.addEventListener('change', () => {
-    const dark = toggle.checked;
-    document.documentElement.setAttribute('data-bs-theme', dark ? 'dark' : 'light');
-    localStorage.setItem('theme', dark ? 'dark' : 'light');
-  });
+  if (localStorage.getItem('theme') === 'dark') {
+    document.documentElement.setAttribute('data-bs-theme', 'dark');
+  }
+  if (localStorage.getItem('sidebarCollapsed') === '1') {
+    document.getElementById('sidebar')?.classList.add('sidebar-collapsed');
+  }
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Dark mode toggle
+  const darkToggle = document.getElementById('darkModeToggle');
+  if (darkToggle) {
+    darkToggle.checked = localStorage.getItem('theme') === 'dark';
+    darkToggle.addEventListener('change', () => {
+      const dark = darkToggle.checked;
+      document.documentElement.setAttribute('data-bs-theme', dark ? 'dark' : 'light');
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+    });
+  }
+
+  // Sidebar toggle
+  const sidebar     = document.getElementById('sidebar');
+  const toggleBtn   = document.getElementById('sidebarToggle');
+  const toggleIcon  = document.getElementById('sidebarToggleIcon');
+
+  function updateToggleIcon(collapsed) {
+    if (!toggleIcon) return;
+    toggleIcon.className = collapsed ? 'bi bi-chevron-double-right' : 'bi bi-chevron-double-left';
+  }
+
+  if (sidebar && toggleBtn) {
+    // Sync icon with current state (state already applied by IIFE above)
+    updateToggleIcon(sidebar.classList.contains('sidebar-collapsed'));
+
+    toggleBtn.addEventListener('click', () => {
+      const collapsed = sidebar.classList.toggle('sidebar-collapsed');
+      localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+      updateToggleIcon(collapsed);
+    });
+  }
+
   document.querySelectorAll('.alert-dismissible').forEach(alert => {
     setTimeout(() => {
       const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);

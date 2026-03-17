@@ -1,58 +1,76 @@
 <% if (user) { %>
-<nav id="sidebar" class="col-md-2 col-lg-2 d-md-block bg-body-secondary sidebar collapse">
-  <div class="position-sticky pt-4">
+<nav id="sidebar">
+  <div class="position-sticky">
+
+    <!-- Toggle button -->
+    <button id="sidebarToggle" title="Toggle sidebar">
+      <i class="bi bi-chevron-double-left" id="sidebarToggleIcon"></i>
+    </button>
+
     <ul class="nav flex-column">
       <li class="nav-item">
-        <a class="nav-link <%= currentPath === '/' ? 'active' : '' %>" href="/">
-          <i class="bi bi-speedometer2 me-2"></i>Dashboard
+        <a class="nav-link <%= currentPath === '/' ? 'active' : '' %>" href="/" title="Dashboard">
+          <i class="bi bi-speedometer2"></i>
+          <span class="nav-label">Dashboard</span>
         </a>
       </li>
 
       <li class="nav-item mt-2">
-        <span class="nav-link text-muted text-uppercase small fw-bold ps-3">Field</span>
+        <span class="sidebar-section-label">Field</span>
+        <span class="sidebar-section-divider"></span>
       </li>
       <li class="nav-item">
-        <a class="nav-link <%= currentPath.startsWith('/sites') ? 'active' : '' %>" href="/sites">
-          <i class="bi bi-building me-2"></i>Sites
+        <a class="nav-link <%= currentPath.startsWith('/sites') ? 'active' : '' %>" href="/sites" title="Sites">
+          <i class="bi bi-building"></i>
+          <span class="nav-label">Sites</span>
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link <%= currentPath.startsWith('/inventory') ? 'active' : '' %>" href="/inventory">
-          <i class="bi bi-box-seam me-2"></i>Inventory
+        <a class="nav-link <%= currentPath.startsWith('/inventory') ? 'active' : '' %>" href="/inventory" title="Inventory">
+          <i class="bi bi-box-seam"></i>
+          <span class="nav-label">Inventory</span>
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link <%= currentPath.startsWith('/repairs') ? 'active' : '' %>" href="/repairs">
-          <i class="bi bi-wrench-adjustable me-2"></i>Repairs / RMA
+        <a class="nav-link <%= currentPath.startsWith('/repairs') ? 'active' : '' %>" href="/repairs" title="Repairs / RMA">
+          <i class="bi bi-wrench-adjustable"></i>
+          <span class="nav-label">Repairs / RMA</span>
         </a>
       </li>
 
       <% if (user.roles && (user.roles.includes('Admin') || user.roles.includes('Technician'))) { %>
       <li class="nav-item mt-2">
-        <span class="nav-link text-muted text-uppercase small fw-bold ps-3">Admin</span>
+        <span class="sidebar-section-label">Admin</span>
+        <span class="sidebar-section-divider"></span>
       </li>
       <% } %>
 
       <% if (user.roles && user.roles.includes('Admin')) { %>
       <li class="nav-item">
-        <a class="nav-link <%= currentPath.startsWith('/admin') ? 'active' : '' %>" href="/admin">
-          <i class="bi bi-sliders me-2"></i>Administration
+        <a class="nav-link <%= currentPath.startsWith('/admin') ? 'active' : '' %>" href="/admin" title="Administration">
+          <i class="bi bi-sliders"></i>
+          <span class="nav-label">Administration</span>
         </a>
       </li>
       <% } %>
     </ul>
 
-    <div class="text-center px-3 py-3 border-top">
-      <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
-        <i class="bi bi-moon-stars-fill small text-muted"></i>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="darkModeToggle" role="switch" />
-          <label class="form-check-label small text-muted" for="darkModeToggle">Dark mode</label>
-        </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-darkmode">
+        <i class="bi bi-moon-stars-fill text-muted"></i>
+        <span class="nav-label">
+          <div class="form-check form-switch mb-0 ms-1">
+            <input class="form-check-input" type="checkbox" id="darkModeToggle" role="switch" />
+            <label class="form-check-label small text-muted" for="darkModeToggle">Dark mode</label>
+          </div>
+        </span>
       </div>
-      <img src="/images/publicsafetyteam.png" alt="Logo" style="width:60px; height:auto; margin-bottom:8px;" />
-      <p class="text-muted" style="font-size:11px; margin:0;">Call Darron. (701) 328-6974</p>
+      <div class="sidebar-logo nav-label">
+        <img src="/images/publicsafetyteam.png" alt="Logo" style="width:60px;height:auto;margin-bottom:4px;" />
+        <p class="text-muted" style="font-size:11px;margin:0;">Call Darron. (701) 328-6974</p>
+      </div>
     </div>
+
   </div>
 </nav>
 <% } %>
