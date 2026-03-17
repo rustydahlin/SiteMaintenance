@@ -63,7 +63,7 @@
         <% rows.forEach(row => { %>
         <tr>
           <td class="text-nowrap small"><%= new Date(row.ChangedAt).toLocaleString() %></td>
-          <td><span class="badge bg-light text-dark border"><%= row.TableName %></span></td>
+          <td><span class="badge bg-body-secondary text-body border"><%= row.TableName %></span></td>
           <td class="text-muted small"><%= row.RecordID || '—' %></td>
           <td>
             <span class="badge <%=
@@ -89,7 +89,7 @@
         </tr>
         <% if (row.OldValues || row.NewValues) { %>
         <tr class="collapse" id="detail-<%= row.AuditID %>">
-          <td colspan="8" class="bg-light">
+          <td colspan="8" class="bg-body-secondary">
             <div class="row g-2 p-2">
               <% if (row.OldValues) { %>
               <div class="col-md-6">

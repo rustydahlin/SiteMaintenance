@@ -45,7 +45,7 @@
       <%- statusBadge(site.SiteStatusName) %>
       <%- warrantyBadge(site.WarrantyExpires) %>
       <% if (site.SiteTypeName) { %>
-        <span class="badge bg-light text-dark border"><%= site.SiteTypeName %></span>
+        <span class="badge bg-body-secondary text-body border"><%= site.SiteTypeName %></span>
       <% } %>
     </div>
   </div>
@@ -77,7 +77,7 @@
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#docs">Documents & Photos</a></li>
 </ul>
 
-<div class="tab-content border border-top-0 rounded-bottom p-3 bg-white shadow-sm">
+<div class="tab-content border border-top-0 rounded-bottom p-3 bg-body shadow-sm">
 
   <!-- ── Overview ─────────────────────────────────────────────────────────── -->
   <div class="tab-pane fade show active" id="overview">
@@ -174,7 +174,7 @@
     <% } else { %>
     <div class="table-responsive">
       <table class="table table-hover table-sm align-middle">
-        <thead class="table-light">
+        <thead>
           <tr>
             <th>Type</th>
             <th>Date</th>
@@ -220,7 +220,7 @@
     <% } else { %>
     <div class="table-responsive">
       <table class="table table-hover table-sm align-middle">
-        <thead class="table-light">
+        <thead>
           <tr>
             <th>Item</th>
             <th>Category</th>
@@ -255,17 +255,38 @@
             <td class="small text-muted"><%= item.InstalledByName || '—' %></td>
             <% if (isAdminUser) { %>
             <td>
-              <%
-                const removeMsg = item.TrackingType === 'bulk'
-                  ? 'Remove ' + item.Quantity + ' unit(s) of this item from the site?'
-                  : 'Remove this item from the site?';
-              %>
-              <form method="POST" action="/sites/<%= site.SiteID %>/inventory/<%= item.SiteInventoryID %>/remove"
-                    onsubmit="return confirm('<%= removeMsg %>')">
-                <button type="submit" class="btn btn-sm btn-outline-danger">
+              <div class="d-flex gap-1">
+              <% if (item.TrackingType === 'bulk') { %>
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                        data-bs-toggle="modal" data-bs-target="#removeBulkModal"
+                        data-item-id="<%= item.ItemID %>"
+                        data-item-name="<%= (item.ModelNumber || item.Manufacturer || 'Item') %>"
+                        data-max-qty="<%= item.Quantity %>">
                   <i class="bi bi-dash-circle me-1"></i>Remove
                 </button>
-              </form>
+                <button type="button" class="btn btn-sm btn-outline-warning"
+                        data-bs-toggle="modal" data-bs-target="#replaceBulkModal"
+                        data-item-id="<%= item.ItemID %>"
+                        data-item-name="<%= (item.ModelNumber || item.Manufacturer || 'Item') %>"
+                        data-max-qty="<%= item.Quantity %>">
+                  <i class="bi bi-arrow-repeat me-1"></i>Replace
+                </button>
+              <% } else { %>
+                <form method="POST" action="/sites/<%= site.SiteID %>/inventory/<%= item.SiteInventoryID %>/remove"
+                      onsubmit="return confirm('Remove this item from the site?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-dash-circle me-1"></i>Remove
+                  </button>
+                </form>
+                <button type="button" class="btn btn-sm btn-outline-warning"
+                        data-bs-toggle="modal" data-bs-target="#replaceModal"
+                        data-si-id="<%= item.SiteInventoryID %>"
+                        data-serial="<%= item.SerialNumber %>"
+                        data-model="<%= item.ModelNumber || '' %>">
+                  <i class="bi bi-arrow-repeat me-1"></i>Replace
+                </button>
+              <% } %>
+              </div>
             </td>
             <% } %>
           </tr>
@@ -281,9 +302,10 @@
     <div class="d-flex justify-content-between align-items-center mt-2 mb-3">
       <h6 class="mb-0">Preventive Maintenance Schedules</h6>
       <% if (isAdminUser) { %>
-        <a href="/pm/new?siteID=<%= site.SiteID %>" class="btn btn-sm btn-primary">
+        <button type="button" class="btn btn-sm btn-primary"
+                data-bs-toggle="modal" data-bs-target="#pmModal">
           <i class="bi bi-plus-lg me-1"></i>Add Schedule
-        </a>
+        </button>
       <% } %>
     </div>
 
@@ -292,22 +314,21 @@
     <% } else { %>
     <div class="table-responsive">
       <table class="table table-hover table-sm align-middle">
-        <thead class="table-light">
+        <thead>
           <tr>
             <th>Title</th>
             <th>Frequency</th>
             <th>Last Performed</th>
             <th>Next Due</th>
             <th>Assigned To</th>
+            <% if (isAdminUser) { %><th></th><% } %>
           </tr>
         </thead>
         <tbody>
           <% pmSchedules.forEach(pm => { %>
           <%
             const lastPerf = pm.LastPerformedAt ? new Date(pm.LastPerformedAt) : null;
-            const nextDue  = lastPerf && pm.FrequencyDays
-              ? new Date(lastPerf.getTime() + pm.FrequencyDays * 86400000)
-              : null;
+            const nextDue  = pm.NextDueDate ? new Date(pm.NextDueDate) : null;
           %>
           <tr>
             <td class="fw-semibold small"><%= pm.Title %></td>
@@ -317,6 +338,34 @@
             </td>
             <td><%- pmDueBadge(nextDue) %></td>
             <td class="small text-muted"><%= pm.AssignedToName || '—' %></td>
+            <% if (isAdminUser) { %>
+            <td>
+              <div class="d-flex gap-1">
+                <button type="button" class="btn btn-sm btn-outline-success py-0"
+                        data-bs-toggle="modal" data-bs-target="#pmCompleteModal"
+                        data-schedule-id="<%= pm.ScheduleID %>"
+                        data-title="<%= pm.Title %>">
+                  <i class="bi bi-check-lg"></i> Complete
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0"
+                        data-bs-toggle="modal" data-bs-target="#pmEditModal"
+                        data-schedule-id="<%= pm.ScheduleID %>"
+                        data-title="<%= pm.Title %>"
+                        data-frequency="<%= pm.FrequencyDays %>"
+                        data-assigned-user-id="<%= pm.AssignedUserID || '' %>"
+                        data-notes="<%= pm.Notes || '' %>">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="POST" action="/sites/<%= site.SiteID %>/pm/<%= pm.ScheduleID %>"
+                      onsubmit="return confirm('Delete this PM schedule?')">
+                  <input type="hidden" name="action" value="delete" />
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+            <% } %>
           </tr>
           <% }) %>
         </tbody>
@@ -406,7 +455,7 @@
             <h6 class="text-muted small text-uppercase mb-2">Bulk / FRU Items</h6>
             <div class="table-responsive">
               <table class="table table-sm table-hover align-middle mb-0">
-                <thead class="table-light">
+                <thead>
                   <tr>
                     <th>Item</th>
                     <th class="text-center">Available</th>
@@ -420,7 +469,7 @@
                     <td>
                       <div class="fw-semibold small"><%= bi.ModelNumber || '(no model)' %></div>
                       <% if (bi.Manufacturer) { %><div class="small text-muted"><%= bi.Manufacturer %></div><% } %>
-                      <% if (bi.CategoryName) { %><span class="badge bg-light text-dark border small"><%= bi.CategoryName %></span><% } %>
+                      <% if (bi.CategoryName) { %><span class="badge bg-body-secondary text-body border small"><%= bi.CategoryName %></span><% } %>
                     </td>
                     <td class="text-center">
                       <span class="badge <%= bi.QuantityAvailable > 0 ? 'bg-success' : 'bg-secondary' %>">
@@ -441,7 +490,7 @@
                               </option>
                             <% } else if (s.UserID) { %>
                               <option value="user:<%= s.UserID %>">
-                                <%= s.UserName %> (<%= s.Quantity %> avail)
+                                <%= s.UserDisplayName %> (<%= s.Quantity %> avail)
                               </option>
                             <% } %>
                           <% }); %>
@@ -517,6 +566,281 @@
 </div>
 <% } %>
 
+<!-- ── PM Add Modal ───────────────────────────────────────────────────────── -->
+<% if (isAdminUser) { %>
+<div class="modal fade" id="pmModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-calendar-check me-2"></i>Add PM Schedule</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="/sites/<%= site.SiteID %>/pm">
+        <div class="modal-body row g-3">
+          <div class="col-12">
+            <label class="form-label">Title <span class="text-danger">*</span></label>
+            <input type="text" name="title" class="form-control" required maxlength="200"
+                   placeholder="e.g. Annual Inspection" />
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Frequency (days) <span class="text-danger">*</span></label>
+            <input type="number" name="frequencyDays" class="form-control" required min="1"
+                   placeholder="e.g. 365" />
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Assigned To</label>
+            <select name="assignedUserID" class="form-select">
+              <option value="">— Unassigned —</option>
+              <% (allUsers || []).forEach(u => { %>
+              <option value="<%= u.UserID %>"><%= u.DisplayName %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Schedule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── PM Complete Modal ───────────────────────────────────────────────────── -->
+<div class="modal fade" id="pmCompleteModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-check-circle me-2 text-success"></i>Mark PM Complete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="pmCompleteForm">
+        <input type="hidden" name="action" value="complete" />
+        <div class="modal-body">
+          <p class="small mb-2">Completing: <strong id="pmCompleteTitle"></strong></p>
+          <label class="form-label small">Date Performed</label>
+          <input type="date" name="performedDate" id="pmCompleteDate" class="form-control" required />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success btn-sm">Mark Complete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── PM Edit Modal ───────────────────────────────────────────────────────── -->
+<div class="modal fade" id="pmEditModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit PM Schedule</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="pmEditForm">
+        <div class="modal-body row g-3">
+          <div class="col-12">
+            <label class="form-label">Title <span class="text-danger">*</span></label>
+            <input type="text" name="title" id="pmEditTitle" class="form-control" required maxlength="200" />
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Frequency (days) <span class="text-danger">*</span></label>
+            <input type="number" name="frequencyDays" id="pmEditFreq" class="form-control" required min="1" />
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Assigned To</label>
+            <select name="assignedUserID" id="pmEditUser" class="form-select">
+              <option value="">— Unassigned —</option>
+              <% (allUsers || []).forEach(u => { %>
+              <option value="<%= u.UserID %>"><%= u.DisplayName %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" id="pmEditNotes" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<!-- ── Remove Bulk Item Modal ──────────────────────────────────────────────── -->
+<div class="modal fade" id="removeBulkModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-dash-circle me-2 text-danger"></i>Remove Equipment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="removeBulkForm">
+        <div class="modal-body">
+          <p class="small mb-2">
+            Removing <strong id="removeBulkName"></strong> from this site.<br>
+            <span class="text-muted">Currently installed: <strong id="removeBulkMax"></strong> unit(s)</span>
+          </p>
+          <label class="form-label small">Quantity to remove</label>
+          <input type="number" name="quantity" id="removeBulkQty"
+                 class="form-control" min="1" value="1" required />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Replace Bulk Item Modal ───────────────────────────────────────────────── -->
+<div class="modal fade" id="replaceBulkModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-arrow-repeat me-2 text-warning"></i>Replace Bulk / FRU Units</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="replaceBulkForm">
+        <div class="modal-body">
+          <p class="small text-muted mb-3">
+            Replacing units of: <strong id="replaceBulkName"></strong>
+            &nbsp;·&nbsp; Installed: <strong id="replaceBulkInstalled"></strong>
+          </p>
+
+          <div class="row g-3">
+            <div class="col-sm-4">
+              <label class="form-label small fw-semibold">Units to replace <span class="text-danger">*</span></label>
+              <input type="number" name="replaceQty" id="replaceBulkQty"
+                     class="form-control form-control-sm" min="1" value="1" required />
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label small fw-semibold">Replacement qty to install</label>
+              <input type="number" name="installQty" id="replaceBulkInstallQty"
+                     class="form-control form-control-sm" min="0" value="1" />
+              <div class="form-text">Leave blank to match replaced qty.</div>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label small fw-semibold">Pull replacement from</label>
+            <select name="pulledFrom" id="replaceBulkPullFrom" class="form-select form-select-sm">
+              <option value="">— Unallocated / General Stock —</option>
+            </select>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label small">Install notes (optional)</label>
+            <textarea name="installNotes" class="form-control form-control-sm" rows="2"></textarea>
+          </div>
+
+          <hr class="my-3" />
+
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="startRepair" value="1"
+                   id="replaceBulkRepairCheck" />
+            <label class="form-check-label fw-semibold" for="replaceBulkRepairCheck">
+              Send replaced units for repair / start RMA(s)
+            </label>
+          </div>
+          <div id="replaceBulkRepairGroup" style="display:none" class="ms-4">
+            <div class="alert alert-info py-2 small mb-2" id="replaceBulkRmaNote"></div>
+            <label class="form-label small">Reason for repair <span class="text-danger">*</span></label>
+            <textarea name="repairReason" id="replaceBulkReasonInput"
+                      class="form-control form-control-sm" rows="2"
+                      placeholder="Describe the fault or reason..."></textarea>
+            <div class="form-text">You'll be taken to the first RMA to finish filling in details.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning btn-sm">
+            <i class="bi bi-arrow-repeat me-1"></i>Replace Units
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Replace Item Modal ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="replaceModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-arrow-repeat me-2 text-warning"></i>Replace Equipment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="replaceForm">
+        <div class="modal-body">
+          <p class="small text-muted mb-3">
+            Replacing: <strong id="replaceItemLabel"></strong>
+          </p>
+
+          <!-- Replacement item select -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Replacement Item <span class="text-danger">*</span></label>
+            <% const replaceableItems = (inStockItems || []).filter(i => i.TrackingType !== 'bulk'); %>
+            <% if (replaceableItems.length === 0) { %>
+              <p class="text-muted small">No serialized items currently in stock. Add inventory first.</p>
+            <% } else { %>
+              <input type="text" id="replaceSearch" class="form-control form-control-sm mb-1"
+                     placeholder="Filter by serial, model, manufacturer..." autocomplete="off" />
+              <select name="replacementItemID" id="replaceSelect" class="form-select" required size="5">
+                <% replaceableItems.forEach(ri => { %>
+                <option value="<%= ri.ItemID %>"
+                  data-search="<%= ((ri.SerialNumber||'') + ' ' + (ri.ModelNumber||'') + ' ' + (ri.Manufacturer||'')).toLowerCase() %>">
+                  <%= ri.SerialNumber || '(no serial)' %>
+                  <% if (ri.ModelNumber)  { %> — <%= ri.ModelNumber %><% } %>
+                  <% if (ri.Manufacturer) { %> / <%= ri.Manufacturer %><% } %>
+                  <% if (ri.StockLocationName) { %> [<%= ri.StockLocationName %>]<% } %>
+                </option>
+                <% }) %>
+              </select>
+            <% } %>
+          </div>
+
+          <!-- Install notes -->
+          <div class="mb-3">
+            <label class="form-label small">Install Notes (optional)</label>
+            <textarea name="installNotes" class="form-control form-control-sm" rows="2"></textarea>
+          </div>
+
+          <!-- Start RMA checkbox -->
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="startRepair" value="1" id="startRepairCheck" />
+            <label class="form-check-label fw-semibold" for="startRepairCheck">
+              Send replaced item for repair / start RMA
+            </label>
+          </div>
+          <div id="repairReasonGroup" style="display:none" class="ms-4 mb-2">
+            <label class="form-label small">Reason for repair <span class="text-danger">*</span></label>
+            <textarea name="repairReason" id="repairReasonInput" class="form-control form-control-sm" rows="2"
+                      placeholder="Describe the fault or reason for sending to repair..."></textarea>
+            <div class="form-text">You'll be taken to the RMA record to finish filling in details.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning btn-sm" id="replaceSubmitBtn">
+            <i class="bi bi-arrow-repeat me-1"></i>Replace Item
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script>
   // Activate the correct tab if the URL hash matches
   (function () {
@@ -528,6 +852,155 @@
       }
     }
   })();
+
+  // Replace modal — populate from data attributes and wire up checkbox/search
+  var replaceModal = document.getElementById('replaceModal');
+  if (replaceModal) {
+    replaceModal.addEventListener('show.bs.modal', function (e) {
+      var btn    = e.relatedTarget;
+      var siID   = btn.dataset.siId;
+      var serial = btn.dataset.serial;
+      var model  = btn.dataset.model;
+      var label  = serial + (model ? ' — ' + model : '');
+      document.getElementById('replaceItemLabel').textContent = label;
+      document.getElementById('replaceForm').action =
+        `/sites/<%= site.SiteID %>/inventory/${siID}/replace`;
+      // Reset state
+      document.getElementById('startRepairCheck').checked = false;
+      document.getElementById('repairReasonGroup').style.display = 'none';
+      document.getElementById('repairReasonInput').required = false;
+    });
+
+    document.getElementById('startRepairCheck').addEventListener('change', function () {
+      var group = document.getElementById('repairReasonGroup');
+      var input = document.getElementById('repairReasonInput');
+      group.style.display = this.checked ? '' : 'none';
+      input.required = this.checked;
+    });
+
+    var replaceSearch = document.getElementById('replaceSearch');
+    if (replaceSearch) {
+      replaceSearch.addEventListener('input', function () {
+        var q = this.value.toLowerCase();
+        document.querySelectorAll('#replaceSelect option').forEach(function (opt) {
+          opt.hidden = q.length > 0 && !opt.dataset.search.includes(q);
+        });
+      });
+    }
+  }
+
+  // PM Complete modal
+  var pmCompleteModal = document.getElementById('pmCompleteModal');
+  if (pmCompleteModal) {
+    pmCompleteModal.addEventListener('show.bs.modal', function (e) {
+      var btn = e.relatedTarget;
+      document.getElementById('pmCompleteTitle').textContent = btn.dataset.title;
+      document.getElementById('pmCompleteDate').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('pmCompleteForm').action =
+        '/sites/<%= site.SiteID %>/pm/' + btn.dataset.scheduleId;
+    });
+  }
+
+  // PM Edit modal
+  var pmEditModal = document.getElementById('pmEditModal');
+  if (pmEditModal) {
+    pmEditModal.addEventListener('show.bs.modal', function (e) {
+      var btn = e.relatedTarget;
+      document.getElementById('pmEditTitle').value = btn.dataset.title;
+      document.getElementById('pmEditFreq').value  = btn.dataset.frequency;
+      document.getElementById('pmEditNotes').value = btn.dataset.notes;
+      document.getElementById('pmEditUser').value  = btn.dataset.assignedUserId || '';
+      document.getElementById('pmEditForm').action =
+        '/sites/<%= site.SiteID %>/pm/' + btn.dataset.scheduleId;
+    });
+  }
+
+  // Replace Bulk modal
+  var replaceBulkModal = document.getElementById('replaceBulkModal');
+  if (replaceBulkModal) {
+    // Stock data from server for pull-from options
+    var stockByItem = <%- JSON.stringify(stockByItem || {}) %>;
+
+    replaceBulkModal.addEventListener('show.bs.modal', function (e) {
+      var btn    = e.relatedTarget;
+      var itemID = btn.dataset.itemId;
+      var name   = btn.dataset.itemName;
+      var maxQty = parseInt(btn.dataset.maxQty, 10);
+
+      document.getElementById('replaceBulkName').textContent      = name;
+      document.getElementById('replaceBulkInstalled').textContent = maxQty;
+      document.getElementById('replaceBulkQty').max               = maxQty;
+      document.getElementById('replaceBulkQty').value             = 1;
+      document.getElementById('replaceBulkInstallQty').value      = 1;
+      document.getElementById('replaceBulkRepairCheck').checked   = false;
+      document.getElementById('replaceBulkRepairGroup').style.display = 'none';
+      document.getElementById('replaceBulkReasonInput').required  = false;
+      document.getElementById('replaceBulkForm').action =
+        `/sites/<%= site.SiteID %>/inventory/${itemID}/replace-bulk`;
+
+      // Populate pull-from select
+      var sel = document.getElementById('replaceBulkPullFrom');
+      sel.innerHTML = '<option value="">— Unallocated / General Stock —</option>';
+      var rows = stockByItem[itemID] || [];
+      rows.forEach(function (s) {
+        var opt = document.createElement('option');
+        if (s.LocationID) {
+          opt.value = 'location:' + s.LocationID;
+          opt.textContent = s.LocationName + ' (' + s.Quantity + ' avail)';
+        } else if (s.UserID) {
+          opt.value = 'user:' + s.UserID;
+          opt.textContent = s.UserDisplayName + ' (' + s.Quantity + ' avail)';
+        }
+        sel.appendChild(opt);
+      });
+    });
+
+    document.getElementById('replaceBulkRepairCheck').addEventListener('change', function () {
+      var group  = document.getElementById('replaceBulkRepairGroup');
+      var input  = document.getElementById('replaceBulkReasonInput');
+      var note   = document.getElementById('replaceBulkRmaNote');
+      group.style.display = this.checked ? '' : 'none';
+      input.required = this.checked;
+      if (this.checked) {
+        var qty = parseInt(document.getElementById('replaceBulkQty').value, 10) || 1;
+        note.textContent = qty === 1
+          ? '1 RMA record will be created.'
+          : qty + ' separate RMA records will be created (one per replaced unit).';
+      }
+    });
+
+    document.getElementById('replaceBulkQty').addEventListener('input', function () {
+      var check = document.getElementById('replaceBulkRepairCheck');
+      if (check.checked) {
+        var qty  = parseInt(this.value, 10) || 1;
+        var note = document.getElementById('replaceBulkRmaNote');
+        note.textContent = qty === 1
+          ? '1 RMA record will be created.'
+          : qty + ' separate RMA records will be created (one per replaced unit).';
+      }
+      // Keep install qty in sync by default
+      var installInput = document.getElementById('replaceBulkInstallQty');
+      if (!installInput._manuallyChanged) installInput.value = this.value;
+    });
+
+    document.getElementById('replaceBulkInstallQty').addEventListener('change', function () {
+      this._manuallyChanged = true;
+    });
+  }
+
+  // Remove bulk modal — populate from data attributes
+  document.getElementById('removeBulkModal').addEventListener('show.bs.modal', function (e) {
+    const btn    = e.relatedTarget;
+    const itemID = btn.dataset.itemId;
+    const name   = btn.dataset.itemName;
+    const max    = parseInt(btn.dataset.maxQty, 10);
+    document.getElementById('removeBulkName').textContent = name;
+    document.getElementById('removeBulkMax').textContent  = max;
+    document.getElementById('removeBulkQty').max          = max;
+    document.getElementById('removeBulkQty').value        = max;
+    document.getElementById('removeBulkForm').action      =
+      `/sites/<%= site.SiteID %>/inventory/${itemID}/remove-bulk`;
+  });
 
   // Filter in-stock items list
   const stockSearch = document.getElementById('stockSearch');

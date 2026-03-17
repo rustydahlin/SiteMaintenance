@@ -33,7 +33,11 @@
     "winston-daily-rotate-file": "^5.0.0"
   },
   "overrides": {
-    "ldapauth-fork": "^6.1.0"
+    "ldapauth-fork": "5.0.5",
+    "ldapjs": "2.3.3"
+  },
+  "optionalDependencies": {
+    "ldapjs": "2.3.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

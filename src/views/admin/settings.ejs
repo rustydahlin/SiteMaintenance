@@ -4,6 +4,20 @@
 </div>
 
 <form action="/admin/settings" method="POST">
+  <!-- General -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-sliders me-2"></i>General</div>
+    <div class="card-body row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Application Name</label>
+        <input type="text" name="app.name" class="form-control"
+               value="<%= settings['app.name'] || 'SiteMaintenance' %>"
+               placeholder="SiteMaintenance" maxlength="80" />
+        <div class="form-text">Displayed in the top-left navigation bar.</div>
+      </div>
+    </div>
+  </div>
+
   <!-- OIDC / Entra ID -->
   <div class="card shadow-sm mb-4">
     <div class="card-header fw-semibold"><i class="bi bi-microsoft me-2"></i>OIDC / Entra ID Authentication</div>
@@ -35,43 +49,156 @@
     </div>
   </div>
 
-  <!-- LDAP -->
+  <!-- LDAP / Active Directory -->
   <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold"><i class="bi bi-diagram-3 me-2"></i>LDAP / Active Directory Authentication</div>
-    <div class="card-body row g-3">
-      <div class="col-md-3">
-        <label class="form-label">Enable LDAP Login</label>
-        <select name="ldap.enabled" class="form-select">
-          <option value="0" <%= settings['ldap.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
-          <option value="1" <%= settings['ldap.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
-        </select>
+    <div class="card-header fw-semibold"><i class="bi bi-diagram-3 me-2"></i>Active Directory / LDAP</div>
+    <div class="card-body p-0">
+      <p class="px-3 pt-3 mb-0 text-muted small">Changes to LDAP settings require a server restart to take effect.</p>
+
+      <%
+        function ldapRow(label, desc, inputHtml) {
+          return `<div class="d-flex align-items-center border-top px-3 py-3 gap-3">
+            <div style="min-width:260px">
+              <div class="fw-semibold small">${label}</div>
+              <div class="text-muted" style="font-size:0.78rem">${desc}</div>
+            </div>
+            <div class="flex-grow-1">${inputHtml}</div>
+          </div>`;
+        }
+      %>
+
+      <!-- Enable toggle -->
+      <div class="d-flex align-items-center border-top px-3 py-3 gap-3">
+        <div style="min-width:260px">
+          <div class="fw-semibold small">Enable Active Directory Login</div>
+          <div class="text-muted" style="font-size:0.78rem">Allow users with auth type "Active Directory (LDAP)" to sign in via on-premises AD</div>
+        </div>
+        <div class="flex-grow-1 d-flex justify-content-end">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch"
+                   name="ldap.enabled" value="1" style="width:3rem;height:1.5rem"
+                   <%= settings['ldap.enabled'] === '1' ? 'checked' : '' %>>
+          </div>
+        </div>
       </div>
-      <div class="col-md-9">
-        <label class="form-label">LDAP URL</label>
-        <input type="text" name="ldap.url" class="form-control" value="<%= settings['ldap.url'] || '' %>" placeholder="ldap://dc.example.com:389" />
+
+      <!-- LDAP Server URL -->
+      <div class="d-flex align-items-center border-top px-3 py-3 gap-3">
+        <div style="min-width:260px">
+          <div class="fw-semibold small">LDAP Server URL</div>
+          <div class="text-muted" style="font-size:0.78rem">
+            Hostname, IP, or full URL of your domain controller. <code>ldap://</code> is added automatically if
+            omitted — e.g. <code>dc.example.com</code> or <code>ldaps://dc.example.com:636</code>
+          </div>
+        </div>
+        <div class="flex-grow-1">
+          <input type="text" name="ldap.url" class="form-control"
+                 value="<%= settings['ldap.url'] || '' %>" placeholder="dc.example.com" />
+        </div>
       </div>
-      <div class="col-md-6">
-        <label class="form-label">Bind DN</label>
-        <input type="text" name="ldap.bindDn" class="form-control" value="<%= settings['ldap.bindDn'] || '' %>" placeholder="CN=svc-app,DC=example,DC=com" />
+
+      <!-- Bind Username -->
+      <div class="d-flex align-items-center border-top px-3 py-3 gap-3">
+        <div style="min-width:260px">
+          <div class="fw-semibold small">LDAP Bind Username</div>
+          <div class="text-muted" style="font-size:0.78rem">
+            Account used to search the directory — e.g. <code>binduser@example.com</code> or
+            <code>CN=binduser,DC=example,DC=com</code>
+          </div>
+        </div>
+        <div class="flex-grow-1">
+          <input type="text" name="ldap.bindDn" class="form-control"
+                 value="<%= settings['ldap.bindDn'] || '' %>" placeholder="binduser@example.com" />
+        </div>
       </div>
-      <div class="col-md-6">
-        <label class="form-label">Bind Password</label>
-        <input type="password" name="ldap.bindCredentials" class="form-control" placeholder="<%= settings['ldap.bindCredentials'] ? '••••••' : 'Not set' %>" autocomplete="new-password" />
+
+      <!-- Bind Password -->
+      <div class="d-flex align-items-center border-top px-3 py-3 gap-3">
+        <div style="min-width:260px">
+          <div class="fw-semibold small">LDAP Bind Password</div>
+          <div class="text-muted" style="font-size:0.78rem">Password for the bind account</div>
+        </div>
+        <div class="flex-grow-1">
+          <input type="password" name="ldap.bindCredentials" class="form-control"
+                 placeholder="<%= settings['ldap.bindCredentials'] ? '••••••••••••••••••••' : 'Not set' %>"
+                 autocomplete="new-password" />
+        </div>
       </div>
-      <div class="col-md-6">
-        <label class="form-label">Search Base</label>
-        <input type="text" name="ldap.searchBase" class="form-control" value="<%= settings['ldap.searchBase'] || '' %>" placeholder="OU=Users,DC=example,DC=com" />
+
+      <!-- Search Base -->
+      <div class="d-flex align-items-center border-top px-3 py-3 gap-3">
+        <div style="min-width:260px">
+          <div class="fw-semibold small">Base DN for User Search</div>
+          <div class="text-muted" style="font-size:0.78rem">
+            The LDAP subtree to search for users — e.g. <code>DC=example,DC=com</code>
+          </div>
+        </div>
+        <div class="flex-grow-1">
+          <input type="text" name="ldap.searchBase" class="form-control"
+                 value="<%= settings['ldap.searchBase'] || '' %>" placeholder="DC=example,DC=com" />
+        </div>
       </div>
-      <div class="col-md-6">
-        <label class="form-label">Search Filter</label>
-        <input type="text" name="ldap.searchFilter" class="form-control" value="<%= settings['ldap.searchFilter'] || '' %>" placeholder="(sAMAccountName={{username}})" />
+
+      <!-- Search Filter -->
+      <div class="d-flex align-items-center border-top px-3 py-3 gap-3">
+        <div style="min-width:260px">
+          <div class="fw-semibold small">Search Filter</div>
+          <div class="text-muted" style="font-size:0.78rem">
+            How to find the user — <code>&#123;&#123;username&#125;&#125;</code> is replaced with the entered username
+          </div>
+        </div>
+        <div class="flex-grow-1">
+          <input type="text" name="ldap.searchFilter" class="form-control"
+                 value="<%= settings['ldap.searchFilter'] || '(sAMAccountName={{username}})' %>"
+                 placeholder="(sAMAccountName={{username}})" />
+        </div>
       </div>
-      <div class="col-12">
-        <button type="button" class="btn btn-outline-secondary btn-sm" id="testLdapBtn">
-          <i class="bi bi-plug me-1"></i>Test LDAP Connection
-        </button>
-        <span id="ldapTestResult" class="ms-3 small"></span>
+
+      <!-- STARTTLS -->
+      <div class="d-flex align-items-center border-top px-3 py-3 gap-3">
+        <div style="min-width:260px">
+          <div class="fw-semibold small">Use STARTTLS (port 389 + TLS upgrade)</div>
+          <div class="text-muted" style="font-size:0.78rem">Enable if your DC requires encrypted searches on port 389. Use <code>ldaps://</code> instead for port 636 SSL.</div>
+        </div>
+        <div class="flex-grow-1 d-flex justify-content-end">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch"
+                   name="ldap.starttls" value="1" style="width:3rem;height:1.5rem"
+                   <%= settings['ldap.starttls'] === '1' ? 'checked' : '' %>>
+          </div>
+        </div>
       </div>
+
+      <!-- Reject Unauthorized TLS -->
+      <div class="d-flex align-items-center border-top px-3 py-3 gap-3">
+        <div style="min-width:260px">
+          <div class="fw-semibold small">Reject Unauthorized TLS</div>
+          <div class="text-muted" style="font-size:0.78rem">Reject self-signed or untrusted certificates (disable only for testing)</div>
+        </div>
+        <div class="flex-grow-1 d-flex justify-content-end">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch"
+                   name="ldap.rejectUnauthorized" value="1" style="width:3rem;height:1.5rem"
+                   <%= (settings['ldap.rejectUnauthorized'] === '0') ? '' : 'checked' %>>
+          </div>
+        </div>
+      </div>
+
+      <!-- Test Connection -->
+      <div class="d-flex align-items-center border-top px-3 py-3 gap-3">
+        <div style="min-width:260px">
+          <div class="fw-semibold small">Test Connection</div>
+          <div class="text-muted" style="font-size:0.78rem">
+            Save settings first. Enter a username to verify the server is reachable and the account can be found.
+          </div>
+        </div>
+        <div class="flex-grow-1 d-flex gap-2 align-items-center">
+          <input type="text" id="ldapTestUser" class="form-control" placeholder="AD username" style="max-width:220px" />
+          <button type="button" class="btn btn-secondary btn-sm px-3" id="testLdapBtn">Test</button>
+          <span id="ldapTestResult" class="small"></span>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -166,18 +293,24 @@ document.getElementById('testEmailBtn').addEventListener('click', async () => {
 });
 
 document.getElementById('testLdapBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('testLdapBtn');
-  const result = document.getElementById('ldapTestResult');
+  const btn      = document.getElementById('testLdapBtn');
+  const result   = document.getElementById('ldapTestResult');
+  const username = document.getElementById('ldapTestUser').value.trim();
   btn.disabled = true;
   result.textContent = 'Testing...';
+  result.className = 'small text-muted';
   try {
-    const res = await fetch('/admin/settings/ldap/test', { method: 'POST' });
+    const res  = await fetch('/admin/settings/ldap/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username }),
+    });
     const data = await res.json();
     result.textContent = data.message;
-    result.className = 'ms-3 small ' + (data.success ? 'text-success' : 'text-danger');
+    result.className   = 'small ' + (data.success ? 'text-success' : 'text-danger');
   } catch (e) {
     result.textContent = 'Request failed.';
-    result.className = 'ms-3 small text-danger';
+    result.className   = 'small text-danger';
   } finally {
     btn.disabled = false;
   }

@@ -25,7 +25,7 @@
     <div class="d-flex gap-2 flex-wrap align-items-center">
       <%- statusBadge() %>
       <% if (repair.RMANumber) { %>
-        <span class="badge bg-light text-dark border">RMA: <%= repair.RMANumber %></span>
+        <span class="badge bg-body-secondary text-body border">RMA: <%= repair.RMANumber %></span>
       <% } %>
       <a href="/inventory/<%= repair.ItemID %>" class="small text-decoration-none text-muted">
         <i class="bi bi-box-seam me-1"></i><%= repair.SerialNumber %>

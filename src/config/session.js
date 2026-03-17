@@ -32,7 +32,9 @@ async function buildSessionMiddleware() {
     cookie: {
       httpOnly:  true,
       sameSite:  'lax',
-      secure:    process.env.NODE_ENV === 'production',
+      // Set COOKIE_SECURE=true only when running behind HTTPS. Never enable over plain HTTP
+      // or sessions will silently break (browser won't send secure cookies over HTTP).
+      secure:    process.env.COOKIE_SECURE === 'true',
       maxAge:    8 * 60 * 60 * 1000,  // 8 hours
     },
   });

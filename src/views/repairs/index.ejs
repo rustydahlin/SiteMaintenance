@@ -42,28 +42,34 @@
 <% } else { %>
 <div class="table-responsive">
   <table class="table table-hover table-sm align-middle mb-0">
-    <thead class="table-light">
+    <thead>
       <tr>
-        <th>Serial Number</th>
-        <th>Model</th>
+        <th>Item</th>
         <th>Manufacturer</th>
         <th>Sent Date</th>
         <th>RMA #</th>
         <th>Expected Return</th>
         <th>Follow-Up</th>
+        <th>Created By</th>
         <th>Status</th>
         <th>Days Open</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
       <% repairs.forEach(repair => { %>
       <tr>
         <td>
-          <a href="/inventory/<%= repair.ItemID %>" class="text-decoration-none fw-semibold">
-            <%= repair.SerialNumber %>
+          <a href="/repairs/<%= repair.RepairID %>" class="text-decoration-none fw-semibold">
+            <%= repair.SerialNumber || repair.ModelNumber || ('Item #' + repair.ItemID) %>
           </a>
+          <% if (!repair.SerialNumber && repair.ModelNumber) { %>
+            <span class="badge bg-info text-dark small ms-1">FRU</span>
+          <% } %>
+          <% if (repair.ModelNumber && repair.SerialNumber) { %>
+            <div class="small text-muted"><%= repair.ModelNumber %></div>
+          <% } %>
         </td>
-        <td class="small text-muted"><%= repair.ModelNumber || '—' %></td>
         <td class="small text-muted"><%= repair.Manufacturer || '—' %></td>
         <td class="small text-muted text-nowrap">
           <%= repair.SentDate ? new Date(repair.SentDate).toLocaleDateString() : '—' %>
@@ -85,6 +91,7 @@
             <span class="text-muted">—</span>
           <% } %>
         </td>
+        <td class="small text-muted"><%= repair.SentByName || '—' %></td>
         <td><%- statusBadge(repair) %></td>
         <td class="small text-muted">
           <% if (!repair.ReceivedDate) { %>
@@ -92,6 +99,9 @@
           <% } else { %>
             <span class="text-success">Closed</span>
           <% } %>
+        </td>
+        <td>
+          <a href="/repairs/<%= repair.RepairID %>" class="btn btn-sm btn-outline-secondary">View</a>
         </td>
       </tr>
       <% }) %>

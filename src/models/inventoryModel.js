@@ -344,10 +344,41 @@ async function getStock(itemID) {
 async function upsertStock(itemID, { locationID, userID, quantity, notes } = {}) {
   const pool = await getPool();
   const qty  = parseInt(quantity, 10) || 0;
-  const req  = pool.request()
-    .input('ItemID',   sql.Int,             itemID)
-    .input('Quantity', sql.Int,             qty)
-    .input('Notes',    sql.NVarChar(255),   notes || null);
+
+  // Validate: sum of all other rows + this qty must not exceed QuantityTotal
+  const itemRow = await pool.request()
+    .input('ItemID', sql.Int, itemID)
+    .query('SELECT QuantityTotal FROM Inventory WHERE ItemID = @ItemID');
+  const quantityTotal = itemRow.recordset[0]?.QuantityTotal ?? 0;
+
+  // Sum existing stock rows, excluding the row we're about to update
+  const chkReq = pool.request().input('ItemID', sql.Int, itemID);
+  let excludeClause = '';
+  if (locationID) {
+    chkReq.input('ExcludeLocationID', sql.Int, parseInt(locationID, 10));
+    excludeClause = 'AND (LocationID != @ExcludeLocationID OR LocationID IS NULL)';
+  } else if (userID) {
+    chkReq.input('ExcludeUserID', sql.Int, parseInt(userID, 10));
+    excludeClause = 'AND (UserID != @ExcludeUserID OR UserID IS NULL)';
+  }
+  const chkResult = await chkReq.query(
+    `SELECT ISNULL(SUM(Quantity), 0) AS OtherTotal FROM InventoryStock WHERE ItemID = @ItemID ${excludeClause}`
+  );
+  const otherTotal = chkResult.recordset[0].OtherTotal;
+
+  if (otherTotal + qty > quantityTotal) {
+    const err = new Error(
+      `Cannot distribute ${qty} unit(s) here — ${otherTotal} already distributed elsewhere, ` +
+      `leaving only ${quantityTotal - otherTotal} of ${quantityTotal} total available.`
+    );
+    err.userMessage = err.message;
+    throw err;
+  }
+
+  const req = pool.request()
+    .input('ItemID',   sql.Int,           itemID)
+    .input('Quantity', sql.Int,           qty)
+    .input('Notes',    sql.NVarChar(255), notes || null);
 
   if (locationID) {
     req.input('LocationID', sql.Int, parseInt(locationID, 10));

@@ -2,6 +2,20 @@
 'use strict';
 
 // Auto-dismiss flash alerts after 6 seconds
+// Dark mode
+(function () {
+  const toggle = document.getElementById('darkModeToggle');
+  if (!toggle) return;
+  const isDark = localStorage.getItem('theme') === 'dark';
+  toggle.checked = isDark;
+  document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
+  toggle.addEventListener('change', () => {
+    const dark = toggle.checked;
+    document.documentElement.setAttribute('data-bs-theme', dark ? 'dark' : 'light');
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+  });
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.alert-dismissible').forEach(alert => {
     setTimeout(() => {

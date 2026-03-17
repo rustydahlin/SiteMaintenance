@@ -117,27 +117,32 @@ async function initLDAP() {
     return;
   }
 
-  const url             = await settingsModel.getSetting('ldap.url',             'LDAP_URL');
-  const bindDN          = await settingsModel.getSetting('ldap.bindDn',          'LDAP_BIND_DN');
-  const bindCredentials = await settingsModel.getSetting('ldap.bindCredentials', 'LDAP_BIND_CREDENTIALS');
-  const searchBase      = await settingsModel.getSetting('ldap.searchBase',      'LDAP_SEARCH_BASE');
-  const searchFilter    = await settingsModel.getSetting('ldap.searchFilter',    'LDAP_SEARCH_FILTER');
+  const url                = await settingsModel.getSetting('ldap.url',                'LDAP_URL');
+  const bindDN             = await settingsModel.getSetting('ldap.bindDn',             'LDAP_BIND_DN');
+  const bindCredentials    = await settingsModel.getSetting('ldap.bindCredentials',    'LDAP_BIND_CREDENTIALS');
+  const searchBase         = await settingsModel.getSetting('ldap.searchBase',         'LDAP_SEARCH_BASE');
+  const searchFilter       = await settingsModel.getSetting('ldap.searchFilter',       'LDAP_SEARCH_FILTER');
+  const rejectUnauthorized = await settingsModel.getSettingsBool('ldap.rejectUnauthorized', 'LDAP_REJECT_UNAUTHORIZED');
 
   if (!url || !bindDN || !searchBase) {
     logger.warn('LDAP strategy: enabled but missing required settings — skipping');
     return;
   }
 
+  // Auto-prepend ldap:// if no protocol specified
+  const normalizedUrl = /^ldaps?:\/\//i.test(url) ? url : `ldap://${url}`;
+
   try {
     const LdapStrategy = require('passport-ldapauth');
     passport.use('ldapauth', new LdapStrategy(
       {
         server: {
-          url,
+          url:          normalizedUrl,
           bindDN,
           bindCredentials,
           searchBase,
           searchFilter: searchFilter || '(sAMAccountName={{username}})',
+          tlsOptions:   { rejectUnauthorized: rejectUnauthorized !== false },
         },
         usernameField: 'ldapUsername',
         passwordField: 'ldapPassword',

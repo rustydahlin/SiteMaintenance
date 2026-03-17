@@ -6,11 +6,13 @@
           <i class="bi bi-person-lock me-1"></i>Local
         </button>
       </li>
-      <li class="nav-item" id="ldapTabBtn" style="display:none">
+      <% if (ldapEnabled) { %>
+      <li class="nav-item">
         <button class="nav-link" data-bs-toggle="tab" data-bs-target="#ldapTab">
           <i class="bi bi-diagram-3 me-1"></i>Active Directory
         </button>
       </li>
+      <% } %>
     </ul>
 
     <div class="tab-content">
@@ -49,25 +51,13 @@
       </div>
     </div>
 
-    <!-- OIDC / Entra ID button -->
-    <div id="oidcSection" style="display:none" class="mt-3">
+    <% if (oidcEnabled) { %>
+    <div class="mt-3">
       <hr />
       <a href="/auth/oidc" class="btn btn-outline-secondary w-100">
         <i class="bi bi-microsoft me-2"></i>Sign in with Microsoft / Entra ID
       </a>
     </div>
+    <% } %>
   </div>
 </div>
-
-<script>
-// Show LDAP and OIDC tabs only if enabled (server injects data attributes)
-document.addEventListener('DOMContentLoaded', () => {
-  fetch('/auth/methods')
-    .then(r => r.json())
-    .then(data => {
-      if (data.ldap)  document.getElementById('ldapTabBtn').style.display  = '';
-      if (data.oidc)  document.getElementById('oidcSection').style.display = '';
-    })
-    .catch(() => {});
-});
-</script>

@@ -17,6 +17,8 @@ async function createApp() {
 
   // ── Security headers ──────────────────────────────────────────────────────
   app.use(helmet({
+    // Disable HSTS — app runs over plain HTTP; HSTS would force browsers to HTTPS and break everything
+    strictTransportSecurity: false,
     contentSecurityPolicy: {
       directives: {
         defaultSrc:  ["'self'"],
@@ -24,9 +26,11 @@ async function createApp() {
         styleSrc:    ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
         fontSrc:     ["'self'", 'cdn.jsdelivr.net'],
         imgSrc:      ["'self'", 'data:', 'blob:'],
-        connectSrc:  ["'self'"],
-        frameSrc:    ["'none'"],
-        objectSrc:   ["'none'"],
+        connectSrc:  ["'self'", 'cdn.jsdelivr.net'],
+        formAction:              ["'self'"],
+        frameSrc:                ["'none'"],
+        objectSrc:               ["'none'"],
+        upgradeInsecureRequests: null,   // Disable — app runs over plain HTTP
       },
     },
   }));
@@ -69,10 +73,16 @@ async function createApp() {
   app.use(flash());
 
   // ── Global locals for every view ──────────────────────────────────────────
-  app.use((req, res, next) => {
+  const settingsModel = require('./models/settingsModel');
+  app.use(async (req, res, next) => {
     res.locals.user        = req.user || null;
     res.locals.flash       = req.flash();
     res.locals.currentPath = req.path;
+    try {
+      res.locals.appName = await settingsModel.getSetting('app.name', null) || 'SiteMaintenance';
+    } catch (_) {
+      res.locals.appName = 'SiteMaintenance';
+    }
     next();
   });
 

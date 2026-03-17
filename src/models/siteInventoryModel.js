@@ -29,7 +29,21 @@ async function getCurrentItems(siteID) {
         AND si.RemovedAt IS NULL
       ORDER BY si.InstalledAt DESC
     `);
-  return result.recordset;
+
+  // Combine multiple install records for the same bulk item into one display row
+  const rows = result.recordset;
+  const serialized = rows.filter(r => r.TrackingType !== 'bulk');
+  const bulkMap = new Map();
+  rows.filter(r => r.TrackingType === 'bulk').forEach(r => {
+    if (bulkMap.has(r.ItemID)) {
+      bulkMap.get(r.ItemID).Quantity += r.Quantity;
+    } else {
+      bulkMap.set(r.ItemID, { ...r });
+    }
+  });
+
+  return [...serialized, ...bulkMap.values()]
+    .sort((a, b) => new Date(b.InstalledAt) - new Date(a.InstalledAt));
 }
 
 async function getHistory(siteID) {
@@ -280,4 +294,58 @@ async function getItemHistory(itemID) {
   return result.recordset;
 }
 
-module.exports = { getCurrentItems, getHistory, getItemHistory, installItem, removeItem };
+// Removes a specific quantity of a bulk item from a site.
+// Consumes rows newest-first; fully soft-deletes rows where qty is exhausted,
+// partially reduces the quantity on rows where only some units are removed.
+async function removeBulkQuantity(siteID, itemID, removeQty, { removedByUserID } = {}, auditContext = {}) {
+  const pool = await getPool();
+
+  const siRows = await pool.request()
+    .input('SiteID', sql.Int, siteID)
+    .input('ItemID', sql.Int, itemID)
+    .query(`
+      SELECT si.SiteInventoryID, si.Quantity
+      FROM SiteInventory si
+      WHERE si.SiteID = @SiteID AND si.ItemID = @ItemID AND si.RemovedAt IS NULL
+      ORDER BY si.InstalledAt DESC
+    `);
+
+  const totalInstalled = siRows.recordset.reduce((sum, r) => sum + r.Quantity, 0);
+  if (removeQty > totalInstalled) {
+    const err = new Error(`Cannot remove ${removeQty} — only ${totalInstalled} currently installed.`);
+    err.userMessage = err.message;
+    throw err;
+  }
+
+  let remaining = removeQty;
+  for (const row of siRows.recordset) {
+    if (remaining <= 0) break;
+    if (row.Quantity <= remaining) {
+      await removeItem(row.SiteInventoryID, { removedByUserID }, auditContext);
+      remaining -= row.Quantity;
+    } else {
+      // Partial reduction — just lower the quantity, no full removal
+      await pool.request()
+        .input('SiteInventoryID', sql.Int, row.SiteInventoryID)
+        .input('NewQuantity',     sql.Int, row.Quantity - remaining)
+        .query('UPDATE SiteInventory SET Quantity = @NewQuantity WHERE SiteInventoryID = @SiteInventoryID');
+      remaining = 0;
+    }
+  }
+}
+
+async function getByID(siteInventoryID) {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('SiteInventoryID', sql.Int, siteInventoryID)
+    .query(`
+      SELECT si.SiteInventoryID, si.SiteID, si.ItemID, si.Quantity,
+             i.SerialNumber, i.ModelNumber, i.Manufacturer, i.TrackingType
+      FROM SiteInventory si
+      JOIN Inventory i ON i.ItemID = si.ItemID
+      WHERE si.SiteInventoryID = @SiteInventoryID
+    `);
+  return result.recordset[0] || null;
+}
+
+module.exports = { getCurrentItems, getHistory, getItemHistory, getByID, installItem, removeItem, removeBulkQuantity };

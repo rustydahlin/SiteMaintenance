@@ -9,6 +9,8 @@ const documentModel      = require('../models/documentModel');
 const siteInventoryModel = require('../models/siteInventoryModel');
 const inventoryModel     = require('../models/inventoryModel');
 const pmModel            = require('../models/pmModel');
+const repairModel        = require('../models/repairModel');
+const userModel          = require('../models/userModel');
 const { isAuthenticated, isAdmin, canWrite } = require('../middleware/auth');
 
 // All routes require authentication
@@ -103,7 +105,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
 
-    const [site, inventory, recentLogs, documents, pmSchedules, inStockItems, categories, stockLocations] = await Promise.all([
+    const [site, inventory, recentLogs, documents, pmSchedules, inStockItems, categories, stockLocations, allUsers] = await Promise.all([
       siteModel.getByID(siteID),
       siteInventoryModel.getCurrentItems(siteID),
       logModel.getBySite(siteID, { pageSize: 10 }).then(r => r.rows),
@@ -112,6 +114,7 @@ router.get('/:id', async (req, res, next) => {
       inventoryModel.getInStock(),
       lookupModel.getInventoryCategories(),
       lookupModel.getStockLocations(),
+      userModel.getAll(),
     ]);
 
     // Load stock distribution for each bulk item so the install modal can show pull-from options
@@ -142,6 +145,7 @@ router.get('/:id', async (req, res, next) => {
       stockByItem,
       categories,
       stockLocations,
+      allUsers,
       isAdminUser: isAdmin,
       canWrite:    canWriteFlag,
       uploadUrl:   `/documents/upload`,
@@ -294,6 +298,126 @@ router.post('/:id/inventory/install', isAdmin, async (req, res, next) => {
   }
 });
 
+// ── POST /:id/inventory/:siID/replace ────────────────────────────────────────
+router.post('/:id/inventory/:siID/replace', isAdmin, async (req, res, next) => {
+  try {
+    const siteID = parseInt(req.params.id, 10);
+    const siID   = parseInt(req.params.siID, 10);
+    const { replacementItemID, installNotes, startRepair, repairReason } = req.body;
+
+    if (!replacementItemID) {
+      req.flash('error', 'Please select a replacement item.');
+      return res.redirect(`/sites/${siteID}#equipment`);
+    }
+
+    // Fetch the old SiteInventory row before removing it
+    const oldSI = await siteInventoryModel.getByID(siID);
+    if (!oldSI) {
+      req.flash('error', 'Equipment record not found.');
+      return res.redirect(`/sites/${siteID}#equipment`);
+    }
+
+    // Remove the old item from the site
+    await siteInventoryModel.removeItem(siID, { removedByUserID: req.user?.UserID }, req.auditContext);
+
+    // Install the replacement
+    await siteInventoryModel.installItem(
+      siteID,
+      parseInt(replacementItemID, 10),
+      { installedAt: new Date(), installedByUserID: req.user?.UserID, installNotes: installNotes || null },
+      req.auditContext,
+    );
+
+    // Optionally start an RMA for the removed item
+    if (startRepair === '1' || startRepair === 'on') {
+      const repair = await repairModel.create({
+        itemID:          oldSI.ItemID,
+        siteInventoryID: siID,
+        sentDate:        new Date(),
+        reason:          repairReason || 'Replaced at site',
+        sentByUserID:    req.user?.UserID,
+      }, req.auditContext);
+
+      req.flash('success', 'Item replaced. RMA started — please finish filling out the repair details.');
+      return res.redirect(`/repairs/${repair.RepairID}`);
+    }
+
+    req.flash('success', 'Item replaced successfully.');
+    res.redirect(`/sites/${siteID}#equipment`);
+  } catch (err) { next(err); }
+});
+
+// ── POST /:id/inventory/:itemID/replace-bulk ─────────────────────────────────
+router.post('/:id/inventory/:itemID/replace-bulk', isAdmin, async (req, res, next) => {
+  try {
+    const siteID  = parseInt(req.params.id, 10);
+    const itemID  = parseInt(req.params.itemID, 10);
+    const replaceQty  = parseInt(req.body.replaceQty, 10);
+    const installQty  = parseInt(req.body.installQty, 10) || replaceQty;
+    const { installNotes, startRepair, repairReason, pulledFrom } = req.body;
+
+    if (!replaceQty || replaceQty < 1) {
+      req.flash('error', 'Please enter a valid quantity to replace.');
+      return res.redirect(`/sites/${siteID}#equipment`);
+    }
+
+    // Parse pulledFrom: "location:123" | "user:456" | ""
+    let pulledFromLocationID = null;
+    let pulledFromUserID     = null;
+    if (pulledFrom && pulledFrom.startsWith('location:')) {
+      pulledFromLocationID = parseInt(pulledFrom.split(':')[1], 10) || null;
+    } else if (pulledFrom && pulledFrom.startsWith('user:')) {
+      pulledFromUserID = parseInt(pulledFrom.split(':')[1], 10) || null;
+    }
+
+    // Remove the faulty units from the site
+    await siteInventoryModel.removeBulkQuantity(siteID, itemID, replaceQty,
+      { removedByUserID: req.user?.UserID }, req.auditContext);
+
+    // Install replacement units (same item, from chosen stock source)
+    await siteInventoryModel.installItem(siteID, itemID, {
+      installedAt:          new Date(),
+      installedByUserID:    req.user?.UserID,
+      installNotes:         installNotes || null,
+      pulledFromLocationID,
+      pulledFromUserID,
+      quantity:             installQty,
+    }, req.auditContext);
+
+    // Optionally create one RMA per replaced unit
+    if (startRepair === '1' || startRepair === 'on') {
+      if (!repairReason || !repairReason.trim()) {
+        req.flash('error', 'A repair reason is required when starting an RMA.');
+        return res.redirect(`/sites/${siteID}#equipment`);
+      }
+      let firstRepairID = null;
+      for (let i = 0; i < replaceQty; i++) {
+        const repair = await repairModel.create({
+          itemID,
+          sentDate:     new Date(),
+          reason:       repairReason.trim(),
+          sentByUserID: req.user?.UserID,
+        }, req.auditContext);
+        if (i === 0) firstRepairID = repair.RepairID;
+      }
+      const msg = replaceQty === 1
+        ? 'Item replaced. RMA started — please finish filling out the repair details.'
+        : `Item replaced. ${replaceQty} RMA records created — finishing the first one now.`;
+      req.flash('success', msg);
+      return res.redirect(`/repairs/${firstRepairID}`);
+    }
+
+    req.flash('success', `${replaceQty} unit(s) replaced successfully.`);
+    res.redirect(`/sites/${siteID}#equipment`);
+  } catch (err) {
+    if (err.userMessage) {
+      req.flash('error', err.userMessage);
+      return res.redirect(`/sites/${req.params.id}#equipment`);
+    }
+    next(err);
+  }
+});
+
 // ── POST /:id/inventory/:siID/remove ─────────────────────────────────────────
 router.post('/:id/inventory/:siID/remove', isAdmin, async (req, res, next) => {
   try {
@@ -303,6 +427,28 @@ router.post('/:id/inventory/:siID/remove', isAdmin, async (req, res, next) => {
     req.flash('success', 'Item removed from site.');
     res.redirect(`/sites/${siteID}#equipment`);
   } catch (err) { next(err); }
+});
+
+// ── POST /:id/inventory/:itemID/remove-bulk ───────────────────────────────────
+router.post('/:id/inventory/:itemID/remove-bulk', isAdmin, async (req, res, next) => {
+  try {
+    const siteID   = parseInt(req.params.id, 10);
+    const itemID   = parseInt(req.params.itemID, 10);
+    const quantity = parseInt(req.body.quantity, 10);
+    if (!quantity || quantity < 1) {
+      req.flash('error', 'Please enter a valid quantity to remove.');
+      return res.redirect(`/sites/${siteID}#equipment`);
+    }
+    await siteInventoryModel.removeBulkQuantity(siteID, itemID, quantity, { removedByUserID: req.user?.UserID }, req.auditContext);
+    req.flash('success', `${quantity} unit(s) removed from site.`);
+    res.redirect(`/sites/${siteID}#equipment`);
+  } catch (err) {
+    if (err.userMessage) {
+      req.flash('error', err.userMessage);
+      return res.redirect(`/sites/${req.params.id}#equipment`);
+    }
+    next(err);
+  }
 });
 
 module.exports = router;

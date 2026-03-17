@@ -42,7 +42,7 @@
       <%- statusBadge(item.StatusName) %>
       <%- warrantyBadge(item.WarrantyExpires) %>
       <% if (item.CategoryName) { %>
-        <span class="badge bg-light text-dark border"><%= item.CategoryName %></span>
+        <span class="badge bg-body-secondary text-body border"><%= item.CategoryName %></span>
       <% } %>
     </div>
   </div>
@@ -86,7 +86,7 @@
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#docs">Documents</a></li>
 </ul>
 
-<div class="tab-content border border-top-0 rounded-bottom p-3 bg-white shadow-sm">
+<div class="tab-content border border-top-0 rounded-bottom p-3 bg-body shadow-sm">
 
   <!-- ── Overview ─────────────────────────────────────────────────────────── -->
   <div class="tab-pane fade show active" id="overview">
@@ -124,11 +124,24 @@
               <dt class="col-sm-5 text-muted">Status</dt>
               <dd class="col-sm-7"><%- statusBadge(item.StatusName) %></dd>
 
+              <% if (item.TrackingType === 'bulk') { %>
+              <dt class="col-sm-5 text-muted">Total Units</dt>
+              <dd class="col-sm-7 fw-semibold"><%= item.QuantityTotal %></dd>
+
+              <dt class="col-sm-5 text-muted">Available</dt>
+              <dd class="col-sm-7">
+                <span class="badge <%= item.QuantityAvailable > 0 ? 'bg-success' : 'bg-secondary' %>">
+                  <%= item.QuantityAvailable %>
+                </span>
+                <span class="text-muted small ms-1">of <%= item.QuantityTotal %></span>
+              </dd>
+              <% } else { %>
               <dt class="col-sm-5 text-muted">Location</dt>
-              <dd class="col-sm-7"><%= item.LocationName || '—' %></dd>
+              <dd class="col-sm-7"><%= item.StockLocationName || '—' %></dd>
 
               <dt class="col-sm-5 text-muted">Assigned To</dt>
-              <dd class="col-sm-7"><%= item.AssignedToName || '—' %></dd>
+              <dd class="col-sm-7"><%= item.AssignedToUserName || '—' %></dd>
+              <% } %>
 
               <dt class="col-sm-5 text-muted">Warranty</dt>
               <dd class="col-sm-7">
@@ -179,7 +192,7 @@
             <% if (stockDistribution && stockDistribution.length > 0) { %>
             <div class="table-responsive mb-3">
               <table class="table table-sm table-hover align-middle mb-0">
-                <thead class="table-light">
+                <thead>
                   <tr><th>Location / Person</th><th class="text-center">Qty</th><th>Notes</th><% if (isAdminUser) { %><th></th><% } %></tr>
                 </thead>
                 <tbody>
@@ -215,7 +228,7 @@
 
             <!-- Add / update stock entry form -->
             <% if (isAdminUser) { %>
-            <form method="POST" action="/inventory/<%= item.ItemID %>/stock" class="border rounded p-3 bg-light">
+            <form method="POST" action="/inventory/<%= item.ItemID %>/stock" class="border rounded p-3 bg-body-secondary">
               <div class="row g-2 align-items-end">
                 <div class="col-sm-3">
                   <label class="form-label small mb-1">Holder Type</label>
@@ -262,6 +275,70 @@
       </div>
       <% } %>
 
+      <!-- Open RMAs -->
+      <% const openRepairs = (repairs || []).filter(r => !r.ReceivedDate); %>
+      <% if (openRepairs.length > 0) { %>
+      <div class="col-12">
+        <div class="card border-warning">
+          <div class="card-header small fw-semibold d-flex justify-content-between align-items-center bg-warning bg-opacity-10">
+            <span><i class="bi bi-wrench-adjustable me-1 text-warning"></i>Open Repairs / RMAs</span>
+            <span class="badge bg-warning text-dark"><%= openRepairs.length %> open</span>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>RMA #</th>
+                  <th>Sent Date</th>
+                  <th>Reason</th>
+                  <th>Sent By</th>
+                  <th>Expected Return</th>
+                  <th>Follow-Up</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% openRepairs.forEach(r => { %>
+                <tr>
+                  <td class="small fw-semibold"><%= r.RMANumber || '—' %></td>
+                  <td class="small text-muted text-nowrap">
+                    <%= r.SentDate ? new Date(r.SentDate).toLocaleDateString() : '—' %>
+                  </td>
+                  <td class="small"><%= r.Reason || '—' %></td>
+                  <td class="small text-muted"><%= r.SentByName || '—' %></td>
+                  <td class="small text-muted text-nowrap">
+                    <% if (r.ExpectedReturnDate) { %>
+                      <% var exp = new Date(r.ExpectedReturnDate); var overdue = exp < new Date(); %>
+                      <span class="<%= overdue ? 'text-danger fw-semibold' : '' %>">
+                        <%= exp.toLocaleDateString() %><%= overdue ? ' ⚠' : '' %>
+                      </span>
+                    <% } else { %>—<% } %>
+                  </td>
+                  <td class="small text-muted text-nowrap">
+                    <%= r.FollowUpDate ? new Date(r.FollowUpDate).toLocaleDateString() : '—' %>
+                  </td>
+                  <td>
+                    <a href="/repairs/<%= r.RepairID %>" class="btn btn-sm btn-outline-secondary py-0">View</a>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <% } %>
+
+      <!-- All RMAs (collapsed link) -->
+      <% const allRepairs = repairs || []; %>
+      <% if (allRepairs.length > 0 && openRepairs.length < allRepairs.length) { %>
+      <div class="col-12">
+        <a href="/repairs?itemID=<%= item.ItemID %>&status=all" class="small text-muted">
+          <i class="bi bi-clock-history me-1"></i>View all <%= allRepairs.length %> repair records for this item
+        </a>
+      </div>
+      <% } %>
+
     </div>
   </div>
 
@@ -286,7 +363,7 @@
     <% } else { %>
     <div class="table-responsive">
       <table class="table table-sm align-middle">
-        <thead class="table-light">
+        <thead>
           <tr>
             <th>Type</th>
             <th>Date</th>
@@ -349,7 +426,7 @@
     <% } else { %>
     <div class="table-responsive">
       <table class="table table-sm align-middle">
-        <thead class="table-light">
+        <thead>
           <tr>
             <th>Sent Date</th>
             <th>RMA #</th>
@@ -396,3 +473,28 @@
   </div>
 
 </div><!-- /.tab-content -->
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var holderType   = document.getElementById('holderType');
+  var locGroup     = document.getElementById('stockLocGroup');
+  var userGroup    = document.getElementById('stockUserGroup');
+
+  if (holderType) {
+    function toggleHolder() {
+      var isPerson = holderType.value === 'user';
+      locGroup.style.display  = isPerson ? 'none' : '';
+      userGroup.style.display = isPerson ? '' : 'none';
+    }
+    holderType.addEventListener('change', toggleHolder);
+    toggleHolder();
+  }
+
+  // Activate tab from URL hash
+  var hash = window.location.hash;
+  if (hash) {
+    var tab = document.querySelector('[href="' + hash + '"]');
+    if (tab) new bootstrap.Tab(tab).show();
+  }
+});
+</script>

@@ -9,9 +9,17 @@ const logger     = require('../utils/logger');
 const router     = express.Router();
 
 // ── GET /auth/login ───────────────────────────────────────────────────────────
-router.get('/login', (req, res) => {
+router.get('/login', async (req, res) => {
   if (req.isAuthenticated()) return res.redirect('/');
-  res.render('auth/login', { title: 'Sign In', layout: 'layouts/auth' });
+  const settings = require('../models/settingsModel');
+  let ldapEnabled = false, oidcEnabled = false;
+  try {
+    [ldapEnabled, oidcEnabled] = await Promise.all([
+      settings.getSettingsBool('ldap.enabled', 'LDAP_ENABLED'),
+      settings.getSettingsBool('oidc.enabled', 'OIDC_ENABLED'),
+    ]);
+  } catch (_) {}
+  res.render('auth/login', { title: 'Sign In', layout: 'layouts/auth', ldapEnabled, oidcEnabled });
 });
 
 // ── POST /auth/login (local) ──────────────────────────────────────────────────
@@ -55,11 +63,13 @@ router.post('/login',
 router.post('/ldap', (req, res, next) => {
   passport.authenticate('ldapauth', async (err, user, info) => {
     if (err) {
-      if (err.name === 'InvalidCredentialsError' || err.message?.includes('no such user')) {
-        req.flash('error', 'Invalid LDAP credentials.');
-        return res.redirect('/auth/login');
-      }
-      return next(err);
+      // Treat all LDAP errors as auth failures rather than 500s
+      logger.warn(`LDAP auth error [${err.name}]: ${err.message}`);
+      let msg = 'Invalid username or password.';
+      if (err.name === 'InvalidCredentialsError') msg = 'Invalid username or password.';
+      else msg = `LDAP error (${err.name}): ${err.message}`;
+      req.flash('error', msg);
+      return res.redirect('/auth/login');
     }
     if (!user) {
       req.flash('error', info?.message || 'LDAP authentication failed.');
@@ -110,12 +120,17 @@ router.get('/oidc/callback', (req, res, next) => {
 
 // ── GET /auth/methods — tells the login page which SSO buttons to show ────────
 router.get('/methods', async (_req, res) => {
-  const settings = require('../models/settingsModel');
-  const [oidc, ldap] = await Promise.all([
-    settings.getSettingsBool('oidc.enabled', 'OIDC_ENABLED'),
-    settings.getSettingsBool('ldap.enabled', 'LDAP_ENABLED'),
-  ]);
-  res.json({ oidc, ldap });
+  try {
+    const settings = require('../models/settingsModel');
+    const [oidc, ldap] = await Promise.all([
+      settings.getSettingsBool('oidc.enabled', 'OIDC_ENABLED'),
+      settings.getSettingsBool('ldap.enabled', 'LDAP_ENABLED'),
+    ]);
+    res.json({ oidc, ldap });
+  } catch (err) {
+    logger.warn('GET /auth/methods failed:', err.message);
+    res.json({ oidc: false, ldap: false });
+  }
 });
 
 // ── GET /auth/logout ──────────────────────────────────────────────────────────

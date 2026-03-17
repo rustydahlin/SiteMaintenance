@@ -1,5 +1,5 @@
 <% if (user) { %>
-<nav id="sidebar" class="col-md-2 col-lg-2 d-md-block bg-light sidebar collapse">
+<nav id="sidebar" class="col-md-2 col-lg-2 d-md-block bg-body-secondary sidebar collapse">
   <div class="position-sticky pt-4">
     <ul class="nav flex-column">
       <li class="nav-item">
@@ -41,6 +41,18 @@
       </li>
       <% } %>
     </ul>
+
+    <div class="text-center px-3 py-3 border-top">
+      <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
+        <i class="bi bi-moon-stars-fill small text-muted"></i>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="darkModeToggle" role="switch" />
+          <label class="form-check-label small text-muted" for="darkModeToggle">Dark mode</label>
+        </div>
+      </div>
+      <img src="/images/publicsafetyteam.png" alt="Logo" style="width:60px; height:auto; margin-bottom:8px;" />
+      <p class="text-muted" style="font-size:11px; margin:0;">Call Darron. (701) 328-6974</p>
+    </div>
   </div>
 </nav>
 <% } %>

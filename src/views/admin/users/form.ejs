@@ -30,13 +30,15 @@
         <div class="col-md-6">
           <label class="form-label">Auth Provider</label>
           <select name="authProvider" class="form-select" id="authProviderSelect">
-            <option value="local">Local (username + password)</option>
+            <% (authProviders || [{value:'local', label:'Local (username + password)'}]).forEach(p => { %>
+              <option value="<%= p.value %>"><%= p.label %></option>
+            <% }) %>
           </select>
         </div>
         <div class="col-md-6" id="passwordField">
           <label class="form-label">Password <span class="text-danger">*</span></label>
-          <input type="password" name="password" class="form-control" autocomplete="new-password" minlength="8" />
-          <div class="form-text">Minimum 8 characters.</div>
+          <input type="password" name="password" id="passwordInput" class="form-control" autocomplete="new-password" minlength="8" />
+          <div class="form-text">Minimum 8 characters. Not required for LDAP/OIDC accounts.</div>
         </div>
         <% } else { %>
         <div class="col-md-6">
@@ -70,3 +72,22 @@
     </form>
   </div>
 </div>
+
+<% if (!editUser) { %>
+<script>
+(function () {
+  const providerSelect = document.getElementById('authProviderSelect');
+  const passwordField  = document.getElementById('passwordField');
+  const passwordInput  = document.getElementById('passwordInput');
+
+  function togglePassword() {
+    const isLocal = providerSelect.value === 'local';
+    passwordField.style.display = isLocal ? '' : 'none';
+    passwordInput.required = isLocal;
+  }
+
+  providerSelect.addEventListener('change', togglePassword);
+  togglePassword();
+})();
+</script>
+<% } %>

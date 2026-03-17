@@ -116,15 +116,22 @@ router.get('/users', async (_req, res, next) => {
 
 router.get('/users/new', async (_req, res, next) => {
   try {
-    const roles = await lookupModel.getRoles();
-    res.render('admin/users/form', { title: 'New User', editUser: null, roles });
+    const [roles, ldapEnabled, oidcEnabled] = await Promise.all([
+      lookupModel.getRoles(),
+      settingsModel.getSettingsBool('ldap.enabled', 'LDAP_ENABLED'),
+      settingsModel.getSettingsBool('oidc.enabled', 'OIDC_ENABLED'),
+    ]);
+    const authProviders = [{ value: 'local', label: 'Local (username + password)' }];
+    if (ldapEnabled) authProviders.push({ value: 'ldap', label: 'Active Directory (LDAP)' });
+    if (oidcEnabled) authProviders.push({ value: 'oidc', label: 'OIDC / Entra ID' });
+    res.render('admin/users/form', { title: 'New User', editUser: null, roles, authProviders });
   } catch (err) { next(err); }
 });
 
 router.post('/users', [
   body('username').trim().notEmpty().withMessage('Username is required'),
   body('displayName').trim().notEmpty().withMessage('Display name is required'),
-  body('password').notEmpty().withMessage('Password is required for local accounts').if(body('authProvider').equals('local')),
+  body('password').if(body('authProvider').equals('local')).notEmpty().withMessage('Password is required for local accounts'),
 ], async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -189,8 +196,17 @@ router.get('/settings', async (_req, res, next) => {
 
 router.post('/settings', async (req, res, next) => {
   try {
+    // Checkbox fields: if absent from body they were unchecked — save '0' explicitly
+    const checkboxKeys = ['ldap.enabled', 'ldap.starttls', 'ldap.rejectUnauthorized', 'oidc.enabled', 'email.enabled'];
+    for (const ck of checkboxKeys) {
+      if (!(ck in req.body)) req.body[ck] = '0';
+    }
+
+    // Password/secret fields: skip saving if left blank (preserve existing stored value)
+    const secretKeys = ['ldap.bindCredentials', 'oidc.clientSecret', 'email.password'];
     const keys = Object.keys(req.body).filter(k => k !== '_csrf');
     for (const key of keys) {
+      if (secretKeys.includes(key) && !req.body[key]) continue;
       await settingsModel.upsert(key, req.body[key] || '', req.user.UserID, req.auditContext);
     }
     // Re-initialize SSO strategies with new settings
@@ -218,30 +234,85 @@ router.post('/settings/email/test', async (req, res) => {
   }
 });
 
-router.post('/settings/ldap/test', async (req, res, next) => {
-  try {
-    const settingsModel = require('../models/settingsModel');
-    const ldapUrl    = await settingsModel.getSetting('ldap.url',          'LDAP_URL');
-    const bindDN     = await settingsModel.getSetting('ldap.bindDn',       'LDAP_BIND_DN');
-    const bindCreds  = await settingsModel.getSetting('ldap.bindCredentials', 'LDAP_BIND_CREDENTIALS');
-    const searchBase = await settingsModel.getSetting('ldap.searchBase',   'LDAP_SEARCH_BASE');
+router.post('/settings/ldap/test', async (req, res) => {
+  const settingsModel = require('../models/settingsModel');
+  const rawUrl        = await settingsModel.getSetting('ldap.url',             'LDAP_URL');
+  const bindDN        = await settingsModel.getSetting('ldap.bindDn',          'LDAP_BIND_DN');
+  const bindCreds     = await settingsModel.getSetting('ldap.bindCredentials', 'LDAP_BIND_CREDENTIALS');
+  const searchBase    = await settingsModel.getSetting('ldap.searchBase',      'LDAP_SEARCH_BASE');
+  const searchFilter  = await settingsModel.getSetting('ldap.searchFilter',    'LDAP_SEARCH_FILTER');
+  const testUsername  = (req.body.username || '').trim();
 
-    if (!ldapUrl || !bindDN) {
-      return res.json({ success: false, message: 'LDAP URL and Bind DN are required.' });
+  if (!rawUrl || !bindDN) {
+    return res.json({ success: false, message: 'LDAP URL and Bind DN are required.' });
+  }
+
+  const ldapUrl = /^ldaps?:\/\//i.test(rawUrl) ? rawUrl : `ldap://${rawUrl}`;
+  const ldap    = require('ldapjs');
+  let responded = false;
+
+  const client = ldap.createClient({
+    url: ldapUrl,
+    tlsOptions: { rejectUnauthorized: false },
+    connectTimeout: 5000,
+    timeout: 5000,
+  });
+
+  function respond(result) {
+    if (!responded) {
+      responded = true;
+      try { client.destroy(); } catch (_) {}
+      res.json(result);
+    }
+  }
+
+  client.on('error', (err) => {
+    respond({ success: false, message: `Cannot reach LDAP server: ${err.message}` });
+  });
+
+  client.bind(bindDN, bindCreds || '', (bindErr) => {
+    if (bindErr) {
+      return respond({ success: false, message: `Bind failed: ${bindErr.message}` });
     }
 
-    const ldap   = require('ldapjs');
-    const client = ldap.createClient({ url: ldapUrl });
-    await new Promise((resolve, reject) => {
-      client.bind(bindDN, bindCreds || '', (err) => {
-        client.destroy();
-        if (err) reject(err); else resolve();
+    if (!testUsername || !searchBase) {
+      return respond({ success: true, message: 'LDAP connection and bind successful.' });
+    }
+
+    // Escape special chars in username before inserting into filter
+    const escaped = testUsername.replace(/[*()\\\x00]/g, c => '\\' + c.charCodeAt(0).toString(16).padStart(2, '0'));
+    const filter  = (searchFilter || '(sAMAccountName={{username}})').replace('{{username}}', escaped);
+
+    client.search(searchBase, { filter, scope: 'sub', attributes: ['dn', 'displayName', 'mail', 'userPrincipalName'] }, (searchErr, searchRes) => {
+      if (searchErr) {
+        return respond({ success: false, message: `Search failed: ${searchErr.message}` });
+      }
+
+      let found = false;
+      let foundDn = '';
+
+      searchRes.on('searchEntry', (entry) => {
+        found = true;
+        foundDn = entry.objectName || '';
+      });
+
+      searchRes.on('error', (err) => {
+        if (found) {
+          respond({ success: true, message: `Bind OK. User "${testUsername}" found.${foundDn ? ' DN: ' + foundDn : ''}` });
+        } else {
+          respond({ success: false, message: `Search error: ${err.message}` });
+        }
+      });
+
+      searchRes.on('end', () => {
+        if (found) {
+          respond({ success: true, message: `Bind OK. User "${testUsername}" found.${foundDn ? ' DN: ' + foundDn : ''}` });
+        } else {
+          respond({ success: false, message: `Bind OK, but user "${testUsername}" was not found in ${searchBase}.` });
+        }
       });
     });
-    res.json({ success: true, message: 'LDAP connection and bind successful.' });
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
+  });
 });
 
 // ── Audit Log ─────────────────────────────────────────────────────────────────

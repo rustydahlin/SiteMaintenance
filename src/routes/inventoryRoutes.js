@@ -7,6 +7,7 @@ const lookupModel        = require('../models/lookupModel');
 const documentModel      = require('../models/documentModel');
 const siteInventoryModel = require('../models/siteInventoryModel');
 const userModel          = require('../models/userModel');
+const repairModel        = require('../models/repairModel');
 const { isAuthenticated, isAdmin } = require('../middleware/auth');
 
 // All routes require authentication
@@ -116,11 +117,12 @@ router.get('/:id', async (req, res, next) => {
   try {
     const itemID = parseInt(req.params.id, 10);
 
-    const [item, possessionHistory, documents, siteHistory] = await Promise.all([
+    const [item, possessionHistory, documents, siteHistory, repairResult] = await Promise.all([
       inventoryModel.getByID(itemID),
       inventoryModel.getPossessionHistory(itemID),
       documentModel.getByItem(itemID),
       siteInventoryModel.getItemHistory(itemID),
+      repairModel.getAll({ itemID }),
     ]);
     const [stockDistribution, stockLocations, allUsers] = item && item.TrackingType === 'bulk'
       ? await Promise.all([
@@ -148,6 +150,7 @@ router.get('/:id', async (req, res, next) => {
       stockDistribution,
       stockLocations,
       allUsers,
+      repairs: repairResult.rows,
       isAdminUser,
       canWrite:        canWriteFlag,
       uploadUrl:       `/documents/upload`,
@@ -323,7 +326,13 @@ router.post('/:id/stock', isAdmin, async (req, res, next) => {
     });
     req.flash('success', 'Stock distribution updated.');
     res.redirect(`/inventory/${itemID}#overview`);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.userMessage) {
+      req.flash('error', err.userMessage);
+      return res.redirect(`/inventory/${req.params.id}#overview`);
+    }
+    next(err);
+  }
 });
 
 // ── POST /:id/stock/:stockId/delete — remove a stock row ─────────────────────

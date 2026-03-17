@@ -84,14 +84,20 @@ cd SiteMaintenance
    DB_TRUST_SERVER_CERT=true    # Set to false in production with valid certs
    ```
 
-   **Required — Session:**
+   **Required — Session & Encryption:**
    ```
    SESSION_SECRET=replace-with-a-long-random-string
+   SETTINGS_ENCRYPTION_KEY=replace-with-another-long-random-string
+   COOKIE_SECURE=false
    ```
-   Generate a strong secret:
+   Generate strong secrets (run twice — once for each key):
    ```bash
    node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
    ```
+
+   > **`SETTINGS_ENCRYPTION_KEY`** — Used to encrypt sensitive settings stored in the database (LDAP bind password, OIDC client secret, SMTP password). If not set, `SESSION_SECRET` is used as a fallback. **Warning:** changing this key invalidates previously encrypted settings — you will need to re-enter them in Admin → Settings.
+
+   > **`COOKIE_SECURE`** — Set to `true` only when the app is behind HTTPS. Leave `false` for plain HTTP. Setting this to `true` over HTTP will silently break login (browser will not send secure cookies over HTTP).
 
    **Optional — OIDC / Entra ID:** (can also be configured in the Admin UI after setup)
    ```
@@ -211,7 +217,7 @@ For production deployments:
    ```
 3. **Environment** — Set `NODE_ENV=production` in `.env`
 4. **HTTPS** — Configure TLS on your reverse proxy and set `DB_ENCRYPT=true`
-5. **Session cookie** — With `NODE_ENV=production`, cookies are marked `secure: true` — requires HTTPS
+5. **Session cookie** — Set `COOKIE_SECURE=true` in `.env` once HTTPS is in place. Do not set this over plain HTTP or login will silently break.
 
 ---
 
@@ -262,9 +268,15 @@ SiteMaintenance/
 **Session errors on startup**
 - Ensure `schema.sql` was run and the `Sessions` table exists in your database
 
-**Login not working**
+**Login not working / sign-in button appears to do nothing**
 - Verify the `Users` table has the admin row from `seed.sql`
+- Check that `COOKIE_SECURE` is not set to `true` while running over plain HTTP — this silently breaks sessions
 - Check the application log in `src/logs/` for error details
+
+**LDAP encrypted password lost after saving settings**
+- Sensitive fields (LDAP bind password, OIDC secret, SMTP password) are skipped if left blank on save, preserving the stored value
+- If a password appears as "Not set", re-enter and save it once to store it encrypted
+- If you change `SETTINGS_ENCRYPTION_KEY`, all previously encrypted values must be re-entered
 
 **OIDC callback errors**
 - Ensure the `OIDC_REDIRECT_URI` exactly matches what is registered in your Entra ID app registration
