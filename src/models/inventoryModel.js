@@ -553,10 +553,31 @@ async function getInStock() {
   return result.recordset;
 }
 
+async function findByImportKey(trackingType, serialNumber, commonName, modelNumber) {
+  const pool = await getPool();
+  if (trackingType === 'serialized' && serialNumber) {
+    const r = await pool.request()
+      .input('SerialNumber', sql.NVarChar(100), serialNumber)
+      .query('SELECT ItemID FROM Inventory WHERE SerialNumber = @SerialNumber AND IsActive = 1');
+    return r.recordset.length ? r.recordset[0].ItemID : null;
+  }
+  if (trackingType === 'bulk') {
+    const req = pool.request().input('CommonName', sql.NVarChar(150), commonName);
+    const modelClause = modelNumber ? 'AND ModelNumber = @ModelNumber' : 'AND ModelNumber IS NULL';
+    if (modelNumber) req.input('ModelNumber', sql.NVarChar(100), modelNumber);
+    const r = await req.query(
+      `SELECT ItemID FROM Inventory WHERE TrackingType = 'bulk' AND CommonName = @CommonName AND IsActive = 1 ${modelClause}`
+    );
+    return r.recordset.length ? r.recordset[0].ItemID : null;
+  }
+  return null;
+}
+
 module.exports = {
   getAll, getByID, create, update, softDelete,
   updateStatus, checkOut, checkIn,
   getPossessionHistory, getCurrentHolder,
   getInStock, getRelatedParts, getSystemsList,
   getStock, upsertStock, removeStock, adjustStock,
+  findByImportKey,
 };

@@ -34,11 +34,27 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-box-seam me-2"></i>Inventory</h1>
-  <% if (user && user.roles && user.roles.includes('Admin')) { %>
-    <a href="/inventory/new" class="btn btn-primary btn-sm">
-      <i class="bi bi-plus-lg me-1"></i>Add Item
+  <div class="d-flex gap-2">
+    <%
+      const exportParts = [];
+      if (filters.categoryID) exportParts.push(`categoryID=${encodeURIComponent(filters.categoryID)}`);
+      if (filters.statusID)   exportParts.push(`statusID=${encodeURIComponent(filters.statusID)}`);
+      if (filters.search)     exportParts.push(`search=${encodeURIComponent(filters.search)}`);
+      if (filters.locationID) exportParts.push(`locationID=${encodeURIComponent(filters.locationID)}`);
+      exportParts.push(`sort=${encodeURIComponent(curSort)}`, `dir=${encodeURIComponent(curDir)}`);
+    %>
+    <a href="/inventory/export?<%= exportParts.join('&') %>" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-file-earmark-arrow-down me-1"></i>Export
     </a>
-  <% } %>
+    <% if (user && user.roles && user.roles.includes('Admin')) { %>
+      <a href="/inventory/import" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-spreadsheet me-1"></i>Import
+      </a>
+      <a href="/inventory/new" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Add Item
+      </a>
+    <% } %>
+  </div>
 </div>
 
 <!-- Filter form -->

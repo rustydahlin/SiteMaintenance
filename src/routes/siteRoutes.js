@@ -66,6 +66,41 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// ── GET /export — download all matching sites as Excel ───────────────────────
+router.get('/export', async (req, res, next) => {
+  try {
+    const { typeID, statusID, search, pmDue, sort = 'siteName', dir = 'asc' } = req.query;
+    const { rows } = await siteModel.getAll({ typeID, statusID, search, pmDue, page: 1, pageSize: 100000, sort, dir });
+
+    const sheetData = rows.map(s => ({
+      SiteNumber:      s.SiteNumber      || '',
+      SiteName:        s.SiteName        || '',
+      SiteType:        s.SiteTypeName    || '',
+      Status:          s.SiteStatusName  || '',
+      Address:         s.Address         || '',
+      City:            s.City            || '',
+      State:           s.State           || '',
+      ZipCode:         s.ZipCode         || '',
+      Latitude:        s.Latitude        != null ? s.Latitude  : '',
+      Longitude:       s.Longitude       != null ? s.Longitude : '',
+      WarrantyExpires: s.WarrantyExpires  ? new Date(s.WarrantyExpires).toISOString().split('T')[0]  : '',
+      NextPMDate:      s.NextPMDate       ? new Date(s.NextPMDate).toISOString().split('T')[0]       : '',
+      Description:     s.Description     || '',
+    }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheetData), 'Sites');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="sites-export-${date}.xlsx"`);
+    res.send(buf);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── GET /import/template — download blank Excel template ─────────────────────
 router.get('/import/template', isAdmin, (_req, res) => {
   const wb = XLSX.utils.book_new();
@@ -89,7 +124,7 @@ router.get('/import', isAdmin, (_req, res) => {
   res.render('sites/import', { title: 'Import Sites', results: null });
 });
 
-// ── POST /import — process uploaded file ──────────────────────────────────────
+// ── POST /import — dry-run: parse file and show preview ───────────────────────
 router.post('/import', isAdmin, importUpload.single('importFile'), async (req, res, next) => {
   try {
     if (!req.file) {
@@ -97,7 +132,6 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
       return res.redirect('/sites/import');
     }
 
-    // Parse workbook from buffer
     const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
@@ -107,7 +141,6 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
       return res.redirect('/sites/import');
     }
 
-    // Load lookups for name→ID resolution
     const [siteTypes, siteStatuses] = await Promise.all([
       lookupModel.getSiteTypes(),
       lookupModel.getSiteStatuses(),
@@ -115,16 +148,20 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
     const typeMap   = Object.fromEntries(siteTypes.map(t => [t.TypeName.toLowerCase(),   t.SiteTypeID]));
     const statusMap = Object.fromEntries(siteStatuses.map(s => [s.StatusName.toLowerCase(), s.SiteStatusID]));
 
-    const results = { total: rows.length, created: 0, skipped: 0, errors: 0, rows: [] };
+    const plan    = [];
+    const summary = { total: rows.length, created: 0, updated: 0, skipped: 0, errors: 0 };
+    const norm    = v => (v == null || v === '') ? null : String(v).trim();
+    const fmtDate = v => { if (!v) return null; const d = v instanceof Date ? v : new Date(v); return isNaN(d) ? null : d.toISOString().split('T')[0]; };
 
     for (let i = 0; i < rows.length; i++) {
-      const row     = rows[i];
-      const rowNum  = i + 2; // +2: 1-based + header row
-      const siteName = (row['SiteName'] || '').toString().trim();
+      const row        = rows[i];
+      const rowNum     = i + 2;
+      const siteName   = (row['SiteName']   || '').toString().trim();
+      const siteNumber = (row['SiteNumber'] || '').toString().trim() || null;
 
       if (!siteName) {
-        results.skipped++;
-        results.rows.push({ rowNum, siteName: '', result: 'skipped', message: 'SiteName is blank' });
+        summary.skipped++;
+        plan.push({ action: 'skip', rowNum, display: { siteName: '', siteNumber }, message: 'SiteName is blank' });
         continue;
       }
 
@@ -133,56 +170,101 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
       const siteTypeID   = siteTypeName ? (typeMap[siteTypeName.toLowerCase()]   || null) : null;
       const siteStatusID = statusName   ? (statusMap[statusName.toLowerCase()] || null) : null;
 
-      // Warn if a type/status name was given but not found
       if (siteTypeName && !siteTypeID) {
-        results.errors++;
-        results.rows.push({ rowNum, siteName, siteNumber: row['SiteNumber'], siteType: siteTypeName, status: statusName, result: 'error', message: `Site Type "${siteTypeName}" not found` });
+        summary.errors++;
+        plan.push({ action: 'error', rowNum, display: { siteName, siteNumber, siteType: siteTypeName, status: statusName }, message: `Site Type "${siteTypeName}" not found` });
         continue;
       }
       if (statusName && !siteStatusID) {
-        results.errors++;
-        results.rows.push({ rowNum, siteName, siteNumber: row['SiteNumber'], siteType: siteTypeName, status: statusName, result: 'error', message: `Status "${statusName}" not found` });
+        summary.errors++;
+        plan.push({ action: 'error', rowNum, display: { siteName, siteNumber, siteType: siteTypeName, status: statusName }, message: `Status "${statusName}" not found` });
         continue;
       }
 
-      // Parse warranty date — may come in as a JS Date (cellDates:true) or a string
-      let warrantyExpires = null;
-      const rawWarranty = row['WarrantyExpires'];
-      if (rawWarranty) {
-        const d = rawWarranty instanceof Date ? rawWarranty : new Date(rawWarranty);
-        if (!isNaN(d)) warrantyExpires = d.toISOString().split('T')[0];
+      const latRaw = row['Latitude']  !== '' ? parseFloat(row['Latitude'])  : null;
+      const lonRaw = row['Longitude'] !== '' ? parseFloat(row['Longitude']) : null;
+
+      const siteData = {
+        siteName,
+        siteNumber,
+        contractNumber:  norm(row['ContractNumber']),
+        siteTypeID,
+        siteStatusID,
+        address:         norm(row['Address']),
+        city:            norm(row['City']),
+        state:           norm(row['State']),
+        zipCode:         norm(row['ZipCode']),
+        latitude:        isNaN(latRaw)  ? null : latRaw,
+        longitude:       isNaN(lonRaw) ? null : lonRaw,
+        warrantyExpires: fmtDate(row['WarrantyExpires']),
+        description:     norm(row['Description']),
+      };
+
+      const existingID = await siteModel.findByImportKey(siteNumber, siteName);
+      if (existingID) {
+        const existing = await siteModel.getByID(existingID);
+        const diff = [
+          ['Site Name',    norm(existing.SiteName),        norm(siteData.siteName)],
+          ['Site #',       norm(existing.SiteNumber),       norm(siteData.siteNumber)],
+          ['Contract #',   norm(existing.ContractNumber),   norm(siteData.contractNumber)],
+          ['Type',         norm(existing.SiteTypeName),     norm(siteTypeName) || null],
+          ['Status',       norm(existing.SiteStatusName),   norm(statusName)   || null],
+          ['Address',      norm(existing.Address),          norm(siteData.address)],
+          ['City',         norm(existing.City),             norm(siteData.city)],
+          ['State',        norm(existing.State),            norm(siteData.state)],
+          ['Zip',          norm(existing.ZipCode),          norm(siteData.zipCode)],
+          ['Latitude',     existing.Latitude  != null ? String(existing.Latitude)  : null, siteData.latitude  != null ? String(siteData.latitude)  : null],
+          ['Longitude',    existing.Longitude != null ? String(existing.Longitude) : null, siteData.longitude != null ? String(siteData.longitude) : null],
+          ['Warranty',     fmtDate(existing.WarrantyExpires), siteData.warrantyExpires],
+          ['Description',  norm(existing.Description),     norm(siteData.description)],
+        ].filter(([, from, to]) => from !== to)
+         .map(([field, from, to]) => ({ field, from, to }));
+
+        summary.updated++;
+        plan.push({ action: 'update', rowNum, display: { siteName, siteNumber, siteType: siteTypeName, status: statusName }, existingID, data: siteData, diff });
+      } else {
+        summary.created++;
+        plan.push({ action: 'create', rowNum, display: { siteName, siteNumber, siteType: siteTypeName, status: statusName }, data: siteData });
       }
+    }
 
-      // Parse lat/lon — coerce empty string to null
-      const latitude  = row['Latitude']  !== '' ? parseFloat(row['Latitude'])  : null;
-      const longitude = row['Longitude'] !== '' ? parseFloat(row['Longitude']) : null;
+    res.render('sites/import-preview', { title: 'Import Sites — Preview', summary, plan, importPlan: JSON.stringify(plan) });
+  } catch (err) {
+    next(err);
+  }
+});
 
+// ── POST /import/confirm — execute confirmed plan ─────────────────────────────
+router.post('/import/confirm', isAdmin, async (req, res, next) => {
+  try {
+    const plan = JSON.parse(req.body.importPlan || '[]');
+    const results = { total: plan.length, created: 0, updated: 0, skipped: 0, errors: 0, rows: [] };
+
+    for (const entry of plan) {
+      if (entry.action === 'skip') {
+        results.skipped++;
+        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'skipped', message: entry.message });
+        continue;
+      }
+      if (entry.action === 'error') {
+        results.errors++;
+        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: entry.message });
+        continue;
+      }
       try {
-        const site = await siteModel.create({
-          siteName,
-          siteNumber:      (row['SiteNumber']     || '').toString().trim() || null,
-          contractNumber:  (row['ContractNumber'] || '').toString().trim() || null,
-          siteTypeID,
-          siteStatusID,
-          address:         (row['Address']     || '').toString().trim() || null,
-          city:            (row['City']         || '').toString().trim() || null,
-          state:           (row['State']        || '').toString().trim() || null,
-          zipCode:         (row['ZipCode']      || '').toString().trim() || null,
-          latitude:        isNaN(latitude)  ? null : latitude,
-          longitude:       isNaN(longitude) ? null : longitude,
-          warrantyExpires,
-          description:     (row['Description'] || '').toString().trim() || null,
-        }, req.auditContext);
-
-        results.created++;
-        results.rows.push({
-          rowNum, siteName, siteNumber: row['SiteNumber'], siteType: siteTypeName,
-          status: statusName, result: 'created', siteID: site.SiteID,
-        });
+        if (entry.action === 'update') {
+          await siteModel.update(entry.existingID, entry.data, req.auditContext);
+          results.updated++;
+          results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'updated', siteID: entry.existingID });
+        } else {
+          const site = await siteModel.create(entry.data, req.auditContext);
+          results.created++;
+          results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'created', siteID: site.SiteID });
+        }
       } catch (err) {
         results.errors++;
         const msg = err.number === 2627 ? 'Duplicate site name' : (err.message || 'Database error');
-        results.rows.push({ rowNum, siteName, siteNumber: row['SiteNumber'], siteType: siteTypeName, status: statusName, result: 'error', message: msg });
+        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: msg });
       }
     }
 

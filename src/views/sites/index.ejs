@@ -51,16 +51,27 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-building me-2"></i>Sites</h1>
-  <% if (user && user.roles && user.roles.includes('Admin')) { %>
   <div class="d-flex gap-2">
+    <%
+      const exportParts = [];
+      if (filters.typeID)   exportParts.push(`typeID=${encodeURIComponent(filters.typeID)}`);
+      if (filters.statusID) exportParts.push(`statusID=${encodeURIComponent(filters.statusID)}`);
+      if (filters.search)   exportParts.push(`search=${encodeURIComponent(filters.search)}`);
+      if (filters.pmDue)    exportParts.push(`pmDue=${encodeURIComponent(filters.pmDue)}`);
+      exportParts.push(`sort=${encodeURIComponent(curSort)}`, `dir=${encodeURIComponent(curDir)}`);
+    %>
+    <a href="/sites/export?<%= exportParts.join('&') %>" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-file-earmark-arrow-down me-1"></i>Export
+    </a>
+    <% if (user && user.roles && user.roles.includes('Admin')) { %>
     <a href="/sites/import" class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-file-earmark-spreadsheet me-1"></i>Import
     </a>
     <a href="/sites/new" class="btn btn-primary btn-sm">
       <i class="bi bi-plus-lg me-1"></i>New Site
     </a>
+    <% } %>
   </div>
-  <% } %>
 </div>
 
 <!-- Filter form -->

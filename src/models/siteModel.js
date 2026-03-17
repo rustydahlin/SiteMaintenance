@@ -253,4 +253,18 @@ async function getSimpleList() {
   return result.recordset;
 }
 
-module.exports = { getAll, getByID, getSubsites, getSimpleList, create, update, softDelete };
+async function findByImportKey(siteNumber, siteName) {
+  const pool = await getPool();
+  if (siteNumber) {
+    const r = await pool.request()
+      .input('SiteNumber', sql.NVarChar(100), siteNumber)
+      .query('SELECT SiteID FROM Sites WHERE SiteNumber = @SiteNumber AND IsActive = 1');
+    if (r.recordset.length) return r.recordset[0].SiteID;
+  }
+  const r = await pool.request()
+    .input('SiteName', sql.NVarChar(200), siteName)
+    .query('SELECT SiteID FROM Sites WHERE SiteName = @SiteName AND IsActive = 1');
+  return r.recordset.length ? r.recordset[0].SiteID : null;
+}
+
+module.exports = { getAll, getByID, getSubsites, getSimpleList, create, update, softDelete, findByImportKey };

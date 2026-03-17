@@ -2,7 +2,18 @@
 
 const express            = require('express');
 const router             = express.Router();
+const multer             = require('multer');
+const XLSX               = require('xlsx');
 const inventoryModel     = require('../models/inventoryModel');
+
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (/\.(xlsx|xls)$/i.test(file.originalname)) cb(null, true);
+    else cb(new Error('Only .xlsx and .xls files are accepted'));
+  },
+});
 const lookupModel        = require('../models/lookupModel');
 const documentModel      = require('../models/documentModel');
 const siteInventoryModel = require('../models/siteInventoryModel');
@@ -50,6 +61,234 @@ router.get('/', async (req, res, next) => {
         queryString: queryParts.join('&'),
       },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /export — download all matching inventory as Excel ───────────────────
+router.get('/export', async (req, res, next) => {
+  try {
+    const { categoryID, statusID, search, locationID, sort = 'commonName', dir = 'asc' } = req.query;
+    const { rows } = await inventoryModel.getAll({ categoryID, statusID, search, locationID, page: 1, pageSize: 100000, sort, dir });
+
+    const sheetData = rows.map(i => ({
+      TrackingType:    i.TrackingType    || '',
+      CommonName:      i.CommonName      || '',
+      SerialNumber:    i.SerialNumber    || '',
+      AssetTag:        i.AssetTag        || '',
+      PartNumber:      i.PartNumber      || '',
+      ModelNumber:     i.ModelNumber     || '',
+      Manufacturer:    i.Manufacturer    || '',
+      Category:        i.CategoryName    || '',
+      Status:          i.StatusName      || '',
+      StockLocation:   i.TrackingType === 'bulk' ? (i.BulkPrimaryLocation || '') : (i.StockLocationName || ''),
+      QuantityTotal:   i.TrackingType === 'bulk' ? (i.QuantityTotal   ?? '') : '',
+      QuantityAvailable: i.TrackingType === 'bulk' ? (i.QuantityAvailable ?? '') : '',
+      CurrentSite:     i.CurrentSiteName || '',
+      AssignedTo:      i.AssignedToUserName || '',
+      PurchaseDate:    i.PurchaseDate    ? new Date(i.PurchaseDate).toISOString().split('T')[0]    : '',
+      WarrantyExpires: i.WarrantyExpires ? new Date(i.WarrantyExpires).toISOString().split('T')[0] : '',
+      Description:     i.Description    || '',
+      Notes:           i.Notes          || '',
+    }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheetData), 'Inventory');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="inventory-export-${date}.xlsx"`);
+    res.send(buf);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /import/template — download blank Excel template ─────────────────────
+router.get('/import/template', isAdmin, (_req, res) => {
+  const wb = XLSX.utils.book_new();
+  const headers = [
+    'TrackingType', 'CommonName', 'SerialNumber', 'AssetTag', 'PartNumber',
+    'ModelNumber', 'Manufacturer', 'Category', 'Status', 'StockLocation',
+    'QuantityTotal', 'PurchaseDate', 'WarrantyExpires', 'Description', 'Notes',
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers]);
+  ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 4, 16) }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Disposition', 'attachment; filename="inventory_import_template.xlsx"');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buf);
+});
+
+// ── GET /import — upload form ─────────────────────────────────────────────────
+router.get('/import', isAdmin, (_req, res) => {
+  res.render('inventory/import', { title: 'Import Inventory', results: null });
+});
+
+// ── POST /import — dry-run: parse file and show preview ───────────────────────
+router.post('/import', isAdmin, importUpload.single('importFile'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      req.flash('error', 'Please select a file to upload.');
+      return res.redirect('/inventory/import');
+    }
+
+    const wb   = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    if (rows.length === 0) {
+      req.flash('error', 'The file appears to be empty.');
+      return res.redirect('/inventory/import');
+    }
+
+    const [categories, statuses, locations] = await Promise.all([
+      lookupModel.getInventoryCategories(),
+      lookupModel.getInventoryStatuses(),
+      lookupModel.getStockLocations(),
+    ]);
+    const categoryMap     = Object.fromEntries(categories.map(c => [c.CategoryName.toLowerCase(), c.CategoryID]));
+    const statusMap       = Object.fromEntries(statuses.map(s => [s.StatusName.toLowerCase(), s.StatusID]));
+    const locationMap     = Object.fromEntries(locations.map(l => [l.LocationName.toLowerCase(), l.LocationID]));
+    const inStockStatusID = statuses.find(s => s.StatusName === 'In-Stock')?.StatusID || null;
+
+    const plan    = [];
+    const summary = { total: rows.length, created: 0, updated: 0, skipped: 0, errors: 0 };
+    const norm    = v => (v == null || v === '') ? null : String(v).trim();
+    const fmtDate = v => { if (!v) return null; const d = v instanceof Date ? v : new Date(v); return isNaN(d) ? null : d.toISOString().split('T')[0]; };
+
+    for (let i = 0; i < rows.length; i++) {
+      const row         = rows[i];
+      const rowNum      = i + 2;
+      const commonName  = (row['CommonName']   || '').toString().trim();
+      const trackingRaw = (row['TrackingType'] || '').toString().trim().toLowerCase();
+
+      if (!commonName) {
+        summary.skipped++;
+        plan.push({ action: 'skip', rowNum, display: { commonName: '', trackingType: '' }, message: 'CommonName is blank' });
+        continue;
+      }
+
+      const trackingType = trackingRaw === 'bulk' ? 'bulk' : 'serialized';
+      const serialNumber = trackingType === 'serialized' ? norm(row['SerialNumber']) : null;
+      const modelNumber  = norm(row['ModelNumber']);
+
+      const categoryName = (row['Category']     || '').toString().trim();
+      const statusName   = (row['Status']        || '').toString().trim();
+      const locationName = (row['StockLocation'] || '').toString().trim();
+
+      const categoryID = categoryName ? (categoryMap[categoryName.toLowerCase()] || null) : null;
+      const locationID = locationName ? (locationMap[locationName.toLowerCase()] || null) : null;
+      const statusID   = statusName   ? (statusMap[statusName.toLowerCase()]     || null) : inStockStatusID;
+
+      if (categoryName && !categoryID) {
+        summary.errors++;
+        plan.push({ action: 'error', rowNum, display: { commonName, serialNumber, trackingType, category: categoryName }, message: `Category "${categoryName}" not found` });
+        continue;
+      }
+      if (statusName && !statusID) {
+        summary.errors++;
+        plan.push({ action: 'error', rowNum, display: { commonName, serialNumber, trackingType, category: categoryName }, message: `Status "${statusName}" not found` });
+        continue;
+      }
+      if (locationName && !locationID) {
+        summary.errors++;
+        plan.push({ action: 'error', rowNum, display: { commonName, serialNumber, trackingType, category: categoryName }, message: `Stock Location "${locationName}" not found` });
+        continue;
+      }
+
+      const quantityTotal = trackingType === 'bulk' ? (parseInt(row['QuantityTotal'], 10) || 1) : 1;
+
+      const itemData = {
+        commonName,
+        serialNumber,
+        assetTag:        trackingType === 'serialized' ? norm(row['AssetTag']) : null,
+        partNumber:      norm(row['PartNumber']),
+        modelNumber,
+        manufacturer:    norm(row['Manufacturer']),
+        categoryID,
+        statusID,
+        stockLocationID: trackingType === 'serialized' ? locationID : null,
+        quantityTotal,
+        description:     norm(row['Description']),
+        notes:           norm(row['Notes']),
+        purchaseDate:    fmtDate(row['PurchaseDate']),
+        warrantyExpires: fmtDate(row['WarrantyExpires']),
+      };
+
+      const existingID = await inventoryModel.findByImportKey(trackingType, serialNumber, commonName, modelNumber);
+      if (existingID) {
+        const existing = await inventoryModel.getByID(existingID);
+        const diff = [
+          ['Common Name',    norm(existing.CommonName),       norm(itemData.commonName)],
+          ['Serial #',       norm(existing.SerialNumber),     norm(itemData.serialNumber)],
+          ['Asset Tag',      norm(existing.AssetTag),         norm(itemData.assetTag)],
+          ['Part #',         norm(existing.PartNumber),       norm(itemData.partNumber)],
+          ['Model #',        norm(existing.ModelNumber),      norm(itemData.modelNumber)],
+          ['Manufacturer',   norm(existing.Manufacturer),     norm(itemData.manufacturer)],
+          ['Category',       norm(existing.CategoryName),     norm(categoryName) || null],
+          ['Status',         norm(existing.StatusName),       norm(statusName)   || null],
+          ['Stock Location', norm(existing.StockLocationName), norm(locationName) || null],
+          ['Qty Total',      existing.QuantityTotal != null ? String(existing.QuantityTotal) : null, String(itemData.quantityTotal)],
+          ['Purchase Date',  fmtDate(existing.PurchaseDate),  itemData.purchaseDate],
+          ['Warranty',       fmtDate(existing.WarrantyExpires), itemData.warrantyExpires],
+          ['Description',    norm(existing.Description),      norm(itemData.description)],
+          ['Notes',          norm(existing.Notes),            norm(itemData.notes)],
+        ].filter(([, from, to]) => from !== to)
+         .map(([field, from, to]) => ({ field, from, to }));
+
+        summary.updated++;
+        plan.push({ action: 'update', rowNum, display: { commonName, serialNumber, trackingType, category: categoryName }, existingID, data: itemData, diff });
+      } else {
+        summary.created++;
+        plan.push({ action: 'create', rowNum, display: { commonName, serialNumber, trackingType, category: categoryName }, data: { trackingType, ...itemData } });
+      }
+    }
+
+    res.render('inventory/import-preview', { title: 'Import Inventory — Preview', summary, plan, importPlan: JSON.stringify(plan) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── POST /import/confirm — execute confirmed plan ─────────────────────────────
+router.post('/import/confirm', isAdmin, async (req, res, next) => {
+  try {
+    const plan = JSON.parse(req.body.importPlan || '[]');
+    const results = { total: plan.length, created: 0, updated: 0, skipped: 0, errors: 0, rows: [] };
+
+    for (const entry of plan) {
+      if (entry.action === 'skip') {
+        results.skipped++;
+        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'skipped', message: entry.message });
+        continue;
+      }
+      if (entry.action === 'error') {
+        results.errors++;
+        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: entry.message });
+        continue;
+      }
+      try {
+        if (entry.action === 'update') {
+          await inventoryModel.update(entry.existingID, entry.data, req.auditContext);
+          results.updated++;
+          results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'updated', itemID: entry.existingID });
+        } else {
+          const item = await inventoryModel.create(entry.data, req.auditContext);
+          results.created++;
+          results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'created', itemID: item.ItemID });
+        }
+      } catch (err) {
+        results.errors++;
+        const msg = err.number === 2627 ? 'Duplicate serial number' : (err.message || 'Database error');
+        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: msg });
+      }
+    }
+
+    res.render('inventory/import', { title: 'Import Inventory', results });
   } catch (err) {
     next(err);
   }

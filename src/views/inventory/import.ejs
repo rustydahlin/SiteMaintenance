@@ -1,18 +1,18 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h1 class="h3 mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Import Sites</h1>
-  <a href="/sites" class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-arrow-left me-1"></i>Back to Sites
+  <h1 class="h3 mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Import Inventory</h1>
+  <a href="/inventory" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back to Inventory
   </a>
 </div>
 
 <% if (!results) { %>
 <!-- ── Upload form ─────────────────────────────────────────────────────────── -->
 <div class="row g-4">
-  <div class="col-lg-6">
+  <div class="col-lg-5">
     <div class="card shadow-sm">
       <div class="card-header"><strong>Upload Excel File</strong></div>
       <div class="card-body">
-        <form method="POST" action="/sites/import" enctype="multipart/form-data">
+        <form method="POST" action="/inventory/import" enctype="multipart/form-data">
           <div class="mb-3">
             <label class="form-label">Excel File <span class="text-danger">*</span></label>
             <input type="file" name="importFile" class="form-control" accept=".xlsx,.xls" required />
@@ -21,7 +21,7 @@
           <button type="submit" class="btn btn-primary">
             <i class="bi bi-upload me-1"></i>Import
           </button>
-          <a href="/sites/import/template" class="btn btn-outline-secondary ms-2">
+          <a href="/inventory/import/template" class="btn btn-outline-secondary ms-2">
             <i class="bi bi-download me-1"></i>Download Template
           </a>
         </form>
@@ -29,32 +29,30 @@
     </div>
   </div>
 
-  <div class="col-lg-6">
+  <div class="col-lg-7">
     <div class="card shadow-sm">
       <div class="card-header"><strong>Column Reference</strong></div>
       <div class="card-body p-0">
         <table class="table table-sm mb-0">
           <thead>
-            <tr>
-              <th>Column</th>
-              <th>Required</th>
-              <th>Notes</th>
-            </tr>
+            <tr><th>Column</th><th>Required</th><th>Notes</th></tr>
           </thead>
           <tbody class="small">
-            <tr><td><code>SiteName</code></td><td><span class="badge bg-danger">Yes</span></td><td>Up to 200 characters</td></tr>
-            <tr><td><code>SiteNumber</code></td><td><span class="badge bg-secondary">No</span></td><td>Up to 100 characters</td></tr>
-            <tr><td><code>ContractNumber</code></td><td><span class="badge bg-secondary">No</span></td><td>Up to 100 characters</td></tr>
-            <tr><td><code>SiteType</code></td><td><span class="badge bg-secondary">No</span></td><td>Must match an existing Site Type name</td></tr>
-            <tr><td><code>Status</code></td><td><span class="badge bg-secondary">No</span></td><td>Must match an existing Status name</td></tr>
-            <tr><td><code>Address</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
-            <tr><td><code>City</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
-            <tr><td><code>State</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
-            <tr><td><code>ZipCode</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
-            <tr><td><code>Latitude</code></td><td><span class="badge bg-secondary">No</span></td><td>Decimal, e.g. 44.9778</td></tr>
-            <tr><td><code>Longitude</code></td><td><span class="badge bg-secondary">No</span></td><td>Decimal, e.g. -93.2650</td></tr>
-            <tr><td><code>WarrantyExpires</code></td><td><span class="badge bg-secondary">No</span></td><td>Date, e.g. 2026-12-31</td></tr>
+            <tr><td><code>TrackingType</code></td><td><span class="badge bg-danger">Yes</span></td><td><code>serialized</code> or <code>bulk</code></td></tr>
+            <tr><td><code>CommonName</code></td><td><span class="badge bg-danger">Yes</span></td><td>Up to 150 characters</td></tr>
+            <tr><td><code>SerialNumber</code></td><td><span class="badge bg-secondary">No</span></td><td>Serialized items only</td></tr>
+            <tr><td><code>AssetTag</code></td><td><span class="badge bg-secondary">No</span></td><td>Serialized items only</td></tr>
+            <tr><td><code>PartNumber</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
+            <tr><td><code>ModelNumber</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
+            <tr><td><code>Manufacturer</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
+            <tr><td><code>Category</code></td><td><span class="badge bg-secondary">No</span></td><td>Must match an existing Category name</td></tr>
+            <tr><td><code>Status</code></td><td><span class="badge bg-secondary">No</span></td><td>Must match an existing Status name (default: In-Stock)</td></tr>
+            <tr><td><code>StockLocation</code></td><td><span class="badge bg-secondary">No</span></td><td>Serialized only — must match an existing Stock Location name</td></tr>
+            <tr><td><code>QuantityTotal</code></td><td><span class="badge bg-secondary">No</span></td><td>Bulk items only — total quantity (default: 1)</td></tr>
+            <tr><td><code>PurchaseDate</code></td><td><span class="badge bg-secondary">No</span></td><td>Date, e.g. 2024-06-15</td></tr>
+            <tr><td><code>WarrantyExpires</code></td><td><span class="badge bg-secondary">No</span></td><td>Date, e.g. 2027-06-15</td></tr>
             <tr><td><code>Description</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
+            <tr><td><code>Notes</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
           </tbody>
         </table>
       </div>
@@ -91,8 +89,8 @@
   <div class="card-header d-flex justify-content-between align-items-center">
     <strong>Row-by-Row Results</strong>
     <div class="d-flex gap-2">
-      <a href="/sites/import" class="btn btn-sm btn-outline-secondary">Import Another File</a>
-      <a href="/sites" class="btn btn-sm btn-primary">View Sites</a>
+      <a href="/inventory/import" class="btn btn-sm btn-outline-secondary">Import Another File</a>
+      <a href="/inventory" class="btn btn-sm btn-primary">View Inventory</a>
     </div>
   </div>
   <div class="table-responsive">
@@ -100,10 +98,10 @@
       <thead>
         <tr>
           <th style="width:3rem">Row</th>
-          <th>Site Name</th>
-          <th>Site #</th>
+          <th>Common Name</th>
+          <th>Serial #</th>
           <th>Type</th>
-          <th>Status</th>
+          <th>Category</th>
           <th>Result</th>
         </tr>
       </thead>
@@ -112,15 +110,15 @@
         <tr>
           <td class="text-muted small"><%= row.rowNum %></td>
           <td class="small fw-semibold">
-            <% if (row.siteID) { %>
-              <a href="/sites/<%= row.siteID %>" class="text-decoration-none"><%= row.siteName %></a>
+            <% if (row.itemID) { %>
+              <a href="/inventory/<%= row.itemID %>" class="text-decoration-none"><%= row.commonName %></a>
             <% } else { %>
-              <%= row.siteName || '—' %>
+              <%= row.commonName || '—' %>
             <% } %>
           </td>
-          <td class="small text-muted"><%= row.siteNumber || '—' %></td>
-          <td class="small text-muted"><%= row.siteType || '—' %></td>
-          <td class="small text-muted"><%= row.status || '—' %></td>
+          <td class="small text-muted"><%= row.serialNumber || '—' %></td>
+          <td class="small text-muted"><%= row.trackingType || '—' %></td>
+          <td class="small text-muted"><%= row.category || '—' %></td>
           <td>
             <% if (row.result === 'created') { %>
               <span class="badge bg-success">Created</span>
