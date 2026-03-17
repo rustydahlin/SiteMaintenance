@@ -2,8 +2,8 @@
   function statusBadge(repair) {
     if (repair.ReceivedDate) return '<span class="badge bg-success">Closed</span>';
     const now = new Date();
-    const fu  = repair.FollowUpDate ? new Date(repair.FollowUpDate) : null;
-    if (fu && fu <= now) return '<span class="badge bg-danger">Follow-Up Due</span>';
+    const exp = repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate) : null;
+    if (exp && exp < now) return '<span class="badge bg-danger">Overdue</span>';
     return '<span class="badge bg-warning text-dark">Open</span>';
   }
 
@@ -66,7 +66,6 @@
         <th><a href="<%- sortLink('sentDate') %>" class="text-decoration-none text-body">Sent Date<%- sortIcon('sentDate') %></a></th>
         <th>RMA #</th>
         <th><a href="<%- sortLink('expectedReturn') %>" class="text-decoration-none text-body">Expected Return<%- sortIcon('expectedReturn') %></a></th>
-        <th><a href="<%- sortLink('followUp') %>" class="text-decoration-none text-body">Follow-Up<%- sortIcon('followUp') %></a></th>
         <th><a href="<%- sortLink('sentBy') %>" class="text-decoration-none text-body">Created By<%- sortIcon('sentBy') %></a></th>
         <th>Status</th>
         <th>Days Open</th>
@@ -96,19 +95,6 @@
         <td class="small"><%= repair.RMANumber || '—' %></td>
         <td class="small text-muted text-nowrap">
           <%= repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate).toLocaleDateString() : '—' %>
-        </td>
-        <td class="small text-nowrap">
-          <%
-            const fu = repair.FollowUpDate ? new Date(repair.FollowUpDate) : null;
-            const fuOverdue = fu && fu <= new Date() && !repair.ReceivedDate;
-          %>
-          <% if (fu) { %>
-            <span class="<%= fuOverdue ? 'text-danger fw-semibold' : 'text-muted' %>">
-              <%= fu.toLocaleDateString() %>
-            </span>
-          <% } else { %>
-            <span class="text-muted">—</span>
-          <% } %>
         </td>
         <td class="small text-muted"><%= repair.SentByName || '—' %></td>
         <td><%- statusBadge(repair) %></td>

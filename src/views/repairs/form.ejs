@@ -94,16 +94,6 @@
                    : '' %>" />
         </div>
 
-        <!-- Follow-Up Date -->
-        <div class="col-md-3">
-          <label for="followUpDate" class="form-label">Follow-Up Date</label>
-          <input type="date" id="followUpDate" name="followUpDate"
-                 class="form-control"
-                 value="<%= repair && repair.FollowUpDate
-                   ? new Date(repair.FollowUpDate).toISOString().split('T')[0]
-                   : '' %>" />
-        </div>
-
         <!-- Reason -->
         <div class="col-12">
           <label for="reason" class="form-label">

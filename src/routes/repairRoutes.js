@@ -96,7 +96,6 @@ router.post('/', isAdmin, async (req, res, next) => {
       manufacturerContact:  req.body.manufacturerContact  || null,
       reason:               reason.trim(),
       expectedReturnDate:   req.body.expectedReturnDate   || null,
-      followUpDate:         req.body.followUpDate         || null,
       sentByUserID:         req.body.sentByUserID         || null,
     }, req.auditContext);
 
@@ -178,7 +177,6 @@ router.post('/:id', isAdmin, async (req, res, next) => {
       manufacturerContact: req.body.manufacturerContact || null,
       reason:              reason                       || null,
       expectedReturnDate:  req.body.expectedReturnDate  || null,
-      followUpDate:        req.body.followUpDate        || null,
       sentByUserID:        req.body.sentByUserID        || null,
     }, req.auditContext);
 

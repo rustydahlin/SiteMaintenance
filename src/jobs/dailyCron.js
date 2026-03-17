@@ -17,11 +17,10 @@ async function runDailyChecks() {
     return;
   }
 
-  try { await checkPMsDue();         } catch (e) { logger.error('Cron PM check failed:', e.message); }
-  try { await checkRepairFollowUps();} catch (e) { logger.error('Cron repair follow-up failed:', e.message); }
-  try { await checkRepairOverdue();  } catch (e) { logger.error('Cron repair overdue failed:', e.message); }
-  try { await checkWarranties();     } catch (e) { logger.error('Cron warranty check failed:', e.message); }
-  try { await checkLongCheckouts();  } catch (e) { logger.error('Cron checkout check failed:', e.message); }
+  try { await checkPMsDue();        } catch (e) { logger.error('Cron PM check failed:', e.message); }
+  try { await checkRepairOverdue(); } catch (e) { logger.error('Cron repair overdue failed:', e.message); }
+  try { await checkWarranties();    } catch (e) { logger.error('Cron warranty check failed:', e.message); }
+  try { await checkLongCheckouts(); } catch (e) { logger.error('Cron checkout check failed:', e.message); }
 
   logger.info('Daily cron: completed');
 }
@@ -38,22 +37,14 @@ async function checkPMsDue() {
   if (schedules.length) logger.info(`Daily cron: sent ${schedules.length} PM reminder(s)`);
 }
 
-async function checkRepairFollowUps() {
-  const repairModel = require('../models/repairModel');
-  const repairs = await repairModel.getOverdueFollowUps();
-  for (const r of repairs) {
-    await email.sendRepairFollowUp(r);
-  }
-  if (repairs.length) logger.info(`Daily cron: sent ${repairs.length} repair follow-up(s)`);
-}
-
 async function checkRepairOverdue() {
-  const repairModel = require('../models/repairModel');
-  const repairs = await repairModel.getOverdueExpected();
+  const repairModel  = require('../models/repairModel');
+  const intervalDays = parseInt(await settingsModel.getSetting('email.repairReminderIntervalDays') || '3', 10);
+  const repairs = await repairModel.getOverdueExpected(intervalDays);
   for (const r of repairs) {
     await email.sendRepairOverdue(r);
   }
-  if (repairs.length) logger.info(`Daily cron: sent ${repairs.length} repair overdue alert(s)`);
+  if (repairs.length) logger.info(`Daily cron: sent ${repairs.length} repair overdue alert(s) (interval: every ${intervalDays}d)`);
 }
 
 async function checkWarranties() {

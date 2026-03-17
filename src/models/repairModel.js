@@ -6,7 +6,7 @@ const inventoryModel      = require('./inventoryModel');
 
 const REPAIR_SELECT = `
   rt.RepairID, rt.ItemID, rt.SiteInventoryID, rt.SentDate, rt.RMANumber,
-  rt.ManufacturerContact, rt.Reason, rt.ExpectedReturnDate, rt.FollowUpDate,
+  rt.ManufacturerContact, rt.Reason, rt.ExpectedReturnDate,
   rt.ReceivedDate, rt.ReturnCondition, rt.ReturnNotes, rt.RepairStatus,
   rt.SentByUserID, rt.ReceivedByUserID, rt.CreatedAt,
   i.CommonName, i.SerialNumber, i.ModelNumber, i.Manufacturer,
@@ -19,7 +19,6 @@ const REPAIR_SORT_COLUMNS = {
   manufacturer:   'i.Manufacturer',
   sentDate:       'rt.SentDate',
   expectedReturn: 'rt.ExpectedReturnDate',
-  followUp:       'rt.FollowUpDate',
   sentBy:         'sb.DisplayName',
 };
 
@@ -100,16 +99,15 @@ async function create(data, auditContext = {}) {
     .input('ManufacturerContact', sql.NVarChar(500),  manufacturerContact || null)
     .input('Reason',              sql.NVarChar(sql.MAX), reason            || null)
     .input('ExpectedReturnDate',  sql.Date,           expectedReturnDate ? new Date(expectedReturnDate) : null)
-    .input('FollowUpDate',        sql.Date,           followUpDate       ? new Date(followUpDate)       : null)
     .input('SentByUserID',        sql.Int,            sentByUserID        || null)
     .input('RepairStatus',        sql.NVarChar(50),   'Sent')
     .query(`
       INSERT INTO RepairTracking
         (ItemID, SiteInventoryID, SentDate, RMANumber, ManufacturerContact, Reason,
-         ExpectedReturnDate, FollowUpDate, SentByUserID, RepairStatus)
+         ExpectedReturnDate, SentByUserID, RepairStatus)
       VALUES
         (@ItemID, @SiteInventoryID, @SentDate, @RMANumber, @ManufacturerContact, @Reason,
-         @ExpectedReturnDate, @FollowUpDate, @SentByUserID, @RepairStatus);
+         @ExpectedReturnDate, @SentByUserID, @RepairStatus);
       SELECT SCOPE_IDENTITY() AS NewID
     `);
 
@@ -129,7 +127,7 @@ async function create(data, auditContext = {}) {
 async function update(repairID, data, auditContext = {}) {
   const {
     itemID, siteInventoryID, sentDate, rmaNumber, manufacturerContact,
-    reason, expectedReturnDate, followUpDate, sentByUserID,
+    reason, expectedReturnDate, sentByUserID,
   } = data;
 
   const pool = await getPool();
@@ -144,7 +142,6 @@ async function update(repairID, data, auditContext = {}) {
     .input('ManufacturerContact', sql.NVarChar(500),  manufacturerContact || null)
     .input('Reason',              sql.NVarChar(sql.MAX), reason            || null)
     .input('ExpectedReturnDate',  sql.Date,           expectedReturnDate ? new Date(expectedReturnDate) : null)
-    .input('FollowUpDate',        sql.Date,           followUpDate       ? new Date(followUpDate)       : null)
     .input('SentByUserID',        sql.Int,            sentByUserID        || null)
     .query(`
       UPDATE RepairTracking SET
@@ -155,7 +152,6 @@ async function update(repairID, data, auditContext = {}) {
         ManufacturerContact = @ManufacturerContact,
         Reason              = @Reason,
         ExpectedReturnDate  = @ExpectedReturnDate,
-        FollowUpDate        = @FollowUpDate,
         SentByUserID        = @SentByUserID
       WHERE RepairID = @RepairID
     `);
@@ -207,31 +203,25 @@ async function markReceived(repairID, { receivedDate, returnCondition, returnNot
   return getByID(repairID);
 }
 
-async function getOverdueFollowUps() {
+// Returns overdue repairs where today falls on a reminder interval boundary.
+// e.g. intervalDays=3 → sends on day 0, 3, 6, 9... after ExpectedReturnDate.
+async function getOverdueExpected(intervalDays = 3) {
   const pool = await getPool();
-  const result = await pool.request().query(`
-    SELECT ${REPAIR_SELECT}
-    ${REPAIR_JOINS}
-    WHERE rt.FollowUpDate <= CAST(GETUTCDATE() AS DATE)
-      AND rt.ReceivedDate IS NULL
-    ORDER BY rt.FollowUpDate
-  `);
-  return result.recordset;
-}
-
-async function getOverdueExpected() {
-  const pool = await getPool();
-  const result = await pool.request().query(`
-    SELECT ${REPAIR_SELECT}
-    ${REPAIR_JOINS}
-    WHERE rt.ExpectedReturnDate < CAST(GETUTCDATE() AS DATE)
-      AND rt.ReceivedDate IS NULL
-    ORDER BY rt.ExpectedReturnDate
-  `);
+  const result = await pool.request()
+    .input('IntervalDays', sql.Int, Math.max(1, intervalDays))
+    .query(`
+      SELECT ${REPAIR_SELECT}
+      ${REPAIR_JOINS}
+      WHERE rt.ExpectedReturnDate IS NOT NULL
+        AND rt.ExpectedReturnDate < CAST(GETUTCDATE() AS DATE)
+        AND rt.ReceivedDate IS NULL
+        AND DATEDIFF(day, rt.ExpectedReturnDate, CAST(GETUTCDATE() AS DATE)) % @IntervalDays = 0
+      ORDER BY rt.ExpectedReturnDate
+    `);
   return result.recordset;
 }
 
 module.exports = {
   getAll, getByID, create, update,
-  markReceived, getOverdueFollowUps, getOverdueExpected,
+  markReceived, getOverdueExpected,
 };

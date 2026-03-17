@@ -5,8 +5,8 @@
   function statusBadge() {
     if (isClosed) return '<span class="badge bg-success">Closed</span>';
     const now = new Date();
-    const fu  = repair.FollowUpDate ? new Date(repair.FollowUpDate) : null;
-    if (fu && fu <= now) return '<span class="badge bg-danger">Follow-Up Due</span>';
+    const exp = repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate) : null;
+    if (exp && exp < now) return '<span class="badge bg-danger">Overdue</span>';
     return '<span class="badge bg-warning text-dark">Open</span>';
   }
 %>
@@ -93,19 +93,6 @@
             <%= repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate).toLocaleDateString() : '—' %>
           </dd>
 
-          <dt class="col-sm-5 text-muted">Follow-Up Date</dt>
-          <dd class="col-sm-7 text-nowrap">
-            <%
-              const fu = repair.FollowUpDate ? new Date(repair.FollowUpDate) : null;
-              const fuOverdue = fu && fu <= new Date() && !isClosed;
-            %>
-            <% if (fu) { %>
-              <span class="<%= fuOverdue ? 'text-danger fw-semibold' : '' %>">
-                <%= fu.toLocaleDateString() %>
-                <% if (fuOverdue) { %><i class="bi bi-exclamation-triangle ms-1"></i><% } %>
-              </span>
-            <% } else { %>—<% } %>
-          </dd>
         </dl>
       </div>
     </div>
