@@ -842,16 +842,6 @@
 </div>
 
 <script>
-  // Activate the correct tab if the URL hash matches
-  (function () {
-    const hash = window.location.hash;
-    if (hash) {
-      const tab = document.querySelector(`[href="${hash}"]`);
-      if (tab) {
-        new bootstrap.Tab(tab).show();
-      }
-    }
-  })();
 
   // Replace modal — populate from data attributes and wire up checkbox/search
   var replaceModal = document.getElementById('replaceModal');

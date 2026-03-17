@@ -44,4 +44,23 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
     new bootstrap.Tooltip(el);
   });
+
+  // ── Tab persistence ───────────────────────────────────────────────────────
+  // Save active tab to sessionStorage on change, restore on load
+  const tabKey = 'activeTab:' + location.pathname;
+
+  // Restore: URL hash takes priority, then sessionStorage
+  const savedHash = location.hash || sessionStorage.getItem(tabKey);
+  if (savedHash) {
+    const tabEl = document.querySelector(`[data-bs-toggle="tab"][href="${savedHash}"]`);
+    if (tabEl) bootstrap.Tab.getOrCreateInstance(tabEl).show();
+  }
+
+  // Save on change
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tabEl => {
+    tabEl.addEventListener('shown.bs.tab', () => {
+      const hash = tabEl.getAttribute('href');
+      if (hash && hash.startsWith('#')) sessionStorage.setItem(tabKey, hash);
+    });
+  });
 });

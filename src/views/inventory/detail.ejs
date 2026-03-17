@@ -490,11 +490,5 @@ document.addEventListener('DOMContentLoaded', function () {
     toggleHolder();
   }
 
-  // Activate tab from URL hash
-  var hash = window.location.hash;
-  if (hash) {
-    var tab = document.querySelector('[href="' + hash + '"]');
-    if (tab) new bootstrap.Tab(tab).show();
-  }
 });
 </script>

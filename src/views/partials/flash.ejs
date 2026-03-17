@@ -1,34 +1,16 @@
-<% if (flash) { %>
-  <% if (flash.success && flash.success.length) { %>
-    <% flash.success.forEach(msg => { %>
-      <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="bi bi-check-circle-fill me-2"></i><%= msg %>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    <% }) %>
-  <% } %>
-  <% if (flash.error && flash.error.length) { %>
-    <% flash.error.forEach(msg => { %>
-      <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= msg %>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    <% }) %>
-  <% } %>
-  <% if (flash.warning && flash.warning.length) { %>
-    <% flash.warning.forEach(msg => { %>
-      <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        <i class="bi bi-exclamation-circle-fill me-2"></i><%= msg %>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    <% }) %>
-  <% } %>
-  <% if (flash.info && flash.info.length) { %>
-    <% flash.info.forEach(msg => { %>
-      <div class="alert alert-info alert-dismissible fade show" role="alert">
-        <i class="bi bi-info-circle-fill me-2"></i><%= msg %>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    <% }) %>
-  <% } %>
+<% const _flashMsgs = flash ? [
+  ...(flash.success||[]).map(m => ({ type:'success', icon:'check-circle-fill',       msg: m })),
+  ...(flash.error  ||[]).map(m => ({ type:'danger',  icon:'exclamation-triangle-fill', msg: m })),
+  ...(flash.warning||[]).map(m => ({ type:'warning', icon:'exclamation-circle-fill',  msg: m })),
+  ...(flash.info   ||[]).map(m => ({ type:'info',    icon:'info-circle-fill',          msg: m })),
+] : [] %>
+<% if (_flashMsgs.length) { %>
+<div class="flash-container">
+  <% _flashMsgs.forEach(f => { %>
+  <div class="alert alert-<%= f.type %> alert-dismissible fade show shadow" role="alert">
+    <i class="bi bi-<%= f.icon %> me-2"></i><%= f.msg %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  <% }) %>
+</div>
 <% } %>
