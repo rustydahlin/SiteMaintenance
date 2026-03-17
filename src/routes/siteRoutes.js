@@ -2,6 +2,8 @@
 
 const express           = require('express');
 const router            = express.Router();
+const multer            = require('multer');
+const XLSX              = require('xlsx');
 const siteModel          = require('../models/siteModel');
 const lookupModel        = require('../models/lookupModel');
 const logModel           = require('../models/logModel');
@@ -12,6 +14,15 @@ const pmModel            = require('../models/pmModel');
 const repairModel        = require('../models/repairModel');
 const userModel          = require('../models/userModel');
 const { isAuthenticated, isAdmin, canWrite } = require('../middleware/auth');
+
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (/\.(xlsx|xls)$/i.test(file.originalname)) cb(null, true);
+    else cb(new Error('Only .xlsx and .xls files are accepted'));
+  },
+});
 
 // All routes require authentication
 router.use(isAuthenticated);
@@ -50,6 +61,132 @@ router.get('/', async (req, res, next) => {
         queryString: queryParts.join('&'),
       },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /import/template — download blank Excel template ─────────────────────
+router.get('/import/template', isAdmin, (_req, res) => {
+  const wb = XLSX.utils.book_new();
+  const headers = [
+    'SiteName', 'SiteNumber', 'ContractNumber', 'SiteType', 'Status',
+    'Address', 'City', 'State', 'ZipCode',
+    'Latitude', 'Longitude', 'WarrantyExpires', 'Description',
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers]);
+  // Set column widths
+  ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 4, 16) }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Sites');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Disposition', 'attachment; filename="sites_import_template.xlsx"');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buf);
+});
+
+// ── GET /import — upload form ─────────────────────────────────────────────────
+router.get('/import', isAdmin, (_req, res) => {
+  res.render('sites/import', { title: 'Import Sites', results: null });
+});
+
+// ── POST /import — process uploaded file ──────────────────────────────────────
+router.post('/import', isAdmin, importUpload.single('importFile'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      req.flash('error', 'Please select a file to upload.');
+      return res.redirect('/sites/import');
+    }
+
+    // Parse workbook from buffer
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    if (rows.length === 0) {
+      req.flash('error', 'The file appears to be empty.');
+      return res.redirect('/sites/import');
+    }
+
+    // Load lookups for name→ID resolution
+    const [siteTypes, siteStatuses] = await Promise.all([
+      lookupModel.getSiteTypes(),
+      lookupModel.getSiteStatuses(),
+    ]);
+    const typeMap   = Object.fromEntries(siteTypes.map(t => [t.TypeName.toLowerCase(),   t.SiteTypeID]));
+    const statusMap = Object.fromEntries(siteStatuses.map(s => [s.StatusName.toLowerCase(), s.SiteStatusID]));
+
+    const results = { total: rows.length, created: 0, skipped: 0, errors: 0, rows: [] };
+
+    for (let i = 0; i < rows.length; i++) {
+      const row     = rows[i];
+      const rowNum  = i + 2; // +2: 1-based + header row
+      const siteName = (row['SiteName'] || '').toString().trim();
+
+      if (!siteName) {
+        results.skipped++;
+        results.rows.push({ rowNum, siteName: '', result: 'skipped', message: 'SiteName is blank' });
+        continue;
+      }
+
+      const siteTypeName = (row['SiteType'] || '').toString().trim();
+      const statusName   = (row['Status']   || '').toString().trim();
+      const siteTypeID   = siteTypeName ? (typeMap[siteTypeName.toLowerCase()]   || null) : null;
+      const siteStatusID = statusName   ? (statusMap[statusName.toLowerCase()] || null) : null;
+
+      // Warn if a type/status name was given but not found
+      if (siteTypeName && !siteTypeID) {
+        results.errors++;
+        results.rows.push({ rowNum, siteName, siteNumber: row['SiteNumber'], siteType: siteTypeName, status: statusName, result: 'error', message: `Site Type "${siteTypeName}" not found` });
+        continue;
+      }
+      if (statusName && !siteStatusID) {
+        results.errors++;
+        results.rows.push({ rowNum, siteName, siteNumber: row['SiteNumber'], siteType: siteTypeName, status: statusName, result: 'error', message: `Status "${statusName}" not found` });
+        continue;
+      }
+
+      // Parse warranty date — may come in as a JS Date (cellDates:true) or a string
+      let warrantyExpires = null;
+      const rawWarranty = row['WarrantyExpires'];
+      if (rawWarranty) {
+        const d = rawWarranty instanceof Date ? rawWarranty : new Date(rawWarranty);
+        if (!isNaN(d)) warrantyExpires = d.toISOString().split('T')[0];
+      }
+
+      // Parse lat/lon — coerce empty string to null
+      const latitude  = row['Latitude']  !== '' ? parseFloat(row['Latitude'])  : null;
+      const longitude = row['Longitude'] !== '' ? parseFloat(row['Longitude']) : null;
+
+      try {
+        const site = await siteModel.create({
+          siteName,
+          siteNumber:      (row['SiteNumber']     || '').toString().trim() || null,
+          contractNumber:  (row['ContractNumber'] || '').toString().trim() || null,
+          siteTypeID,
+          siteStatusID,
+          address:         (row['Address']     || '').toString().trim() || null,
+          city:            (row['City']         || '').toString().trim() || null,
+          state:           (row['State']        || '').toString().trim() || null,
+          zipCode:         (row['ZipCode']      || '').toString().trim() || null,
+          latitude:        isNaN(latitude)  ? null : latitude,
+          longitude:       isNaN(longitude) ? null : longitude,
+          warrantyExpires,
+          description:     (row['Description'] || '').toString().trim() || null,
+        }, req.auditContext);
+
+        results.created++;
+        results.rows.push({
+          rowNum, siteName, siteNumber: row['SiteNumber'], siteType: siteTypeName,
+          status: statusName, result: 'created', siteID: site.SiteID,
+        });
+      } catch (err) {
+        results.errors++;
+        const msg = err.number === 2627 ? 'Duplicate site name' : (err.message || 'Database error');
+        results.rows.push({ rowNum, siteName, siteNumber: row['SiteNumber'], siteType: siteTypeName, status: statusName, result: 'error', message: msg });
+      }
+    }
+
+    res.render('sites/import', { title: 'Import Sites', results });
   } catch (err) {
     next(err);
   }

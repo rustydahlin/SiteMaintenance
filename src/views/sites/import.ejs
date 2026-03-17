@@ -1,0 +1,137 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Import Sites</h1>
+  <a href="/sites" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back to Sites
+  </a>
+</div>
+
+<% if (!results) { %>
+<!-- ── Upload form ─────────────────────────────────────────────────────────── -->
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header"><strong>Upload Excel File</strong></div>
+      <div class="card-body">
+        <form method="POST" action="/sites/import" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label">Excel File <span class="text-danger">*</span></label>
+            <input type="file" name="importFile" class="form-control" accept=".xlsx,.xls" required />
+            <div class="form-text">Accepted formats: .xlsx, .xls — max 5 MB</div>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-upload me-1"></i>Import
+          </button>
+          <a href="/sites/import/template" class="btn btn-outline-secondary ms-2">
+            <i class="bi bi-download me-1"></i>Download Template
+          </a>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header"><strong>Column Reference</strong></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Column</th>
+              <th>Required</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody class="small">
+            <tr><td><code>SiteName</code></td><td><span class="badge bg-danger">Yes</span></td><td>Up to 200 characters</td></tr>
+            <tr><td><code>SiteNumber</code></td><td><span class="badge bg-secondary">No</span></td><td>Up to 100 characters</td></tr>
+            <tr><td><code>ContractNumber</code></td><td><span class="badge bg-secondary">No</span></td><td>Up to 100 characters</td></tr>
+            <tr><td><code>SiteType</code></td><td><span class="badge bg-secondary">No</span></td><td>Must match an existing Site Type name</td></tr>
+            <tr><td><code>Status</code></td><td><span class="badge bg-secondary">No</span></td><td>Must match an existing Status name</td></tr>
+            <tr><td><code>Address</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
+            <tr><td><code>City</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
+            <tr><td><code>State</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
+            <tr><td><code>ZipCode</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
+            <tr><td><code>Latitude</code></td><td><span class="badge bg-secondary">No</span></td><td>Decimal, e.g. 44.9778</td></tr>
+            <tr><td><code>Longitude</code></td><td><span class="badge bg-secondary">No</span></td><td>Decimal, e.g. -93.2650</td></tr>
+            <tr><td><code>WarrantyExpires</code></td><td><span class="badge bg-secondary">No</span></td><td>Date, e.g. 2026-12-31</td></tr>
+            <tr><td><code>Description</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% } else { %>
+<!-- ── Import results ──────────────────────────────────────────────────────── -->
+<div class="d-flex gap-3 mb-4">
+  <div class="card text-center px-4 py-3 border-success">
+    <div class="fs-2 fw-bold text-success"><%= results.created %></div>
+    <div class="small text-muted">Created</div>
+  </div>
+  <div class="card text-center px-4 py-3 border-warning">
+    <div class="fs-2 fw-bold text-warning"><%= results.skipped %></div>
+    <div class="small text-muted">Skipped</div>
+  </div>
+  <div class="card text-center px-4 py-3 border-danger">
+    <div class="fs-2 fw-bold text-danger"><%= results.errors %></div>
+    <div class="small text-muted">Errors</div>
+  </div>
+  <div class="card text-center px-4 py-3">
+    <div class="fs-2 fw-bold"><%= results.total %></div>
+    <div class="small text-muted">Total Rows</div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong>Row-by-Row Results</strong>
+    <div class="d-flex gap-2">
+      <a href="/sites/import" class="btn btn-sm btn-outline-secondary">Import Another File</a>
+      <a href="/sites" class="btn btn-sm btn-primary">View Sites</a>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th style="width:3rem">Row</th>
+          <th>Site Name</th>
+          <th>Site #</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Result</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% results.rows.forEach(row => { %>
+        <tr>
+          <td class="text-muted small"><%= row.rowNum %></td>
+          <td class="small fw-semibold">
+            <% if (row.siteID) { %>
+              <a href="/sites/<%= row.siteID %>" class="text-decoration-none"><%= row.siteName %></a>
+            <% } else { %>
+              <%= row.siteName || '—' %>
+            <% } %>
+          </td>
+          <td class="small text-muted"><%= row.siteNumber || '—' %></td>
+          <td class="small text-muted"><%= row.siteType || '—' %></td>
+          <td class="small text-muted"><%= row.status || '—' %></td>
+          <td>
+            <% if (row.result === 'created') { %>
+              <span class="badge bg-success">Created</span>
+            <% } else if (row.result === 'skipped') { %>
+              <span class="badge bg-warning text-dark" title="<%= row.message %>">Skipped</span>
+              <span class="small text-muted ms-1"><%= row.message %></span>
+            <% } else { %>
+              <span class="badge bg-danger">Error</span>
+              <span class="small text-danger ms-1"><%= row.message %></span>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
