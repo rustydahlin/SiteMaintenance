@@ -1,0 +1,89 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-eye me-2"></i>Import Preview — System Keys</h1>
+  <a href="/system-keys/import" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+
+<%
+  const creates = plan.filter(p => p.action === 'create');
+  const updates = plan.filter(p => p.action === 'update');
+  const skips   = plan.filter(p => p.action === 'skip');
+%>
+
+<div class="alert alert-info mb-4">
+  <strong><%= creates.length %></strong> to create &nbsp;|&nbsp;
+  <strong><%= updates.length %></strong> to update &nbsp;|&nbsp;
+  <strong><%= skips.length   %></strong> skipped
+</div>
+
+<% if (creates.length > 0) { %>
+<h5 class="mb-2 text-success"><i class="bi bi-plus-circle me-1"></i>New Keys (<%= creates.length %>)</h5>
+<div class="table-responsive mb-4">
+  <table class="table table-sm table-bordered">
+    <thead class="table-light"><tr><th>Serial #</th><th>Key Code</th><th>Key Type</th><th>Expiration</th></tr></thead>
+    <tbody>
+    <% for (const item of creates) { %>
+      <tr>
+        <td><%= item.data.serialNumber || '—' %></td>
+        <td><%= item.data.keyCode      || '—' %></td>
+        <td><%= item.data.keyType      || '—' %></td>
+        <td><%= item.data.expirationDate || '—' %></td>
+      </tr>
+    <% } %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+
+<% if (updates.length > 0) { %>
+<h5 class="mb-2 text-primary"><i class="bi bi-pencil-square me-1"></i>Updates (<%= updates.length %>)</h5>
+<div class="table-responsive mb-4">
+  <table class="table table-sm table-bordered">
+    <thead class="table-light"><tr><th>Serial #</th><th>Changes</th></tr></thead>
+    <tbody>
+    <% for (const item of updates) { %>
+      <tr>
+        <td><%= item.serial %></td>
+        <td>
+          <% if (item.diffs && item.diffs.length > 0) { %>
+            <ul class="mb-0 ps-3">
+              <% for (const d of item.diffs) { %><li><%= d %></li><% } %>
+            </ul>
+          <% } else { %>
+            <span class="text-muted">No field changes</span>
+          <% } %>
+        </td>
+      </tr>
+    <% } %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+
+<% if (skips.length > 0) { %>
+<h5 class="mb-2 text-secondary"><i class="bi bi-slash-circle me-1"></i>Skipped (<%= skips.length %>)</h5>
+<div class="table-responsive mb-4">
+  <table class="table table-sm table-bordered">
+    <thead class="table-light"><tr><th>Row</th><th>Reason</th></tr></thead>
+    <tbody>
+    <% for (const item of skips) { %>
+      <tr>
+        <td><%= JSON.stringify(item.row) %></td>
+        <td class="text-danger"><%= item.reason %></td>
+      </tr>
+    <% } %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+
+<div class="d-flex gap-2 mt-3">
+  <form method="POST" action="/system-keys/import/confirm">
+    <button type="submit" class="btn btn-primary"
+            <% if (creates.length === 0 && updates.length === 0) { %>disabled<% } %>>
+      <i class="bi bi-check-lg me-1"></i>Confirm Import
+    </button>
+  </form>
+  <a href="/system-keys/import" class="btn btn-outline-secondary">Cancel</a>
+</div>

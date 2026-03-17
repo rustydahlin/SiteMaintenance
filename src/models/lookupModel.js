@@ -168,6 +168,37 @@ async function toggleStockLocation(id) {
     .query('UPDATE StockLocations SET IsActive = 1 - IsActive WHERE LocationID = @ID');
 }
 
+// ── Key Manufacturers ─────────────────────────────────────────────────────────
+async function getKeyManufacturers(activeOnly = true) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('ActiveOnly', sql.Bit, activeOnly ? 1 : 0)
+    .query(`SELECT * FROM KeyManufacturers WHERE (@ActiveOnly = 0 OR IsActive = 1) ORDER BY ManufacturerName`);
+  return r.recordset;
+}
+
+async function upsertKeyManufacturer(id, manufacturerName, description) {
+  const pool = await getPool();
+  if (id) {
+    await pool.request()
+      .input('ID',              sql.Int,          id)
+      .input('ManufacturerName', sql.NVarChar(200), manufacturerName)
+      .input('Description',     sql.NVarChar(500), description || null)
+      .query('UPDATE KeyManufacturers SET ManufacturerName = @ManufacturerName, Description = @Description WHERE ManufacturerID = @ID');
+  } else {
+    await pool.request()
+      .input('ManufacturerName', sql.NVarChar(200), manufacturerName)
+      .input('Description',     sql.NVarChar(500), description || null)
+      .query('INSERT INTO KeyManufacturers (ManufacturerName, Description) VALUES (@ManufacturerName, @Description)');
+  }
+}
+
+async function toggleKeyManufacturer(id) {
+  const pool = await getPool();
+  await pool.request().input('ID', sql.Int, id)
+    .query('UPDATE KeyManufacturers SET IsActive = 1 - IsActive WHERE ManufacturerID = @ID');
+}
+
 module.exports = {
   getRoles,
   getSiteTypes, upsertSiteType, toggleSiteType,
@@ -176,4 +207,5 @@ module.exports = {
   getInventoryCategories, upsertInventoryCategory, toggleInventoryCategory,
   getInventoryStatuses, getInventoryStatusByName,
   getStockLocations, upsertStockLocation, toggleStockLocation,
+  getKeyManufacturers, upsertKeyManufacturer, toggleKeyManufacturer,
 };

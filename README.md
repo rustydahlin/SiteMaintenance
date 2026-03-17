@@ -12,6 +12,7 @@ A generic infrastructure site management web application for tracking sites, inv
 - **Repair / RMA Tracking** — Track items sent for repair with follow-up and expected return dates; email reminders when overdue
 - **PM Schedules** — Recurring preventive maintenance schedules with configurable frequencies, user/vendor assignment, and email reminders
 - **Vendors / Contractors** — Manage external vendors with contacts, PM work enablement, and per-contact email opt-in for PM reminders
+- **System Keys** — Track physical/electronic access keys issued to system users or vendor contacts; expiration tracking, renewal workflow, and email reminders to the key holder
 - **File Attachments** — Upload photos and documents attached to log entries, sites, or inventory items; stored in database
 - **User Management** — Four roles: Admin, Technician, Contractor, Viewer
 - **Authentication** — Local accounts, Entra ID / OIDC, and LDAP / Active Directory
@@ -241,6 +242,7 @@ When new database migrations are released:
 | `006_inventory_extended.sql` | Adds `PartNumber`, `CommonName`, and `RelatedSystemID` to Inventory |
 | `007_site_fields.sql` | Adds `SiteNumber` and `ContractNumber` to Sites |
 | `008_vendors.sql` | Creates `Vendors` and `VendorContacts` tables; adds `AssignedVendorID` to `PMSchedules` |
+| `009_system_keys.sql` | Creates `KeyManufacturers` lookup and `SystemKeys` table; adds `SystemKeys` role |
 
 > **Note:** `database/schema.sql` always reflects the current full schema. Fresh installs only need to run `schema.sql` + `seed.sql` — migrations are only needed when upgrading an existing database.
 

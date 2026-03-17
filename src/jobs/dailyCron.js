@@ -27,9 +27,10 @@ async function runDailyChecks() {
     return;
   }
 
-  try { await checkPMsDue();        } catch (e) { logger.error('Cron PM check failed:', e.message); }
-  try { await checkRepairOverdue(); } catch (e) { logger.error('Cron repair overdue failed:', e.message); }
-  try { await checkWarranties();    } catch (e) { logger.error('Cron warranty check failed:', e.message); }
+  try { await checkPMsDue();          } catch (e) { logger.error('Cron PM check failed:', e.message); }
+  try { await checkRepairOverdue();   } catch (e) { logger.error('Cron repair overdue failed:', e.message); }
+  try { await checkWarranties();      } catch (e) { logger.error('Cron warranty check failed:', e.message); }
+  try { await checkSystemKeyExpiry(); } catch (e) { logger.error('Cron system key expiry failed:', e.message); }
 
   logger.info('Daily cron: completed');
 }
@@ -132,6 +133,19 @@ async function checkWarranties() {
   if (total) logger.info(`Daily cron: sent ${total} warranty expiry notice(s)`);
 }
 
+
+async function checkSystemKeyExpiry() {
+  const systemKeyModel = require('../models/systemKeyModel');
+  const systemKeysEnabled = (await settingsModel.getSetting('systemKeys.enabled', null)) === '1';
+  if (!systemKeysEnabled) return;
+
+  const reminderDays = parseInt(await settingsModel.getSetting('email.systemKeyReminderDays') || '30', 10);
+  const keys = await systemKeyModel.getExpiringSoon(reminderDays);
+  for (const key of keys) {
+    await email.sendSystemKeyExpiring(key, key.DaysLeft);
+  }
+  if (keys.length) logger.info(`Daily cron: sent ${keys.length} system key expiry notice(s)`);
+}
 
 function start() {
   cron.schedule(SCHEDULE, runDailyChecks, { timezone: 'America/Chicago' });

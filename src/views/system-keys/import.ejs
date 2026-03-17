@@ -1,0 +1,33 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-upload me-2"></i>Import System Keys</h1>
+  <div class="d-flex gap-2">
+    <a href="/system-keys/import/template" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-file-earmark-arrow-down me-1"></i>Download Template
+    </a>
+    <a href="/system-keys" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <p class="text-muted mb-3">
+      Upload an Excel file (.xlsx or .xls) with a <strong>SystemKeys</strong> sheet.
+      Required column: <strong>SerialNumber</strong>. Existing keys matched by serial number will be updated;
+      new serial numbers will be created.
+    </p>
+    <p class="text-muted mb-3">
+      <strong>IssuedToType</strong> must be <code>user</code> or <code>contact</code>.
+      Names must match exactly (case-insensitive).
+    </p>
+
+    <form method="POST" action="/system-keys/import" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Excel File</label>
+        <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+      </div>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>Preview Import</button>
+    </form>
+  </div>
+</div>

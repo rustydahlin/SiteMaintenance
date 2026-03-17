@@ -1,0 +1,83 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-building me-2"></i>Key Manufacturers</h1>
+  <a href="/admin" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm">
+      <div class="card-header" id="formTitle">Add Manufacturer</div>
+      <div class="card-body">
+        <form action="/admin/key-manufacturers" method="POST" id="mfgForm">
+          <input type="hidden" name="id" id="mfgID" value="" />
+          <div class="mb-3">
+            <label class="form-label">Manufacturer Name <span class="text-danger">*</span></label>
+            <input type="text" name="manufacturerName" id="mfgName" class="form-control" required maxlength="200" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <input type="text" name="description" id="mfgDesc" class="form-control" maxlength="500" />
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm" id="submitBtn">Add</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="cancelBtn">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Name</th><th>Description</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <% manufacturers.forEach(m => { %>
+            <tr class="<%= m.IsActive ? '' : 'text-muted' %>">
+              <td><%= m.ManufacturerName %></td>
+              <td class="small"><%= m.Description || '—' %></td>
+              <td><span class="badge <%= m.IsActive ? 'bg-success' : 'bg-secondary' %>"><%= m.IsActive ? 'Active' : 'Inactive' %></span></td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-primary py-0 me-1 js-edit"
+                  data-id="<%= m.ManufacturerID %>"
+                  data-name="<%= m.ManufacturerName %>"
+                  data-desc="<%= m.Description || '' %>">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form action="/admin/key-manufacturers" method="POST" class="d-inline">
+                  <input type="hidden" name="id" value="<%= m.ManufacturerID %>" />
+                  <input type="hidden" name="action" value="toggle" />
+                  <button type="submit" class="btn btn-sm btn-outline-secondary py-0"><%= m.IsActive ? 'Disable' : 'Enable' %></button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.js-edit').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.getElementById('mfgID').value   = this.dataset.id;
+    document.getElementById('mfgName').value = this.dataset.name;
+    document.getElementById('mfgDesc').value = this.dataset.desc;
+    document.getElementById('formTitle').textContent = 'Edit Manufacturer';
+    document.getElementById('submitBtn').textContent = 'Save Changes';
+    document.getElementById('cancelBtn').classList.remove('d-none');
+    document.getElementById('mfgName').focus();
+  });
+});
+
+document.getElementById('cancelBtn').addEventListener('click', function() {
+  document.getElementById('mfgForm').reset();
+  document.getElementById('mfgID').value = '';
+  document.getElementById('formTitle').textContent = 'Add Manufacturer';
+  document.getElementById('submitBtn').textContent = 'Add';
+  this.classList.add('d-none');
+});
+</script>

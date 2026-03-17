@@ -3,11 +3,16 @@
 const express  = require('express');
 const { isAuthenticated } = require('../middleware/auth');
 const { getPool, sql }    = require('../config/database');
+const settingsModel = require('../models/settingsModel');
 const router = express.Router();
 
 router.get('/', isAuthenticated, async (req, res, next) => {
   try {
     const pool = await getPool();
+
+    const userRoles = req.user?.roles || [];
+    const systemKeysEnabled = (await settingsModel.getSetting('systemKeys.enabled', null)) === '1';
+    const canSeeKeys = systemKeysEnabled && (userRoles.includes('Admin') || userRoles.includes('SystemKeys'));
 
     const [countsResult, recentLogsResult, upcomingPMsResult, repairsFollowUpResult] = await Promise.all([
       // Summary counts
@@ -77,6 +82,18 @@ router.get('/', isAuthenticated, async (req, res, next) => {
       `),
     ]);
 
+    // System Keys: expired and expiring soon (only when enabled and user has access)
+    let expiringKeys = [];
+    let expiredKeys  = [];
+    if (canSeeKeys) {
+      const systemKeyModel = require('../models/systemKeyModel');
+      const reminderDays   = parseInt(await settingsModel.getSetting('email.systemKeyReminderDays') || '30', 10);
+      [expiringKeys, expiredKeys] = await Promise.all([
+        systemKeyModel.getExpiringSoon(reminderDays),
+        systemKeyModel.getExpired(),
+      ]);
+    }
+
     const c = countsResult.recordset[0];
     res.render('dashboard/index', {
       title: 'Dashboard',
@@ -89,6 +106,9 @@ router.get('/', isAuthenticated, async (req, res, next) => {
       recentLogs:      recentLogsResult.recordset,
       upcomingPMs:     upcomingPMsResult.recordset,
       repairsFollowUp: repairsFollowUpResult.recordset,
+      canSeeKeys,
+      expiringKeys,
+      expiredKeys,
     });
   } catch (err) { next(err); }
 });

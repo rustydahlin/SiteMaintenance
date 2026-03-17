@@ -193,6 +193,25 @@ async function sendWelcomeEmail(user, temporaryPassword) {
   await sendMail({ to: user.Email, subject, html });
 }
 
+async function sendSystemKeyExpiring(key, daysLeft) {
+  if (!key.IssuedToEmail) return;  // no email on file — skip
+  const expired = daysLeft !== undefined && daysLeft <= 0;
+  const subject = expired
+    ? `System Key EXPIRED: ${key.SerialNumber || key.KeyCode || key.KeyID}`
+    : `System Key Expiring Soon: ${key.SerialNumber || key.KeyCode || key.KeyID}`;
+  const html = `
+    <h3>System Key ${expired ? 'Expired' : 'Expiring Soon'}</h3>
+    <p><strong>Issued To:</strong> ${key.IssuedToName || '—'} (${key.Organization || '—'})</p>
+    ${key.SerialNumber ? `<p><strong>Serial #:</strong> ${key.SerialNumber}</p>` : ''}
+    ${key.KeyCode      ? `<p><strong>Key Code:</strong> ${key.KeyCode}</p>`      : ''}
+    <p><strong>Expires:</strong> ${new Date(key.ExpirationDate).toLocaleDateString()}
+       ${expired ? '<span style="color:red">(EXPIRED)</span>' : `(${daysLeft} day(s) remaining)`}</p>
+    ${key.ManufacturerName ? `<p><strong>Manufacturer:</strong> ${key.ManufacturerName}</p>` : ''}
+    <p><a href="${process.env.APP_BASE_URL || ''}/system-keys/${key.KeyID}">View Key</a></p>
+  `;
+  await sendMail({ to: key.IssuedToEmail, subject, html });
+}
+
 async function notifyNewLogEntry({ site, log }) {
   const admins = await getAdminEmails();
   if (!admins.length) return;
@@ -218,5 +237,6 @@ module.exports = {
   sendSiteStatusChange,
   sendWelcomeEmail,
   notifyNewLogEntry,
+  sendSystemKeyExpiring,
   getAdminEmails,
 };

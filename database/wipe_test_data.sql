@@ -10,7 +10,7 @@
 -- WIPES:   Sites, Inventory, SiteInventory, InventoryStock,
 --          UserInventoryPossession, LogEntries, Documents, DocumentData,
 --          RepairTracking, PMSchedules, Vendors, VendorContacts,
---          AuditLog, Sessions
+--          SystemKeys, KeyManufacturers, AuditLog, Sessions
 --
 -- WARNING: THIS IS IRREVERSIBLE. Take a full database backup before running.
 --          Do NOT run this against a production database with real data.
@@ -72,6 +72,14 @@ PRINT 'VendorContacts:           ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows delet
 DELETE FROM Vendors;
 PRINT 'Vendors:                  ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
 
+-- ── 7c. System Keys ────────────────────────────────────────────────────────────
+DELETE FROM SystemKeys;
+PRINT 'SystemKeys:               ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
+
+-- ── 7d. Key Manufacturers ──────────────────────────────────────────────────────
+DELETE FROM KeyManufacturers;
+PRINT 'KeyManufacturers:         ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
+
 -- ── 8. Log entries ────────────────────────────────────────────────────────────
 DELETE FROM LogEntries;
 PRINT 'LogEntries:               ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
@@ -109,6 +117,8 @@ DBCC CHECKIDENT ('SiteInventory',          RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('PMSchedules',            RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('VendorContacts',         RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('Vendors',                RESEED, 0) WITH NO_INFOMSGS;
+DBCC CHECKIDENT ('SystemKeys',             RESEED, 0) WITH NO_INFOMSGS;
+DBCC CHECKIDENT ('KeyManufacturers',       RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('LogEntries',             RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('Inventory',              RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('Sites',                  RESEED, 0) WITH NO_INFOMSGS;

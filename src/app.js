@@ -79,9 +79,11 @@ async function createApp() {
     res.locals.flash       = req.flash();
     res.locals.currentPath = req.path;
     try {
-      res.locals.appName = await settingsModel.getSetting('app.name', null) || 'SiteMaintenance';
+      res.locals.appName           = await settingsModel.getSetting('app.name', null) || 'SiteMaintenance';
+      res.locals.systemKeysEnabled = (await settingsModel.getSetting('systemKeys.enabled', null)) === '1';
     } catch (_) {
-      res.locals.appName = 'SiteMaintenance';
+      res.locals.appName           = 'SiteMaintenance';
+      res.locals.systemKeysEnabled = false;
     }
     next();
   });
@@ -99,8 +101,9 @@ async function createApp() {
   app.use('/inventory',  require('./routes/inventoryRoutes'));
   app.use('/repairs',    require('./routes/repairRoutes'));
   app.use('/documents',  require('./routes/documentRoutes'));
-  app.use('/vendors',    require('./routes/vendorRoutes'));
-  app.use('/admin',      require('./routes/adminRoutes'));
+  app.use('/vendors',      require('./routes/vendorRoutes'));
+  app.use('/system-keys', require('./routes/systemKeyRoutes'));
+  app.use('/admin',        require('./routes/adminRoutes'));
   app.use('/profile',    require('./routes/profileRoutes'));
 
   // ── Error handling (must be last) ─────────────────────────────────────────

@@ -49,10 +49,19 @@
         </a>
       </li>
 
-      <% if (user.roles && (user.roles.includes('Admin') || user.roles.includes('Technician'))) { %>
+      <% if (user.roles && (user.roles.includes('Admin') || user.roles.includes('Technician') || (systemKeysEnabled && user.roles.includes('SystemKeys')))) { %>
       <li class="nav-item mt-2">
         <span class="sidebar-section-label">Admin</span>
         <span class="sidebar-section-divider"></span>
+      </li>
+      <% } %>
+
+      <% if (systemKeysEnabled && user.roles && (user.roles.includes('Admin') || user.roles.includes('SystemKeys'))) { %>
+      <li class="nav-item">
+        <a class="nav-link <%= currentPath.startsWith('/system-keys') ? 'active' : '' %>" href="/system-keys" title="System Keys">
+          <i class="bi bi-key"></i>
+          <span class="nav-label">System Keys</span>
+        </a>
       </li>
       <% } %>
 

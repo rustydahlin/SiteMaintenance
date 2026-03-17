@@ -30,4 +30,9 @@ function canWrite(req, res, next) {
   return hasRole('Admin', 'Technician', 'Contractor')(req, res, next);
 }
 
-module.exports = { isAuthenticated, isAdmin, hasRole, canWrite };
+// canAccessSystemKeys — Admin or SystemKeys role
+function canAccessSystemKeys(req, res, next) {
+  return hasRole('Admin', 'SystemKeys')(req, res, next);
+}
+
+module.exports = { isAuthenticated, isAdmin, hasRole, canWrite, canAccessSystemKeys };

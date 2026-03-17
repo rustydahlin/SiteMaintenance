@@ -1,0 +1,159 @@
+<%
+  const today = new Date(); today.setHours(0,0,0,0);
+  const expDate = key.ExpirationDate ? new Date(key.ExpirationDate) : null;
+  if (expDate) expDate.setHours(0,0,0,0);
+  const daysLeft = expDate ? Math.ceil((expDate - today) / 86400000) : null;
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">
+    <i class="bi bi-key me-2"></i>
+    System Key
+    <% if (key.SerialNumber) { %><span class="text-muted fw-normal">— <%= key.SerialNumber %></span><% } %>
+  </h1>
+  <div class="d-flex gap-2">
+    <% if (key.IsActive) { %>
+    <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#renewModal">
+      <i class="bi bi-arrow-clockwise me-1"></i>Renew Key
+    </button>
+    <% } %>
+    <a href="/system-keys/<%= key.KeyID %>/edit" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-pencil me-1"></i>Edit
+    </a>
+    <a href="/system-keys" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<% if (!key.IsActive) { %>
+<div class="alert alert-secondary">This key has been deactivated.</div>
+<% } %>
+
+<% if (daysLeft !== null) { %>
+  <% if (daysLeft < 0) { %>
+  <div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>This key <strong>expired <%= Math.abs(daysLeft) %> day(s) ago</strong> (<%= expDate.toLocaleDateString() %>).</div>
+  <% } else if (daysLeft <= 30) { %>
+  <div class="alert alert-warning"><i class="bi bi-clock-fill me-2"></i>This key expires in <strong><%= daysLeft %> day(s)</strong> (<%= expDate.toLocaleDateString() %>).</div>
+  <% } %>
+<% } %>
+
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Key Details</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-5">Issued To</dt>
+          <dd class="col-sm-7"><%= key.IssuedToName || '—' %></dd>
+
+          <dt class="col-sm-5">Organization</dt>
+          <dd class="col-sm-7"><%= key.Organization || '—' %></dd>
+
+          <dt class="col-sm-5">Key Type</dt>
+          <dd class="col-sm-7">
+            <% if (key.KeyType === 'Limited') { %>
+              <span class="badge bg-secondary">Limited</span>
+            <% } else { %>
+              <span class="badge bg-primary">Unlimited</span>
+            <% } %>
+          </dd>
+
+          <dt class="col-sm-5">Serial Number</dt>
+          <dd class="col-sm-7"><%= key.SerialNumber || '—' %></dd>
+
+          <dt class="col-sm-5">Key Code</dt>
+          <dd class="col-sm-7"><%= key.KeyCode || '—' %></dd>
+
+          <dt class="col-sm-5">Manufacturer</dt>
+          <dd class="col-sm-7"><%= key.ManufacturerName || '—' %></dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Dates</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-5">Date Issued</dt>
+          <dd class="col-sm-7"><%= key.DateIssued ? new Date(key.DateIssued).toLocaleDateString() : '—' %></dd>
+
+          <dt class="col-sm-5">Expiration Date</dt>
+          <dd class="col-sm-7">
+            <% if (key.ExpirationDate) { %>
+              <%= expDate.toLocaleDateString() %>
+              <% if (daysLeft !== null && daysLeft < 0) { %>
+                <span class="badge bg-danger ms-1">Expired</span>
+              <% } else if (daysLeft !== null && daysLeft <= 30) { %>
+                <span class="badge bg-warning text-dark ms-1">Expiring Soon</span>
+              <% } %>
+            <% } else { %>—<% } %>
+          </dd>
+
+          <dt class="col-sm-5">Last Renewal</dt>
+          <dd class="col-sm-7"><%= key.LastRenewalDate ? new Date(key.LastRenewalDate).toLocaleDateString() : '—' %></dd>
+
+          <dt class="col-sm-5">Last Updated By</dt>
+          <dd class="col-sm-7"><%= key.LastUpdatedByName || '—' %></dd>
+
+          <dt class="col-sm-5">Created</dt>
+          <dd class="col-sm-7"><%= new Date(key.CreatedAt).toLocaleDateString() %></dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (key.Notes) { %>
+<div class="card mt-4">
+  <div class="card-header fw-semibold">Notes</div>
+  <div class="card-body"><%= key.Notes %></div>
+</div>
+<% } %>
+
+<% if (key.IsActive) { %>
+<div class="mt-4 pt-3 border-top">
+  <form method="POST" action="/system-keys/<%= key.KeyID %>/delete"
+        onsubmit="return confirm('Deactivate this system key? It will no longer appear in the active list.')">
+    <button type="submit" class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-trash me-1"></i>Deactivate Key
+    </button>
+  </form>
+</div>
+<% } %>
+
+<!-- Renew Modal -->
+<div class="modal fade" id="renewModal" tabindex="-1" aria-labelledby="renewModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/system-keys/<%= key.KeyID %>/renew">
+        <div class="modal-header">
+          <h5 class="modal-title" id="renewModalLabel"><i class="bi bi-arrow-clockwise me-2"></i>Renew Key</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Renewal Date</label>
+            <input type="date" name="lastRenewalDate" class="form-control"
+                   value="<%= new Date().toISOString().slice(0,10) %>" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">New Expiration Date</label>
+            <input type="date" name="expirationDate" class="form-control"
+                   value="<%= key.ExpirationDate ? new Date(key.ExpirationDate).toISOString().slice(0,10) : '' %>" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Notes <span class="text-muted fw-normal">(optional — leave blank to keep existing)</span></label>
+            <textarea name="notes" class="form-control" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i>Save Renewal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

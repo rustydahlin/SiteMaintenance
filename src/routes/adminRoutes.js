@@ -113,6 +113,28 @@ router.post('/stock-locations', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Key Manufacturers ─────────────────────────────────────────────────────────
+router.get('/key-manufacturers', async (_req, res, next) => {
+  try {
+    const manufacturers = await lookupModel.getKeyManufacturers(false);
+    res.render('admin/keyManufacturers', { title: 'Key Manufacturers', manufacturers });
+  } catch (err) { next(err); }
+});
+
+router.post('/key-manufacturers', async (req, res, next) => {
+  try {
+    const { id, manufacturerName, description, action } = req.body;
+    if (action === 'toggle') {
+      await lookupModel.toggleKeyManufacturer(parseInt(id));
+    } else {
+      if (!manufacturerName?.trim()) { req.flash('error', 'Manufacturer name is required.'); return res.redirect('/admin/key-manufacturers'); }
+      await lookupModel.upsertKeyManufacturer(id ? parseInt(id) : null, manufacturerName.trim(), description);
+    }
+    req.flash('success', 'Key manufacturer saved.');
+    res.redirect('/admin/key-manufacturers');
+  } catch (err) { next(err); }
+});
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 router.get('/users', async (req, res, next) => {
   try {
@@ -205,7 +227,7 @@ router.get('/settings', async (_req, res, next) => {
 router.post('/settings', async (req, res, next) => {
   try {
     // Checkbox fields: if absent from body they were unchecked — save '0' explicitly
-    const checkboxKeys = ['ldap.enabled', 'ldap.starttls', 'ldap.rejectUnauthorized', 'oidc.enabled', 'email.enabled'];
+    const checkboxKeys = ['ldap.enabled', 'ldap.starttls', 'ldap.rejectUnauthorized', 'oidc.enabled', 'email.enabled', 'systemKeys.enabled'];
     for (const ck of checkboxKeys) {
       if (!(ck in req.body)) req.body[ck] = '0';
     }

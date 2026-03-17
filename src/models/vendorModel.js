@@ -265,8 +265,21 @@ async function getVendorEmailRecipients(vendorID) {
   return emails;
 }
 
+// Returns all active contacts across all vendors (for System Keys issued-to dropdown)
+async function getAllContacts() {
+  const pool = await getPool();
+  const r = await pool.request().query(`
+    SELECT vc.ContactID, vc.FirstName, vc.LastName, vc.Email, v.VendorName
+    FROM VendorContacts vc
+    JOIN Vendors v ON v.VendorID = vc.VendorID
+    WHERE vc.IsActive = 1 AND v.IsActive = 1
+    ORDER BY v.VendorName, vc.FirstName, vc.LastName
+  `);
+  return r.recordset;
+}
+
 module.exports = {
   getAll, getByID, create, update, softDelete, togglePMWork, getPMEnabled, findByName,
   getContactByID, createContact, updateContact, deleteContact, toggleContactEmail,
-  getVendorEmailRecipients,
+  getVendorEmailRecipients, getAllContacts,
 };

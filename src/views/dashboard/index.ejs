@@ -142,5 +142,46 @@
       </ul>
     </div>
     <% } %>
+
+    <!-- System Keys: expired / expiring -->
+    <% if (canSeeKeys && (expiredKeys.length > 0 || expiringKeys.length > 0)) { %>
+    <div class="card shadow-sm mt-3">
+      <div class="card-header text-danger">
+        <i class="bi bi-key me-2"></i>System Keys — Expired / Expiring
+      </div>
+      <ul class="list-group list-group-flush">
+        <% expiredKeys.forEach(k => { %>
+        <li class="list-group-item py-2">
+          <a href="/system-keys/<%= k.KeyID %>" class="text-decoration-none">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="small fw-semibold"><%= k.IssuedToName || '—' %></div>
+                <div class="text-muted" style="font-size:.75rem">
+                  <%= k.Organization || '' %><% if (k.SerialNumber) { %> &bull; <%= k.SerialNumber %><% } %>
+                </div>
+              </div>
+              <span class="badge bg-danger ms-2">Expired <%= new Date(k.ExpirationDate).toLocaleDateString() %></span>
+            </div>
+          </a>
+        </li>
+        <% }) %>
+        <% expiringKeys.forEach(k => { %>
+        <li class="list-group-item py-2">
+          <a href="/system-keys/<%= k.KeyID %>" class="text-decoration-none">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="small fw-semibold"><%= k.IssuedToName || '—' %></div>
+                <div class="text-muted" style="font-size:.75rem">
+                  <%= k.Organization || '' %><% if (k.SerialNumber) { %> &bull; <%= k.SerialNumber %><% } %>
+                </div>
+              </div>
+              <span class="badge bg-warning text-dark ms-2">Expires <%= new Date(k.ExpirationDate).toLocaleDateString() %></span>
+            </div>
+          </a>
+        </li>
+        <% }) %>
+      </ul>
+    </div>
+    <% } %>
   </div>
 </div>

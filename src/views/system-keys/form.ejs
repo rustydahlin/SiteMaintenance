@@ -1,0 +1,122 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">
+    <i class="bi bi-key me-2"></i><%= key ? 'Edit System Key' : 'New System Key' %>
+  </h1>
+  <a href="<%= key ? '/system-keys/' + key.KeyID : '/system-keys' %>" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form method="POST" action="<%= key ? '/system-keys/' + key.KeyID : '/system-keys' %>">
+
+      <!-- Issued To -->
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Issued To Type</label>
+          <select name="issuedToType" id="issuedToType" class="form-select">
+            <option value="user"    <%= (!key || key.IssuedToUserID)    ? 'selected' : '' %>>System User</option>
+            <option value="contact" <%= (key  && key.IssuedToContactID) ? 'selected' : '' %>>Vendor Contact</option>
+          </select>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label fw-semibold">Issued To</label>
+          <select name="issuedToID" id="issuedToID" class="form-select">
+            <option value="">— Select —</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Manufacturer</label>
+          <select name="manufacturerID" class="form-select">
+            <option value="">— None —</option>
+            <% for (const m of manufacturers) { %>
+            <option value="<%= m.ManufacturerID %>" <%= key && key.ManufacturerID === m.ManufacturerID ? 'selected' : '' %>>
+              <%= m.ManufacturerName %>
+            </option>
+            <% } %>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Key Type</label>
+          <select name="keyType" class="form-select">
+            <option value="Unlimited" <%= !key || key.KeyType === 'Unlimited' ? 'selected' : '' %>>Unlimited</option>
+            <option value="Limited"   <%= key && key.KeyType === 'Limited'   ? 'selected' : '' %>>Limited</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Serial Number</label>
+          <input type="text" name="serialNumber" class="form-control"
+                 value="<%= key ? (key.SerialNumber || '') : '' %>">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Key Code</label>
+          <input type="text" name="keyCode" class="form-control"
+                 value="<%= key ? (key.KeyCode || '') : '' %>">
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Date Issued</label>
+          <input type="date" name="dateIssued" class="form-control"
+                 value="<%= key && key.DateIssued ? new Date(key.DateIssued).toISOString().slice(0,10) : '' %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Expiration Date</label>
+          <input type="date" name="expirationDate" class="form-control"
+                 value="<%= key && key.ExpirationDate ? new Date(key.ExpirationDate).toISOString().slice(0,10) : '' %>">
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Notes</label>
+        <textarea name="notes" class="form-control" rows="3"><%= key ? (key.Notes || '') : '' %></textarea>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i><%= key ? 'Save Changes' : 'Create Key' %>
+        </button>
+        <a href="<%= key ? '/system-keys/' + key.KeyID : '/system-keys' %>" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Build lookup maps for users and contacts
+const usersData    = <%- JSON.stringify(users.map(u => ({ id: u.UserID, name: u.DisplayName }))) %>;
+const contactsData = <%- JSON.stringify(contacts.map(c => ({ id: c.ContactID, name: (c.FirstName + ' ' + (c.LastName || '')).trim(), vendor: c.VendorName }))) %>;
+
+const currentType    = '<%= key && key.IssuedToContactID ? "contact" : "user" %>';
+const currentIssuedTo = <%= key ? (key.IssuedToContactID || key.IssuedToUserID || 'null') : 'null' %>;
+
+function updateIssuedToOptions() {
+  const typeEl = document.getElementById('issuedToType');
+  const select = document.getElementById('issuedToID');
+  const type   = typeEl.value;
+
+  select.innerHTML = '<option value="">— Select —</option>';
+
+  const items = type === 'contact' ? contactsData : usersData;
+  for (const item of items) {
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.text  = type === 'contact' ? `${item.name} (${item.vendor})` : item.name;
+    if (item.id === currentIssuedTo && type === currentType) opt.selected = true;
+    select.appendChild(opt);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  updateIssuedToOptions();
+  document.getElementById('issuedToType').addEventListener('change', updateIssuedToOptions);
+});
+</script>
