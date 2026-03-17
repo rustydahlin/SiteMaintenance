@@ -1,10 +1,15 @@
 <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
   <div class="container-fluid">
+    <% if (user) { %>
+    <button class="navbar-toggler border-0 p-1 me-1 d-md-none" id="mobileSidebarToggle" type="button" aria-label="Toggle sidebar">
+      <i class="bi bi-list fs-5"></i>
+    </button>
+    <% } %>
     <a class="navbar-brand fw-bold" href="/">
       <i class="bi bi-tools me-1"></i><%= appName %>
     </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
-      <span class="navbar-toggler-icon"></span>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-label="Toggle navigation">
+      <i class="bi bi-gear fs-5"></i>
     </button>
     <div class="collapse navbar-collapse" id="navbarMain">
       <ul class="navbar-nav ms-auto mb-2 mb-md-0">

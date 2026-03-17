@@ -23,10 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Sidebar toggle
-  const sidebar     = document.getElementById('sidebar');
-  const toggleBtn   = document.getElementById('sidebarToggle');
-  const toggleIcon  = document.getElementById('sidebarToggleIcon');
+  // ── Sidebar (desktop expand/collapse) ──────────────────────────────────────
+  const sidebar    = document.getElementById('sidebar');
+  const toggleBtn  = document.getElementById('sidebarToggle');
+  const toggleIcon = document.getElementById('sidebarToggleIcon');
+  const backdrop   = document.getElementById('sidebarBackdrop');
 
   function updateToggleIcon(collapsed) {
     if (!toggleIcon) return;
@@ -34,15 +35,49 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (sidebar && toggleBtn) {
-    // Sync icon with current state (state already applied by IIFE above)
     updateToggleIcon(sidebar.classList.contains('sidebar-collapsed'));
-
     toggleBtn.addEventListener('click', () => {
       const collapsed = sidebar.classList.toggle('sidebar-collapsed');
       localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
       updateToggleIcon(collapsed);
     });
   }
+
+  // ── Sidebar (mobile overlay) ────────────────────────────────────────────────
+  const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+
+  function openMobileSidebar() {
+    sidebar && sidebar.classList.add('sidebar-mobile-open');
+    backdrop && backdrop.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeMobileSidebar() {
+    sidebar && sidebar.classList.remove('sidebar-mobile-open');
+    backdrop && backdrop.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+
+  if (mobileSidebarToggle) {
+    mobileSidebarToggle.addEventListener('click', () => {
+      sidebar && sidebar.classList.contains('sidebar-mobile-open')
+        ? closeMobileSidebar()
+        : openMobileSidebar();
+    });
+  }
+
+  backdrop && backdrop.addEventListener('click', closeMobileSidebar);
+
+  // Close mobile sidebar when a nav link is tapped
+  sidebar && sidebar.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth < 768) closeMobileSidebar();
+    });
+  });
+
+  // Clean up mobile state when resizing to desktop
+  window.addEventListener('resize', () => {
+    if (window.innerWidth >= 768) closeMobileSidebar();
+  });
 
   document.querySelectorAll('.alert-dismissible').forEach(alert => {
     setTimeout(() => {
