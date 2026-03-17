@@ -43,7 +43,7 @@
     <h1 class="h2 mb-1"><i class="bi bi-building me-2"></i><%= site.SiteName %></h1>
     <div class="d-flex gap-2 flex-wrap">
       <%- statusBadge(site.SiteStatusName) %>
-      <%- warrantyBadge(site.WarrantyExpires) %>
+      <% if (site.WarrantyExpires) { %><%- warrantyBadge(site.WarrantyExpires) %><% } %>
       <% if (site.SiteTypeName) { %>
         <span class="badge bg-body-secondary text-body border"><%= site.SiteTypeName %></span>
       <% } %>
