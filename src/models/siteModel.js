@@ -34,7 +34,9 @@ async function getAll({ typeID, statusID, search, pmDue, page = 1, pageSize = 25
     conditions.push(`EXISTS (
       SELECT 1 FROM PMSchedules pm
       WHERE pm.SiteID = s.SiteID
-        AND DATEADD(DAY, pm.FrequencyDays, pm.LastPerformedAt) <= GETUTCDATE()
+        AND pm.IsActive = 1
+        AND (pm.LastPerformedAt IS NULL
+          OR DATEADD(DAY, pm.FrequencyDays, pm.LastPerformedAt) <= DATEADD(DAY, 14, GETUTCDATE()))
     )`);
   }
 
