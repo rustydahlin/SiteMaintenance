@@ -311,20 +311,59 @@ CREATE INDEX IX_Repair_ItemID ON RepairTracking(ItemID);
 CREATE INDEX IX_Repair_Status ON RepairTracking(RepairStatus);
 
 -- ============================================================
+-- VENDORS / CONTRACTORS
+-- ============================================================
+CREATE TABLE Vendors (
+    VendorID    INT IDENTITY(1,1) PRIMARY KEY,
+    VendorName  NVARCHAR(200) NOT NULL,
+    Phone       NVARCHAR(50)  NULL,
+    Email       NVARCHAR(255) NULL,
+    Address     NVARCHAR(500) NULL,
+    City        NVARCHAR(100) NULL,
+    State       NVARCHAR(50)  NULL,
+    Zip         NVARCHAR(20)  NULL,
+    Website     NVARCHAR(255) NULL,
+    Notes       NVARCHAR(MAX) NULL,
+    DoesPMWork  BIT NOT NULL DEFAULT 0,  -- if 1, appears in PM Assigned To
+    IsActive    BIT NOT NULL DEFAULT 1,
+    CreatedAt   DATETIME2(0) NOT NULL DEFAULT GETUTCDATE(),
+    UpdatedAt   DATETIME2(0) NOT NULL DEFAULT GETUTCDATE()
+);
+CREATE INDEX IX_Vendors_Name ON Vendors(VendorName);
+
+CREATE TABLE VendorContacts (
+    ContactID       INT IDENTITY(1,1) PRIMARY KEY,
+    VendorID        INT NOT NULL,
+    FirstName       NVARCHAR(100) NOT NULL,
+    LastName        NVARCHAR(100) NULL,
+    Title           NVARCHAR(150) NULL,
+    Phone           NVARCHAR(50)  NULL,
+    Email           NVARCHAR(255) NULL,
+    ReceivePMEmails BIT NOT NULL DEFAULT 0,  -- if 1, receives PM cron emails
+    Notes           NVARCHAR(MAX) NULL,
+    IsActive        BIT NOT NULL DEFAULT 1,
+    CreatedAt       DATETIME2(0) NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT FK_VC_Vendor FOREIGN KEY (VendorID) REFERENCES Vendors(VendorID)
+);
+CREATE INDEX IX_VC_VendorID ON VendorContacts(VendorID);
+
+-- ============================================================
 -- PM SCHEDULES
 -- ============================================================
 CREATE TABLE PMSchedules (
-    ScheduleID      INT           IDENTITY(1,1) PRIMARY KEY,
-    SiteID          INT           NOT NULL,
-    Title           NVARCHAR(200) NOT NULL,
-    FrequencyDays   INT           NOT NULL,
-    LastPerformedAt DATE          NULL,
-    AssignedUserID  INT           NULL,
-    IsActive        BIT           NOT NULL DEFAULT 1,
-    Notes           NVARCHAR(MAX) NULL,
-    CreatedAt       DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE(),
-    CONSTRAINT FK_PMS_Site FOREIGN KEY (SiteID)         REFERENCES Sites(SiteID),
-    CONSTRAINT FK_PMS_User FOREIGN KEY (AssignedUserID) REFERENCES Users(UserID)
+    ScheduleID       INT           IDENTITY(1,1) PRIMARY KEY,
+    SiteID           INT           NOT NULL,
+    Title            NVARCHAR(200) NOT NULL,
+    FrequencyDays    INT           NOT NULL,
+    LastPerformedAt  DATE          NULL,
+    AssignedUserID   INT           NULL,
+    AssignedVendorID INT           NULL,
+    IsActive         BIT           NOT NULL DEFAULT 1,
+    Notes            NVARCHAR(MAX) NULL,
+    CreatedAt        DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT FK_PMS_Site   FOREIGN KEY (SiteID)           REFERENCES Sites(SiteID),
+    CONSTRAINT FK_PMS_User   FOREIGN KEY (AssignedUserID)   REFERENCES Users(UserID),
+    CONSTRAINT FK_PMS_Vendor FOREIGN KEY (AssignedVendorID) REFERENCES Vendors(VendorID)
 );
 CREATE INDEX IX_PMS_SiteID ON PMSchedules(SiteID);
 

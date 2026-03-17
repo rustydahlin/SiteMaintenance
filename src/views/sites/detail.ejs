@@ -448,7 +448,7 @@
               <%= lastPerf ? lastPerf.toLocaleDateString() : 'Never' %>
             </td>
             <td><%- pmDueBadge(nextDue) %></td>
-            <td class="small text-muted"><%= pm.AssignedToName || '—' %></td>
+            <td class="small text-muted"><%= pm.AssignedUserName || pm.AssignedVendorName || '—' %></td>
             <% if (isAdminUser) { %>
             <td>
               <div class="d-flex gap-1">
@@ -463,7 +463,7 @@
                         data-schedule-id="<%= pm.ScheduleID %>"
                         data-title="<%= pm.Title %>"
                         data-frequency="<%= pm.FrequencyDays %>"
-                        data-assigned-user-id="<%= pm.AssignedUserID || '' %>"
+                        data-assigned-to="<%= pm.AssignedUserID ? 'user:' + pm.AssignedUserID : (pm.AssignedVendorID ? 'vendor:' + pm.AssignedVendorID : '') %>"
                         data-notes="<%= pm.Notes || '' %>"
                         data-next-due-date="<%= pm.NextDueDate ? new Date(pm.NextDueDate).toISOString().split('T')[0] : '' %>">
                   <i class="bi bi-pencil"></i>
@@ -710,11 +710,22 @@
           </div>
           <div class="col-sm-6">
             <label class="form-label">Assigned To</label>
-            <select name="assignedUserID" class="form-select">
+            <select name="assignedTo" class="form-select">
               <option value="">— Unassigned —</option>
-              <% (allUsers || []).forEach(u => { %>
-              <option value="<%= u.UserID %>"><%= u.DisplayName %></option>
-              <% }) %>
+              <% if ((allUsers || []).length > 0) { %>
+              <optgroup label="System Users">
+                <% (allUsers || []).forEach(u => { %>
+                <option value="user:<%= u.UserID %>"><%= u.DisplayName %></option>
+                <% }) %>
+              </optgroup>
+              <% } %>
+              <% if ((pmVendors || []).length > 0) { %>
+              <optgroup label="Vendors / Contractors">
+                <% (pmVendors || []).forEach(v => { %>
+                <option value="vendor:<%= v.VendorID %>"><%= v.VendorName %></option>
+                <% }) %>
+              </optgroup>
+              <% } %>
             </select>
           </div>
           <div class="col-12">
@@ -780,11 +791,22 @@
           </div>
           <div class="col-sm-6">
             <label class="form-label">Assigned To</label>
-            <select name="assignedUserID" id="pmEditUser" class="form-select">
+            <select name="assignedTo" id="pmEditAssignedTo" class="form-select">
               <option value="">— Unassigned —</option>
-              <% (allUsers || []).forEach(u => { %>
-              <option value="<%= u.UserID %>"><%= u.DisplayName %></option>
-              <% }) %>
+              <% if ((allUsers || []).length > 0) { %>
+              <optgroup label="System Users">
+                <% (allUsers || []).forEach(u => { %>
+                <option value="user:<%= u.UserID %>"><%= u.DisplayName %></option>
+                <% }) %>
+              </optgroup>
+              <% } %>
+              <% if ((pmVendors || []).length > 0) { %>
+              <optgroup label="Vendors / Contractors">
+                <% (pmVendors || []).forEach(v => { %>
+                <option value="vendor:<%= v.VendorID %>"><%= v.VendorName %></option>
+                <% }) %>
+              </optgroup>
+              <% } %>
             </select>
           </div>
           <div class="col-12">
@@ -1025,7 +1047,7 @@
       document.getElementById('pmEditTitle').value    = btn.dataset.title;
       document.getElementById('pmEditFreq').value     = btn.dataset.frequency;
       document.getElementById('pmEditNotes').value    = btn.dataset.notes;
-      document.getElementById('pmEditUser').value     = btn.dataset.assignedUserId || '';
+      document.getElementById('pmEditAssignedTo').value = btn.dataset.assignedTo || '';
       document.getElementById('pmEditNextDate').value = btn.dataset.nextDueDate || '';
       document.getElementById('pmEditForm').action =
         '/sites/<%= site.SiteID %>/pm/' + btn.dataset.scheduleId;

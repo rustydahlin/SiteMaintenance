@@ -9,11 +9,19 @@ const router    = express.Router();
 
 router.use(isAuthenticated);
 
+// Helper: parse "user:123" or "vendor:456" → { assignedUserID, assignedVendorID }
+function parseAssignedTo(value) {
+  if (!value) return { assignedUserID: null, assignedVendorID: null };
+  if (value.startsWith('user:'))   return { assignedUserID:   parseInt(value.split(':')[1], 10) || null, assignedVendorID: null };
+  if (value.startsWith('vendor:')) return { assignedUserID:   null, assignedVendorID: parseInt(value.split(':')[1], 10) || null };
+  return { assignedUserID: null, assignedVendorID: null };
+}
+
 // POST /sites/:siteID/pm — create PM schedule
 router.post('/sites/:siteID/pm', isAdmin, async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.siteID);
-    const { title, frequencyDays, nextPMDate, assignedUserID, notes } = req.body;
+    const { title, frequencyDays, nextPMDate, assignedTo, notes } = req.body;
 
     if (!title?.trim() || !frequencyDays) {
       req.flash('error', 'Title and frequency are required.');
@@ -28,11 +36,14 @@ router.post('/sites/:siteID/pm', isAdmin, async (req, res, next) => {
       lastPerformedAt = d;
     }
 
+    const { assignedUserID, assignedVendorID } = parseAssignedTo(assignedTo);
+
     await pmModel.create({
       siteID, title: title.trim(),
       frequencyDays: freqDays,
       lastPerformedAt,
-      assignedUserID: assignedUserID ? parseInt(assignedUserID) : null,
+      assignedUserID,
+      assignedVendorID,
       notes: notes || null,
     }, req.auditContext);
 
@@ -46,7 +57,7 @@ router.post('/sites/:siteID/pm/:scheduleID', isAdmin, async (req, res, next) => 
   try {
     const siteID     = parseInt(req.params.siteID);
     const scheduleID = parseInt(req.params.scheduleID);
-    const { action, title, frequencyDays, nextPMDate, assignedUserID, notes, performedDate } = req.body;
+    const { action, title, frequencyDays, nextPMDate, assignedTo, notes, performedDate } = req.body;
 
     if (action === 'delete') {
       await pmModel.delete(scheduleID, req.auditContext);
@@ -77,10 +88,12 @@ router.post('/sites/:siteID/pm/:scheduleID', isAdmin, async (req, res, next) => 
         d.setDate(d.getDate() - freqDays);
         lastPerformedAt = d;
       }
+      const { assignedUserID, assignedVendorID } = parseAssignedTo(assignedTo);
       await pmModel.update(scheduleID, {
         title: title?.trim(), frequencyDays: freqDays,
         lastPerformedAt,
-        assignedUserID: assignedUserID ? parseInt(assignedUserID) : null,
+        assignedUserID,
+        assignedVendorID,
         notes: notes || null,
       }, req.auditContext);
       req.flash('success', 'PM schedule updated.');

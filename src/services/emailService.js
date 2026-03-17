@@ -80,19 +80,25 @@ async function sendMail({ to, subject, html, text }) {
 // ── Notification helpers ──────────────────────────────────────────────────────
 
 async function sendPMReminder(site, schedule, daysUntilDue) {
-  const admins = await getAdminEmails();
-  if (!admins.length) return;
+  const vendorModel  = require('../models/vendorModel');
+  const adminEmails  = await getAdminEmails();
+  const vendorEmails = schedule.AssignedVendorID
+    ? await vendorModel.getVendorEmailRecipients(schedule.AssignedVendorID)
+    : [];
+  const allTo = [...new Set([...adminEmails, ...vendorEmails])].filter(Boolean);
+  if (!allTo.length) return;
 
+  const assignedLabel = schedule.AssignedUserName || schedule.AssignedVendorName || null;
   const subject = `PM Reminder: ${schedule.Title} at ${site.SiteName}`;
   const html    = `
     <h3>Preventive Maintenance Reminder</h3>
     <p><strong>Site:</strong> ${site.SiteName}</p>
     <p><strong>Task:</strong> ${schedule.Title}</p>
     <p><strong>Due:</strong> ${daysUntilDue <= 0 ? `<span style="color:red">OVERDUE by ${Math.abs(daysUntilDue)} day(s)</span>` : `in ${daysUntilDue} day(s)`}</p>
-    ${schedule.AssignedUserName ? `<p><strong>Assigned To:</strong> ${schedule.AssignedUserName}</p>` : ''}
+    ${assignedLabel ? `<p><strong>Assigned To:</strong> ${assignedLabel}</p>` : ''}
     <p><a href="${process.env.APP_BASE_URL || ''}/sites/${site.SiteID}">View Site</a></p>
   `;
-  await sendMail({ to: admins, subject, html });
+  await sendMail({ to: allTo, subject, html });
 }
 
 async function sendRepairFollowUp(repair) {

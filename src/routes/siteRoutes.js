@@ -13,6 +13,7 @@ const inventoryModel     = require('../models/inventoryModel');
 const pmModel            = require('../models/pmModel');
 const repairModel        = require('../models/repairModel');
 const userModel          = require('../models/userModel');
+const vendorModel        = require('../models/vendorModel');
 const { isAuthenticated, isAdmin, canWrite } = require('../middleware/auth');
 
 const importUpload = multer({
@@ -341,7 +342,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
 
-    const [site, inventory, recentLogs, documents, pmSchedules, inStockItems, categories, stockLocations, allUsers] = await Promise.all([
+    const [site, inventory, recentLogs, documents, pmSchedules, inStockItems, categories, stockLocations, allUsers, pmVendors] = await Promise.all([
       siteModel.getByID(siteID),
       siteInventoryModel.getCurrentItems(siteID),
       logModel.getBySite(siteID, { pageSize: 10 }).then(r => r.rows),
@@ -351,6 +352,7 @@ router.get('/:id', async (req, res, next) => {
       lookupModel.getInventoryCategories(),
       lookupModel.getStockLocations(),
       userModel.getAll(),
+      vendorModel.getPMEnabled(),
     ]);
 
     // Fetch subsites for parent sites; subsites themselves get an empty array
@@ -396,6 +398,7 @@ router.get('/:id', async (req, res, next) => {
       categories,
       stockLocations,
       allUsers,
+      pmVendors,
       isAdminUser: isAdmin,
       canWrite:    canWriteFlag,
       uploadUrl:   `/documents/upload`,

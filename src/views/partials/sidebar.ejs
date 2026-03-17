@@ -38,6 +38,17 @@
         </a>
       </li>
 
+      <li class="nav-item mt-2">
+        <span class="sidebar-section-label">Vendors</span>
+        <span class="sidebar-section-divider"></span>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link <%= currentPath.startsWith('/vendors') ? 'active' : '' %>" href="/vendors" title="Vendors / Contractors">
+          <i class="bi bi-building-check"></i>
+          <span class="nav-label">Vendors</span>
+        </a>
+      </li>
+
       <% if (user.roles && (user.roles.includes('Admin') || user.roles.includes('Technician'))) { %>
       <li class="nav-item mt-2">
         <span class="sidebar-section-label">Admin</span>

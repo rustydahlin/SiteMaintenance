@@ -6,17 +6,18 @@ A generic infrastructure site management web application for tracking sites, inv
 
 ## Features
 
-- **Sites** — Manage sites of configurable types and statuses with GPS coordinates, warranty tracking, and full history
-- **Inventory** — Track equipment by serial number across stock locations, technician assignments, and site deployments
+- **Sites** — Manage sites of configurable types and statuses with GPS coordinates, warranty tracking, and full history; Excel import/export
+- **Inventory** — Track serialized and bulk equipment across stock locations and site deployments; Excel import/export
 - **Log Entries** — Preventive maintenance, corrective work, contractor/technician notes, auto-generated inventory change logs
 - **Repair / RMA Tracking** — Track items sent for repair with follow-up and expected return dates; email reminders when overdue
-- **PM Schedules** — Recurring preventive maintenance schedules with configurable frequencies and email reminders
+- **PM Schedules** — Recurring preventive maintenance schedules with configurable frequencies, user/vendor assignment, and email reminders
+- **Vendors / Contractors** — Manage external vendors with contacts, PM work enablement, and per-contact email opt-in for PM reminders
 - **File Attachments** — Upload photos and documents attached to log entries, sites, or inventory items; stored in database
 - **User Management** — Four roles: Admin, Technician, Contractor, Viewer
 - **Authentication** — Local accounts, Entra ID / OIDC, and LDAP / Active Directory
-- **Email Notifications** — Configurable SMTP with reminders for PMs, warranties, repairs, and checkouts
-- **Audit Log** — Full record of every user action with before/after values
-- **System Logs** — Rotating file-based application logs via Winston
+- **Email Notifications** — Configurable SMTP with reminders for PMs (including vendor/contact recipients), warranties, and repairs
+- **Audit Log** — Full record of every user action with before/after values; filterable and exportable to Excel
+- **System Logs** — Rotating file-based application logs via Winston; browseable and downloadable from the Admin panel; configurable retention
 
 ---
 
@@ -239,6 +240,7 @@ When new database migrations are released:
 | `005_site_parent.sql` | Adds `ParentSiteID` to Sites for parent/child (simulcast) site hierarchy |
 | `006_inventory_extended.sql` | Adds `PartNumber`, `CommonName`, and `RelatedSystemID` to Inventory |
 | `007_site_fields.sql` | Adds `SiteNumber` and `ContractNumber` to Sites |
+| `008_vendors.sql` | Creates `Vendors` and `VendorContacts` tables; adds `AssignedVendorID` to `PMSchedules` |
 
 > **Note:** `database/schema.sql` always reflects the current full schema. Fresh installs only need to run `schema.sql` + `seed.sql` — migrations are only needed when upgrading an existing database.
 
@@ -251,7 +253,8 @@ SiteMaintenance/
 ├── database/
 │   ├── schema.sql          # All table definitions — run first
 │   ├── seed.sql            # Default data + initial admin user — run second
-│   └── migrations/         # Future schema changes
+│   ├── wipe_test_data.sql  # Removes operational data before going to production
+│   └── migrations/         # Incremental schema changes for existing installs
 └── src/
     ├── server.js           # Entry point — run this
     ├── app.js              # Express app factory

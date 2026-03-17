@@ -99,6 +99,7 @@ async function createApp() {
   app.use('/inventory',  require('./routes/inventoryRoutes'));
   app.use('/repairs',    require('./routes/repairRoutes'));
   app.use('/documents',  require('./routes/documentRoutes'));
+  app.use('/vendors',    require('./routes/vendorRoutes'));
   app.use('/admin',      require('./routes/adminRoutes'));
   app.use('/profile',    require('./routes/profileRoutes'));
 

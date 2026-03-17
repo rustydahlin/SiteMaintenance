@@ -1,0 +1,269 @@
+<% const isAdminUser = user && user.roles && user.roles.includes('Admin'); %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">
+    <i class="bi bi-building-check me-2"></i><%= vendor.VendorName %>
+    <% if (!vendor.IsActive) { %>
+      <span class="badge bg-secondary ms-2">Inactive</span>
+    <% } %>
+    <% if (vendor.DoesPMWork) { %>
+      <span class="badge bg-success ms-1">PM Work</span>
+    <% } %>
+  </h1>
+  <div class="d-flex gap-2">
+    <a href="/vendors" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+    <% if (isAdminUser) { %>
+      <a href="/vendors/<%= vendor.VendorID %>/edit" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil me-1"></i>Edit</a>
+      <form method="POST" action="/vendors/<%= vendor.VendorID %>/toggle-pm" class="d-inline">
+        <button type="submit" class="btn btn-outline-<%= vendor.DoesPMWork ? 'warning' : 'success' %> btn-sm" title="<%= vendor.DoesPMWork ? 'Disable PM Work' : 'Enable PM Work' %>">
+          <i class="bi bi-<%= vendor.DoesPMWork ? 'x-circle' : 'check-circle' %> me-1"></i><%= vendor.DoesPMWork ? 'Disable PM' : 'Enable PM' %>
+        </button>
+      </form>
+      <form method="POST" action="/vendors/<%= vendor.VendorID %>/delete" class="d-inline"
+            onsubmit="return confirm('Delete this vendor? This cannot be undone.')">
+        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1"></i>Delete</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Vendor Info -->
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-info-circle me-2"></i>Details</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4 text-muted">Phone</dt>
+          <dd class="col-sm-8"><%= vendor.Phone || '—' %></dd>
+
+          <dt class="col-sm-4 text-muted">Email</dt>
+          <dd class="col-sm-8">
+            <% if (vendor.Email) { %>
+              <a href="mailto:<%= vendor.Email %>"><%= vendor.Email %></a>
+            <% } else { %>—<% } %>
+          </dd>
+
+          <dt class="col-sm-4 text-muted">Address</dt>
+          <dd class="col-sm-8">
+            <%= [vendor.Address, vendor.City, vendor.State, vendor.Zip].filter(Boolean).join(', ') || '—' %>
+          </dd>
+
+          <dt class="col-sm-4 text-muted">Website</dt>
+          <dd class="col-sm-8">
+            <% if (vendor.Website) { %>
+              <a href="<%= vendor.Website %>" target="_blank" rel="noopener"><%= vendor.Website %></a>
+            <% } else { %>—<% } %>
+          </dd>
+
+          <dt class="col-sm-4 text-muted">PM Work</dt>
+          <dd class="col-sm-8">
+            <% if (vendor.DoesPMWork) { %>
+              <span class="badge bg-success">Enabled — appears in PM Assigned To</span>
+            <% } else { %>
+              <span class="badge bg-secondary">Disabled</span>
+            <% } %>
+          </dd>
+        </dl>
+
+        <% if (vendor.Notes) { %>
+          <hr />
+          <p class="mb-0 small text-muted" style="white-space:pre-wrap;"><%= vendor.Notes %></p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Contact form -->
+  <% if (isAdminUser) { %>
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-person-plus me-2"></i>Add Contact</div>
+      <div class="card-body">
+        <form method="POST" action="/vendors/<%= vendor.VendorID %>/contacts">
+          <div class="row g-2">
+            <div class="col-md-6">
+              <input type="text" name="firstName" class="form-control form-control-sm" placeholder="First Name *" required maxlength="100" />
+            </div>
+            <div class="col-md-6">
+              <input type="text" name="lastName" class="form-control form-control-sm" placeholder="Last Name" maxlength="100" />
+            </div>
+            <div class="col-md-6">
+              <input type="text" name="title" class="form-control form-control-sm" placeholder="Title / Role" maxlength="150" />
+            </div>
+            <div class="col-md-6">
+              <input type="text" name="phone" class="form-control form-control-sm" placeholder="Phone" maxlength="50" />
+            </div>
+            <div class="col-12">
+              <input type="email" name="email" class="form-control form-control-sm" placeholder="Email" maxlength="255" />
+            </div>
+            <div class="col-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="receivePMEmails" id="newReceivePM" value="1" />
+                <label class="form-check-label small" for="newReceivePM">Receive PM reminder emails</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Notes" maxlength="2000"></textarea>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Contact</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<!-- Contacts list -->
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold"><i class="bi bi-people me-2"></i>Contacts (<%= vendor.contacts.length %>)</div>
+  <% if (vendor.contacts.length === 0) { %>
+    <div class="card-body text-muted">No contacts added yet.</div>
+  <% } else { %>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Title</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th class="text-center">PM Emails</th>
+          <th class="text-center">Active</th>
+          <% if (isAdminUser) { %><th></th><% } %>
+        </tr>
+      </thead>
+      <tbody>
+        <% vendor.contacts.forEach(c => { %>
+        <tr>
+          <td class="fw-semibold"><%= c.FirstName %> <%= c.LastName || '' %></td>
+          <td class="text-muted small"><%= c.Title || '—' %></td>
+          <td class="text-muted small"><%= c.Phone || '—' %></td>
+          <td class="small">
+            <% if (c.Email) { %>
+              <a href="mailto:<%= c.Email %>" class="text-muted"><%= c.Email %></a>
+            <% } else { %>—<% } %>
+          </td>
+          <td class="text-center">
+            <% if (isAdminUser) { %>
+              <form method="POST" action="/vendors/<%= vendor.VendorID %>/contacts/<%= c.ContactID %>/toggle-email" class="d-inline">
+                <button type="submit" class="btn btn-sm p-0 border-0 bg-transparent" title="Toggle PM emails">
+                  <% if (c.ReceivePMEmails) { %>
+                    <i class="bi bi-envelope-check-fill text-success fs-5"></i>
+                  <% } else { %>
+                    <i class="bi bi-envelope-slash text-muted fs-5"></i>
+                  <% } %>
+                </button>
+              </form>
+            <% } else { %>
+              <% if (c.ReceivePMEmails) { %>
+                <i class="bi bi-envelope-check-fill text-success"></i>
+              <% } else { %>
+                <i class="bi bi-envelope-slash text-muted"></i>
+              <% } %>
+            <% } %>
+          </td>
+          <td class="text-center">
+            <% if (c.IsActive) { %>
+              <i class="bi bi-check-circle-fill text-success"></i>
+            <% } else { %>
+              <i class="bi bi-x-circle text-muted"></i>
+            <% } %>
+          </td>
+          <% if (isAdminUser) { %>
+          <td class="text-end pe-3">
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-bs-toggle="modal" data-bs-target="#editContactModal"
+                    data-cid="<%= c.ContactID %>"
+                    data-firstname="<%= c.FirstName %>"
+                    data-lastname="<%= c.LastName || '' %>"
+                    data-title="<%= c.Title || '' %>"
+                    data-phone="<%= c.Phone || '' %>"
+                    data-email="<%= c.Email || '' %>"
+                    data-receivepm="<%= c.ReceivePMEmails ? '1' : '' %>"
+                    data-notes="<%= c.Notes || '' %>">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form method="POST" action="/vendors/<%= vendor.VendorID %>/contacts/<%= c.ContactID %>/delete"
+                  class="d-inline" onsubmit="return confirm('Remove this contact?')">
+              <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+          <% } %>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</div>
+
+<!-- Edit Contact Modal -->
+<% if (isAdminUser) { %>
+<div class="modal fade" id="editContactModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Contact</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="editContactForm" method="POST" action="">
+        <div class="modal-body row g-3">
+          <div class="col-md-6">
+            <label class="form-label">First Name <span class="text-danger">*</span></label>
+            <input type="text" name="firstName" id="ecFirstName" class="form-control" required maxlength="100" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Last Name</label>
+            <input type="text" name="lastName" id="ecLastName" class="form-control" maxlength="100" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Title</label>
+            <input type="text" name="title" id="ecTitle" class="form-control" maxlength="150" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Phone</label>
+            <input type="text" name="phone" id="ecPhone" class="form-control" maxlength="50" />
+          </div>
+          <div class="col-12">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" id="ecEmail" class="form-control" maxlength="255" />
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="receivePMEmails" id="ecReceivePM" value="1" />
+              <label class="form-check-label" for="ecReceivePM">Receive PM reminder emails</label>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" id="ecNotes" class="form-control" rows="3" maxlength="2000"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('editContactModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  const cid = btn.dataset.cid;
+  document.getElementById('editContactForm').action = `/vendors/<%= vendor.VendorID %>/contacts/${cid}`;
+  document.getElementById('ecFirstName').value  = btn.dataset.firstname || '';
+  document.getElementById('ecLastName').value   = btn.dataset.lastname  || '';
+  document.getElementById('ecTitle').value      = btn.dataset.title     || '';
+  document.getElementById('ecPhone').value      = btn.dataset.phone     || '';
+  document.getElementById('ecEmail').value      = btn.dataset.email     || '';
+  document.getElementById('ecReceivePM').checked = btn.dataset.receivepm === '1';
+  document.getElementById('ecNotes').value      = btn.dataset.notes     || '';
+});
+</script>
+<% } %>

@@ -1,0 +1,94 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-upload me-2"></i>Import Vendors</h1>
+  <div class="d-flex gap-2">
+    <a href="/vendors/import/template" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-file-earmark-arrow-down me-1"></i>Download Template
+    </a>
+    <a href="/vendors" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<% if (results) { %>
+<!-- Import results -->
+<div class="d-flex gap-3 mb-4 flex-wrap">
+  <div class="card text-center px-4 py-3 border-success">
+    <div class="fs-2 fw-bold text-success"><%= results.created %></div>
+    <div class="small text-muted">Created</div>
+  </div>
+  <div class="card text-center px-4 py-3 border-primary">
+    <div class="fs-2 fw-bold text-primary"><%= results.updated %></div>
+    <div class="small text-muted">Updated</div>
+  </div>
+  <div class="card text-center px-4 py-3 border-warning">
+    <div class="fs-2 fw-bold text-warning"><%= results.skipped %></div>
+    <div class="small text-muted">Skipped</div>
+  </div>
+  <div class="card text-center px-4 py-3 border-danger">
+    <div class="fs-2 fw-bold text-danger"><%= results.errors %></div>
+    <div class="small text-muted">Errors</div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold">Results</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr><th>Row</th><th>Vendor Name</th><th>Result</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <% results.rows.forEach(r => { %>
+        <tr>
+          <td class="text-muted small"><%= r.rowNum %></td>
+          <td class="small fw-semibold">
+            <% if (r.vendorID) { %>
+              <a href="/vendors/<%= r.vendorID %>"><%= r.vendorName || '—' %></a>
+            <% } else { %>
+              <%= r.vendorName || '—' %>
+            <% } %>
+          </td>
+          <td>
+            <% if (r.result === 'created') { %>
+              <span class="badge bg-success">Created</span>
+            <% } else if (r.result === 'updated') { %>
+              <span class="badge bg-primary">Updated</span>
+            <% } else if (r.result === 'skipped') { %>
+              <span class="badge bg-warning text-dark">Skipped</span>
+            <% } else { %>
+              <span class="badge bg-danger">Error</span>
+            <% } %>
+          </td>
+          <td class="small text-muted"><%= r.message || '' %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<a href="/vendors/import" class="btn btn-outline-secondary">Import Another File</a>
+<a href="/vendors" class="btn btn-primary ms-2">Back to Vendors</a>
+
+<% } else { %>
+<!-- Upload form -->
+<div class="card shadow-sm" style="max-width:560px">
+  <div class="card-header fw-semibold">Upload Vendor Spreadsheet</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Upload an <code>.xlsx</code> file with a <strong>Vendors</strong> sheet.
+      Match key is <strong>VendorName</strong> (case-insensitive). Existing vendors found by name will be updated;
+      new names will be created. Contacts are managed per-vendor on the detail page.
+    </p>
+    <form method="POST" action="/vendors/import" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">File (.xlsx)</label>
+        <input type="file" name="importFile" class="form-control" accept=".xlsx,.xls" required />
+      </div>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-eye me-1"></i>Preview Import
+      </button>
+    </form>
+  </div>
+</div>
+<% } %>

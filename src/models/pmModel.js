@@ -23,12 +23,14 @@ async function getBySite(siteID) {
     .query(`
       SELECT
         pm.ScheduleID, pm.SiteID, pm.Title, pm.FrequencyDays,
-        pm.LastPerformedAt, pm.AssignedUserID, pm.Notes, pm.CreatedAt,
+        pm.LastPerformedAt, pm.AssignedUserID, pm.AssignedVendorID, pm.Notes, pm.CreatedAt,
         u.DisplayName AS AssignedUserName,
+        v.VendorName  AS AssignedVendorName,
         ${NEXT_DUE_EXPR}      AS NextDueDate,
         ${DAYS_UNTIL_DUE_EXPR} AS DaysUntilDue
       FROM PMSchedules pm
-      LEFT JOIN Users u ON u.UserID = pm.AssignedUserID
+      LEFT JOIN Users   u ON u.UserID   = pm.AssignedUserID
+      LEFT JOIN Vendors v ON v.VendorID = pm.AssignedVendorID
       WHERE pm.SiteID = @SiteID
       ORDER BY NextDueDate
     `);
@@ -42,31 +44,34 @@ async function getByID(scheduleID) {
     .query(`
       SELECT
         pm.ScheduleID, pm.SiteID, pm.Title, pm.FrequencyDays,
-        pm.LastPerformedAt, pm.AssignedUserID, pm.Notes, pm.CreatedAt,
+        pm.LastPerformedAt, pm.AssignedUserID, pm.AssignedVendorID, pm.Notes, pm.CreatedAt,
         u.DisplayName AS AssignedUserName,
+        v.VendorName  AS AssignedVendorName,
         ${NEXT_DUE_EXPR}      AS NextDueDate,
         ${DAYS_UNTIL_DUE_EXPR} AS DaysUntilDue
       FROM PMSchedules pm
-      LEFT JOIN Users u ON u.UserID = pm.AssignedUserID
+      LEFT JOIN Users   u ON u.UserID   = pm.AssignedUserID
+      LEFT JOIN Vendors v ON v.VendorID = pm.AssignedVendorID
       WHERE pm.ScheduleID = @ScheduleID
     `);
   return result.recordset[0] || null;
 }
 
 async function create(data, auditContext = {}) {
-  const { siteID, title, frequencyDays, lastPerformedAt, assignedUserID, notes } = data;
+  const { siteID, title, frequencyDays, lastPerformedAt, assignedUserID, assignedVendorID, notes } = data;
 
   const pool = await getPool();
   const result = await pool.request()
-    .input('SiteID',          sql.Int,            siteID)
-    .input('Title',           sql.NVarChar(300),  title)
-    .input('FrequencyDays',   sql.Int,            frequencyDays)
-    .input('LastPerformedAt', sql.DateTime2,      lastPerformedAt ? new Date(lastPerformedAt) : null)
-    .input('AssignedUserID',  sql.Int,            assignedUserID || null)
-    .input('Notes',           sql.NVarChar(sql.MAX), notes       || null)
+    .input('SiteID',            sql.Int,            siteID)
+    .input('Title',             sql.NVarChar(300),  title)
+    .input('FrequencyDays',     sql.Int,            frequencyDays)
+    .input('LastPerformedAt',   sql.DateTime2,      lastPerformedAt ? new Date(lastPerformedAt) : null)
+    .input('AssignedUserID',    sql.Int,            assignedUserID   || null)
+    .input('AssignedVendorID',  sql.Int,            assignedVendorID || null)
+    .input('Notes',             sql.NVarChar(sql.MAX), notes         || null)
     .query(`
-      INSERT INTO PMSchedules (SiteID, Title, FrequencyDays, LastPerformedAt, AssignedUserID, Notes)
-      VALUES (@SiteID, @Title, @FrequencyDays, @LastPerformedAt, @AssignedUserID, @Notes);
+      INSERT INTO PMSchedules (SiteID, Title, FrequencyDays, LastPerformedAt, AssignedUserID, AssignedVendorID, Notes)
+      VALUES (@SiteID, @Title, @FrequencyDays, @LastPerformedAt, @AssignedUserID, @AssignedVendorID, @Notes);
       SELECT SCOPE_IDENTITY() AS NewID
     `);
 
@@ -80,17 +85,18 @@ async function create(data, auditContext = {}) {
 }
 
 async function update(scheduleID, data, auditContext = {}) {
-  const { siteID, title, frequencyDays, lastPerformedAt, assignedUserID, notes } = data;
+  const { siteID, title, frequencyDays, lastPerformedAt, assignedUserID, assignedVendorID, notes } = data;
 
   const pool = await getPool();
   const old  = await getByID(scheduleID);
 
   const req = pool.request()
-    .input('ScheduleID',    sql.Int,               scheduleID)
-    .input('Title',         sql.NVarChar(300),     title)
-    .input('FrequencyDays', sql.Int,               frequencyDays)
-    .input('AssignedUserID',sql.Int,               assignedUserID || null)
-    .input('Notes',         sql.NVarChar(sql.MAX), notes          || null);
+    .input('ScheduleID',       sql.Int,               scheduleID)
+    .input('Title',            sql.NVarChar(300),     title)
+    .input('FrequencyDays',    sql.Int,               frequencyDays)
+    .input('AssignedUserID',   sql.Int,               assignedUserID   || null)
+    .input('AssignedVendorID', sql.Int,               assignedVendorID || null)
+    .input('Notes',            sql.NVarChar(sql.MAX), notes            || null);
 
   // Only overwrite LastPerformedAt if a new next PM date was explicitly provided;
   // undefined means "leave it unchanged".
@@ -102,11 +108,12 @@ async function update(scheduleID, data, auditContext = {}) {
 
   await req.query(`
       UPDATE PMSchedules SET
-        Title           = @Title,
-        FrequencyDays   = @FrequencyDays,
-        LastPerformedAt = ${lastPerformedCol},
-        AssignedUserID  = @AssignedUserID,
-        Notes           = @Notes
+        Title            = @Title,
+        FrequencyDays    = @FrequencyDays,
+        LastPerformedAt  = ${lastPerformedCol},
+        AssignedUserID   = @AssignedUserID,
+        AssignedVendorID = @AssignedVendorID,
+        Notes            = @Notes
       WHERE ScheduleID = @ScheduleID
     `);
 
@@ -159,14 +166,16 @@ async function getUpcomingDue(daysAhead = 7) {
     .query(`
       SELECT
         pm.ScheduleID, pm.SiteID, pm.Title, pm.FrequencyDays,
-        pm.LastPerformedAt, pm.AssignedUserID, pm.Notes,
+        pm.LastPerformedAt, pm.AssignedUserID, pm.AssignedVendorID, pm.Notes,
         s.SiteName, s.City, s.State,
         u.DisplayName AS AssignedUserName,
+        v.VendorName  AS AssignedVendorName,
         ${NEXT_DUE_EXPR}      AS NextDueDate,
         ${DAYS_UNTIL_DUE_EXPR} AS DaysUntilDue
       FROM PMSchedules pm
-      LEFT JOIN Sites s ON s.SiteID   = pm.SiteID
-      LEFT JOIN Users u ON u.UserID   = pm.AssignedUserID
+      LEFT JOIN Sites   s ON s.SiteID   = pm.SiteID
+      LEFT JOIN Users   u ON u.UserID   = pm.AssignedUserID
+      LEFT JOIN Vendors v ON v.VendorID = pm.AssignedVendorID
       WHERE ${NEXT_DUE_EXPR} <= DATEADD(day, @DaysAhead, GETUTCDATE())
       ORDER BY NextDueDate
     `);

@@ -1,0 +1,84 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-building-check me-2"></i>Vendors / Contractors</h1>
+  <% if (user && user.roles && user.roles.includes('Admin')) { %>
+  <div class="d-flex gap-2">
+    <a href="/vendors/import" class="btn btn-outline-secondary btn-sm"><i class="bi bi-upload me-1"></i>Import</a>
+    <a href="/vendors/export" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export</a>
+    <a href="/vendors/new"    class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Vendor</a>
+  </div>
+  <% } %>
+</div>
+
+<!-- Filters -->
+<form method="GET" action="/vendors" class="row g-2 mb-4">
+  <div class="col-md-5">
+    <input type="text" name="search" class="form-control" placeholder="Search vendor name…" value="<%= search %>">
+  </div>
+  <div class="col-auto">
+    <div class="form-check mt-2">
+      <input class="form-check-input" type="checkbox" name="includeInactive" id="includeInactive" value="1" <%= includeInactive ? 'checked' : '' %>>
+      <label class="form-check-label" for="includeInactive">Include inactive</label>
+    </div>
+  </div>
+  <div class="col-auto">
+    <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-search me-1"></i>Search</button>
+    <a href="/vendors" class="btn btn-outline-secondary ms-1">Clear</a>
+  </div>
+</form>
+
+<% if (vendors.length === 0) { %>
+<div class="alert alert-info">No vendors found.</div>
+<% } else { %>
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Vendor Name</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th>Location</th>
+          <th class="text-center">PM Work</th>
+          <th class="text-center">Contacts</th>
+          <th class="text-center">Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% vendors.forEach(v => { %>
+        <tr>
+          <td>
+            <a href="/vendors/<%= v.VendorID %>" class="fw-semibold text-decoration-none"><%= v.VendorName %></a>
+          </td>
+          <td class="text-muted small"><%= v.Phone || '—' %></td>
+          <td class="text-muted small">
+            <% if (v.Email) { %>
+              <a href="mailto:<%= v.Email %>" class="text-muted"><%= v.Email %></a>
+            <% } else { %>—<% } %>
+          </td>
+          <td class="text-muted small">
+            <%= [v.City, v.State].filter(Boolean).join(', ') || '—' %>
+          </td>
+          <td class="text-center">
+            <% if (v.DoesPMWork) { %>
+              <span class="badge bg-success">Yes</span>
+            <% } else { %>
+              <span class="badge bg-secondary">No</span>
+            <% } %>
+          </td>
+          <td class="text-center">
+            <span class="badge bg-light text-dark"><%= v.ContactCount %></span>
+          </td>
+          <td class="text-center">
+            <% if (v.IsActive) { %>
+              <i class="bi bi-check-circle-fill text-success"></i>
+            <% } else { %>
+              <i class="bi bi-x-circle text-muted"></i>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
