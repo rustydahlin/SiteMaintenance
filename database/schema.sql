@@ -120,6 +120,8 @@ CREATE TABLE StockLocations (
 CREATE TABLE Sites (
     SiteID          INT             IDENTITY(1,1) PRIMARY KEY,
     SiteName        NVARCHAR(150)   NOT NULL,
+    SiteNumber      NVARCHAR(100)   NULL,
+    ContractNumber  NVARCHAR(100)   NULL,
     SiteTypeID      INT             NOT NULL,
     SiteStatusID    INT             NOT NULL,
     Address         NVARCHAR(500)   NULL,
@@ -130,13 +132,15 @@ CREATE TABLE Sites (
     Longitude       DECIMAL(10,7)   NULL,
     Description     NVARCHAR(MAX)   NULL,
     WarrantyExpires DATE            NULL,
+    ParentSiteID    INT             NULL,       -- NULL = top-level site; set for sub-sites
     IsActive        BIT             NOT NULL DEFAULT 1,
     CreatedAt       DATETIME2(0)    NOT NULL DEFAULT GETUTCDATE(),
     UpdatedAt       DATETIME2(0)    NOT NULL DEFAULT GETUTCDATE(),
     CreatedByUserID INT             NULL,
     CONSTRAINT FK_Sites_SiteType   FOREIGN KEY (SiteTypeID)   REFERENCES SiteTypes(SiteTypeID),
     CONSTRAINT FK_Sites_SiteStatus FOREIGN KEY (SiteStatusID) REFERENCES SiteStatuses(SiteStatusID),
-    CONSTRAINT FK_Sites_CreatedBy  FOREIGN KEY (CreatedByUserID) REFERENCES Users(UserID)
+    CONSTRAINT FK_Sites_CreatedBy  FOREIGN KEY (CreatedByUserID) REFERENCES Users(UserID),
+    CONSTRAINT FK_Sites_ParentSite FOREIGN KEY (ParentSiteID) REFERENCES Sites(SiteID)
 );
 CREATE INDEX IX_Sites_SiteTypeID   ON Sites(SiteTypeID);
 CREATE INDEX IX_Sites_SiteStatusID ON Sites(SiteStatusID);
@@ -149,6 +153,9 @@ CREATE TABLE Inventory (
     ItemID            INT           IDENTITY(1,1) PRIMARY KEY,
     TrackingType      NVARCHAR(20)  NOT NULL DEFAULT 'serialized', -- 'serialized' | 'bulk'
     SerialNumber      NVARCHAR(100) NULL,      -- required for serialized, optional for bulk
+    AssetTag          NVARCHAR(100) NULL,      -- optional asset tag / property tag number (serialized only)
+    CommonName        NVARCHAR(150) NULL,      -- friendly/display name (e.g. "Spare VMS NIC")
+    PartNumber        NVARCHAR(100) NULL,      -- manufacturer part number
     ModelNumber       NVARCHAR(100) NULL,
     Manufacturer      NVARCHAR(150) NULL,
     CategoryID        INT           NOT NULL,
@@ -156,6 +163,7 @@ CREATE TABLE Inventory (
     StockLocationID   INT           NULL,      -- set when In-Stock (serialized only)
     AssignedToUserID  INT           NULL,      -- set when Checked-Out (serialized only)
     QuantityTotal     INT           NOT NULL DEFAULT 1, -- bulk: total units owned; serialized: always 1
+    RelatedSystemID   INT           NULL,      -- optional link to a "parent" inventory item (the system this is a part for)
     Description       NVARCHAR(MAX) NULL,
     PurchaseDate      DATE          NULL,
     WarrantyExpires   DATE          NULL,
@@ -168,7 +176,8 @@ CREATE TABLE Inventory (
     CONSTRAINT FK_Inventory_Status        FOREIGN KEY (StatusID)         REFERENCES InventoryStatuses(StatusID),
     CONSTRAINT FK_Inventory_StockLocation FOREIGN KEY (StockLocationID)  REFERENCES StockLocations(LocationID),
     CONSTRAINT FK_Inventory_AssignedTo    FOREIGN KEY (AssignedToUserID) REFERENCES Users(UserID),
-    CONSTRAINT FK_Inventory_CreatedBy     FOREIGN KEY (CreatedByUserID)  REFERENCES Users(UserID)
+    CONSTRAINT FK_Inventory_CreatedBy     FOREIGN KEY (CreatedByUserID)  REFERENCES Users(UserID),
+    CONSTRAINT FK_Inventory_RelatedSystem FOREIGN KEY (RelatedSystemID)  REFERENCES Inventory(ItemID)
 );
 CREATE UNIQUE INDEX IX_Inventory_SerialNumber ON Inventory(SerialNumber) WHERE SerialNumber IS NOT NULL;
 CREATE INDEX IX_Inventory_CategoryID     ON Inventory(CategoryID);

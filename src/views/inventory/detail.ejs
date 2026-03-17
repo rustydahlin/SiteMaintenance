@@ -32,10 +32,10 @@
     <h1 class="h2 mb-1">
       <i class="bi bi-box-seam me-2"></i>
       <% if (item.TrackingType === 'bulk') { %>
-        <%= item.ModelNumber || item.Manufacturer || ('Item #' + item.ItemID) %>
+        <%= item.CommonName || item.ModelNumber || item.Manufacturer || ('Item #' + item.ItemID) %>
         <span class="badge bg-info text-dark fs-6 ms-1">FRU / Bulk</span>
       <% } else { %>
-        <%= item.SerialNumber %>
+        <%= item.CommonName || item.SerialNumber %>
       <% } %>
     </h1>
     <div class="d-flex gap-2 flex-wrap">
@@ -57,10 +57,11 @@
           <i class="bi bi-trash me-1"></i>Delete
         </button>
       </form>
-      <% if (item.StatusName === 'In-Stock') { %>
-        <a href="/inventory/<%= item.ItemID %>/checkout" class="btn btn-sm btn-outline-warning">
-          <i class="bi bi-box-arrow-right me-1"></i>Check Out
-        </a>
+      <% if (item.StatusName === 'In-Stock' || item.TrackingType === 'bulk') { %>
+        <button type="button" class="btn btn-sm btn-outline-warning"
+                data-bs-toggle="modal" data-bs-target="#deployModal">
+          <i class="bi bi-box-arrow-right me-1"></i>Deploy to Site
+        </button>
       <% } %>
       <% if (item.StatusName === 'Checked-Out') { %>
         <form method="POST" action="/inventory/<%= item.ItemID %>/checkin"
@@ -82,7 +83,22 @@
 <ul class="nav nav-tabs mt-3" id="invTab" role="tablist">
   <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#overview">Overview</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#history">History</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#repairs">Repairs</a></li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#repairs">
+      Repairs
+      <% if (repairs && repairs.length > 0) { %>
+        <span class="badge bg-secondary ms-1"><%= repairs.length %></span>
+      <% } %>
+    </a>
+  </li>
+  <% if (relatedParts && relatedParts.length > 0) { %>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#parts">
+      Related Parts
+      <span class="badge bg-secondary ms-1"><%= relatedParts.length %></span>
+    </a>
+  </li>
+  <% } %>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#docs">Documents</a></li>
 </ul>
 
@@ -98,8 +114,25 @@
           </div>
           <div class="card-body small">
             <dl class="row mb-0">
+              <% if (item.CommonName) { %>
+              <dt class="col-sm-5 text-muted">Common Name</dt>
+              <dd class="col-sm-7 fw-semibold"><%= item.CommonName %></dd>
+              <% } %>
+
+              <% if (item.TrackingType !== 'bulk') { %>
               <dt class="col-sm-5 text-muted">Serial Number</dt>
-              <dd class="col-sm-7 fw-semibold"><%= item.SerialNumber %></dd>
+              <dd class="col-sm-7 fw-semibold"><%= item.SerialNumber || '—' %></dd>
+
+              <% if (item.AssetTag) { %>
+              <dt class="col-sm-5 text-muted">Asset Tag #</dt>
+              <dd class="col-sm-7"><%= item.AssetTag %></dd>
+              <% } %>
+              <% } %>
+
+              <% if (item.PartNumber) { %>
+              <dt class="col-sm-5 text-muted">Part #</dt>
+              <dd class="col-sm-7"><%= item.PartNumber %></dd>
+              <% } %>
 
               <dt class="col-sm-5 text-muted">Model Number</dt>
               <dd class="col-sm-7"><%= item.ModelNumber || '—' %></dd>
@@ -109,6 +142,15 @@
 
               <dt class="col-sm-5 text-muted">Category</dt>
               <dd class="col-sm-7"><%= item.CategoryName || '—' %></dd>
+
+              <% if (item.RelatedSystemName) { %>
+              <dt class="col-sm-5 text-muted">Related System</dt>
+              <dd class="col-sm-7">
+                <a href="/inventory/<%= item.RelatedSystemID %>" class="text-decoration-none">
+                  <%= item.RelatedSystemName %>
+                </a>
+              </dd>
+              <% } %>
             </dl>
           </div>
         </div>
@@ -197,7 +239,13 @@
                 </thead>
                 <tbody>
                   <% stockDistribution.forEach(row => { %>
-                  <tr>
+                  <tr class="stock-row" style="cursor:pointer"
+                      data-stock-id="<%= row.StockID %>"
+                      data-holder-type="<%= row.LocationName ? 'location' : 'user' %>"
+                      data-location-id="<%= row.LocationID || '' %>"
+                      data-user-id="<%= row.UserID || '' %>"
+                      data-quantity="<%= row.Quantity %>"
+                      data-notes="<%= row.Notes || '' %>">
                     <td class="small">
                       <% if (row.LocationName) { %>
                         <i class="bi bi-geo-alt text-muted me-1"></i><%= row.LocationName %>
@@ -211,7 +259,7 @@
                     <td>
                       <form method="POST" action="/inventory/<%= item.ItemID %>/stock/<%= row.StockID %>/delete"
                             onsubmit="return confirm('Remove this stock entry?')">
-                        <button type="submit" class="btn btn-sm btn-outline-danger py-0">
+                        <button type="submit" class="btn btn-sm btn-outline-danger py-0" onclick="event.stopPropagation()">
                           <i class="bi bi-trash"></i>
                         </button>
                       </form>
@@ -228,7 +276,7 @@
 
             <!-- Add / update stock entry form -->
             <% if (isAdminUser) { %>
-            <form method="POST" action="/inventory/<%= item.ItemID %>/stock" class="border rounded p-3 bg-body-secondary">
+            <form method="POST" action="/inventory/<%= item.ItemID %>/stock" id="stockForm" class="border rounded p-3 bg-body-secondary">
               <div class="row g-2 align-items-end">
                 <div class="col-sm-3">
                   <label class="form-label small mb-1">Holder Type</label>
@@ -239,7 +287,7 @@
                 </div>
                 <div class="col-sm-3" id="stockLocGroup">
                   <label class="form-label small mb-1">Location</label>
-                  <select name="locationID" class="form-select form-select-sm">
+                  <select name="locationID" id="stockLocationID" class="form-select form-select-sm">
                     <option value="">— Select —</option>
                     <% stockLocations.forEach(l => { %>
                     <option value="<%= l.LocationID %>"><%= l.LocationName %></option>
@@ -248,7 +296,7 @@
                 </div>
                 <div class="col-sm-3" id="stockUserGroup" style="display:none">
                   <label class="form-label small mb-1">Person</label>
-                  <select name="userID" class="form-select form-select-sm">
+                  <select name="userID" id="stockUserID" class="form-select form-select-sm">
                     <option value="">— Select —</option>
                     <% allUsers.forEach(u => { %>
                     <option value="<%= u.UserID %>"><%= u.DisplayName %></option>
@@ -257,14 +305,15 @@
                 </div>
                 <div class="col-sm-2">
                   <label class="form-label small mb-1">Quantity</label>
-                  <input type="number" name="quantity" class="form-control form-control-sm" min="0" value="1" required />
+                  <input type="number" name="quantity" id="stockQuantity" class="form-control form-control-sm" min="0" value="1" required />
                 </div>
                 <div class="col-sm-3">
                   <label class="form-label small mb-1">Notes (optional)</label>
-                  <input type="text" name="notes" class="form-control form-control-sm" maxlength="255" />
+                  <input type="text" name="notes" id="stockNotes" class="form-control form-control-sm" maxlength="255" />
                 </div>
-                <div class="col-auto">
-                  <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                <div class="col-auto d-flex gap-1">
+                  <button type="submit" id="stockSaveBtn" class="btn btn-sm btn-primary">Save</button>
+                  <button type="button" id="stockCancelBtn" class="btn btn-sm btn-outline-secondary" style="display:none">Cancel</button>
                 </div>
               </div>
               <div class="form-text mt-1">Setting quantity to 0 on an existing entry will remove it from the list.</div>
@@ -421,7 +470,7 @@
       <% } %>
     </div>
 
-    <% if (!item.repairs || item.repairs.length === 0) { %>
+    <% if (!repairs || repairs.length === 0) { %>
       <p class="text-muted">No repair records for this item.</p>
     <% } else { %>
     <div class="table-responsive">
@@ -436,7 +485,7 @@
           </tr>
         </thead>
         <tbody>
-          <% item.repairs.forEach(repair => { %>
+          <% repairs.forEach(repair => { %>
           <tr>
             <td class="small text-muted text-nowrap">
               <%= repair.SentDate ? new Date(repair.SentDate).toLocaleDateString() : '—' %>
@@ -459,6 +508,69 @@
     <% } %>
   </div>
 
+  <!-- ── Related Parts ────────────────────────────────────────────────────── -->
+  <% if (relatedParts && relatedParts.length > 0) { %>
+  <div class="tab-pane fade" id="parts">
+    <div class="d-flex justify-content-between align-items-center mt-2 mb-3">
+      <h6 class="mb-0">Parts Associated with this System</h6>
+      <% if (isAdminUser) { %>
+        <a href="/inventory/new?relatedSystemID=<%= item.ItemID %>" class="btn btn-sm btn-primary">
+          <i class="bi bi-plus-lg me-1"></i>Add Part
+        </a>
+      <% } %>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Part</th>
+            <th>Part #</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th class="text-center">Available</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% relatedParts.forEach(part => { %>
+          <tr>
+            <td>
+              <a href="/inventory/<%= part.ItemID %>" class="fw-semibold text-decoration-none">
+                <%= part.CommonName %>
+              </a>
+              <% if (part.TrackingType === 'bulk') { %>
+                <span class="badge bg-info text-dark small ms-1">FRU</span>
+              <% } %>
+              <% if (part.ModelNumber) { %>
+                <div class="small text-muted"><%= part.ModelNumber %><% if (part.Manufacturer) { %> / <%= part.Manufacturer %><% } %></div>
+              <% } %>
+            </td>
+            <td class="small text-muted"><%= part.PartNumber || '—' %></td>
+            <td class="small"><%= part.CategoryName || '—' %></td>
+            <td>
+              <%
+                const statusMap = { 'In-Stock':'bg-success','Deployed':'bg-primary','Checked-Out':'bg-warning text-dark','In-Repair':'bg-danger','Retired':'bg-secondary' };
+                const sBadge = statusMap[part.StatusName] || 'bg-secondary';
+              %>
+              <span class="badge <%= sBadge %>"><%= part.StatusName || '—' %></span>
+            </td>
+            <td class="text-center small">
+              <% if (part.TrackingType === 'bulk') { %>
+                <span class="fw-semibold"><%= part.QuantityAvailable %></span>
+                <span class="text-muted">/ <%= part.QuantityTotal %></span>
+              <% } else if (part.StatusName === 'In-Stock') { %>
+                <span class="badge bg-success">1</span>
+              <% } else { %>
+                <span class="text-muted">—</span>
+              <% } %>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
+
   <!-- ── Documents ─────────────────────────────────────────────────────────── -->
   <div class="tab-pane fade" id="docs">
     <div class="mt-2">
@@ -467,12 +579,122 @@
         uploadUrl:  `/documents/upload`,
         canUpload:  canWriteUser,
         entityType: 'item',
-        entityId:   item.ItemID
+        entityId:   item.ItemID,
+        returnTo:   `/inventory/${item.ItemID}#docs`
       }) %>
     </div>
   </div>
 
 </div><!-- /.tab-content -->
+
+<!-- ── Deploy to Site Modal ──────────────────────────────────────────────────── -->
+<% if (isAdminUser) { %>
+<div class="modal fade" id="deployModal" tabindex="-1" aria-labelledby="deployModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/inventory/<%= item.ItemID %>/deploy">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" />
+        <div class="modal-header">
+          <h5 class="modal-title" id="deployModalLabel">
+            <i class="bi bi-box-arrow-right me-2"></i>Deploy to Site
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3">
+            Deploying: <strong><%= item.CommonName || item.ModelNumber || item.SerialNumber %></strong>
+          </p>
+
+          <!-- Site -->
+          <div class="mb-3">
+            <label for="deploySiteID" class="form-label">Site <span class="text-danger">*</span></label>
+            <select name="siteID" id="deploySiteID" class="form-select" required>
+              <option value="">— Select Site —</option>
+              <%
+                let lastParent = null;
+                (sites || []).forEach(s => {
+                  const group = s.ParentSiteName || null;
+                  if (group !== lastParent) {
+                    if (lastParent !== null) { %></optgroup><% }
+                    lastParent = group;
+                    if (group) { %><optgroup label="<%= group %>"><% }
+                  }
+              %>
+                <option value="<%= s.SiteID %>"><%= s.SiteName %></option>
+              <% }); if (lastParent) { %></optgroup><% } %>
+            </select>
+          </div>
+
+          <!-- Quantity (bulk only) -->
+          <% if (item.TrackingType === 'bulk') { %>
+          <div class="mb-3">
+            <label for="deployQuantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+            <input type="number" name="quantity" id="deployQuantity"
+                   class="form-control" min="1" max="<%= item.QuantityAvailable %>" value="1" required />
+            <div class="form-text"><%= item.QuantityAvailable %> available.</div>
+          </div>
+          <% } %>
+
+          <!-- Pulled From -->
+          <div class="mb-3">
+            <label for="deployPulledFrom" class="form-label">Pulled From</label>
+            <select name="pulledFrom" id="deployPulledFrom" class="form-select">
+              <option value="">— General Stock / Unallocated —</option>
+              <% if (item.TrackingType === 'bulk') { %>
+                <%
+                  const deployLocRows  = (stockDistribution || []).filter(r => r.LocationName);
+                  const deployUserRows = (stockDistribution || []).filter(r => r.UserDisplayName);
+                %>
+                <% if (deployLocRows.length) { %>
+                  <optgroup label="Stock Locations">
+                    <% deployLocRows.forEach(r => { %>
+                      <option value="location:<%= r.LocationID %>">
+                        <%= r.LocationName %> (<%= r.Quantity %> available)
+                      </option>
+                    <% }) %>
+                  </optgroup>
+                <% } %>
+                <% if (deployUserRows.length) { %>
+                  <optgroup label="Person">
+                    <% deployUserRows.forEach(r => { %>
+                      <option value="user:<%= r.UserID %>">
+                        <%= r.UserDisplayName %> (<%= r.Quantity %> available)
+                      </option>
+                    <% }) %>
+                  </optgroup>
+                <% } %>
+              <% } else { %>
+                <% if (item.StockLocationID && item.StockLocationName) { %>
+                  <option value="location:<%= item.StockLocationID %>" selected>
+                    <%= item.StockLocationName %>
+                  </option>
+                <% } else if (item.AssignedToUserID && item.AssignedToUserName) { %>
+                  <option value="user:<%= item.AssignedToUserID %>" selected>
+                    <%= item.AssignedToUserName %>
+                  </option>
+                <% } %>
+              <% } %>
+            </select>
+          </div>
+
+          <!-- Notes -->
+          <div class="mb-1">
+            <label for="deployNotes" class="form-label">Install Notes</label>
+            <input type="text" name="installNotes" id="deployNotes"
+                   class="form-control" maxlength="500" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-box-arrow-right me-1"></i>Deploy
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<% } %>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -480,14 +702,73 @@ document.addEventListener('DOMContentLoaded', function () {
   var locGroup     = document.getElementById('stockLocGroup');
   var userGroup    = document.getElementById('stockUserGroup');
 
+  function toggleHolder() {
+    if (!holderType) return;
+    var isPerson = holderType.value === 'user';
+    if (locGroup)  locGroup.style.display  = isPerson ? 'none' : '';
+    if (userGroup) userGroup.style.display = isPerson ? '' : 'none';
+  }
+
   if (holderType) {
-    function toggleHolder() {
-      var isPerson = holderType.value === 'user';
-      locGroup.style.display  = isPerson ? 'none' : '';
-      userGroup.style.display = isPerson ? '' : 'none';
-    }
     holderType.addEventListener('change', toggleHolder);
     toggleHolder();
+  }
+
+  // ── Stock row click → populate form ────────────────────────────────────────
+  var saveBtn   = document.getElementById('stockSaveBtn');
+  var cancelBtn = document.getElementById('stockCancelBtn');
+  var locSel    = document.getElementById('stockLocationID');
+  var userSel   = document.getElementById('stockUserID');
+  var qtyInput  = document.getElementById('stockQuantity');
+  var notesInput= document.getElementById('stockNotes');
+
+  function resetStockForm() {
+    if (holderType)  holderType.value = 'location';
+    if (locSel)      locSel.value     = '';
+    if (userSel)     userSel.value    = '';
+    if (qtyInput)    qtyInput.value   = '1';
+    if (notesInput)  notesInput.value = '';
+    if (saveBtn)     saveBtn.textContent = 'Save';
+    if (saveBtn)     saveBtn.classList.replace('btn-success', 'btn-primary');
+    if (cancelBtn)   cancelBtn.style.display = 'none';
+    document.querySelectorAll('.stock-row.table-active').forEach(function(r) {
+      r.classList.remove('table-active');
+    });
+    toggleHolder();
+  }
+
+  document.querySelectorAll('.stock-row').forEach(function (row) {
+    row.addEventListener('click', function () {
+      var holderTypeVal = row.dataset.holderType;
+      var locationID    = row.dataset.locationId;
+      var userID        = row.dataset.userId;
+      var quantity      = row.dataset.quantity;
+      var notes         = row.dataset.notes;
+
+      if (holderType)  holderType.value = holderTypeVal;
+      toggleHolder();
+      if (locSel)      locSel.value     = locationID || '';
+      if (userSel)     userSel.value    = userID     || '';
+      if (qtyInput)    qtyInput.value   = quantity;
+      if (notesInput)  notesInput.value = notes;
+
+      if (saveBtn) {
+        saveBtn.textContent = 'Update';
+        saveBtn.classList.replace('btn-primary', 'btn-success');
+      }
+      if (cancelBtn) cancelBtn.style.display = '';
+
+      document.querySelectorAll('.stock-row.table-active').forEach(function(r) {
+        r.classList.remove('table-active');
+      });
+      row.classList.add('table-active');
+
+      document.getElementById('stockForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  });
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', resetStockForm);
   }
 
 });

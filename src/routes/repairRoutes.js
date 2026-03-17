@@ -14,21 +14,27 @@ router.use(isAuthenticated);
 // ── GET / — list repairs ──────────────────────────────────────────────────────
 router.get('/', async (req, res, next) => {
   try {
-    const { status = 'open', itemID, page = 1 } = req.query;
+    const { status = 'open', itemID, page = 1, sort = 'sentDate', dir = 'desc' } = req.query;
 
     const result = await repairModel.getAll({
       status,
       itemID: itemID ? parseInt(itemID, 10) : undefined,
       page: parseInt(page, 10),
+      sort,
+      dir,
     });
 
     const queryParts = [`status=${encodeURIComponent(status)}`];
     if (itemID) queryParts.push(`itemID=${encodeURIComponent(itemID)}`);
+    if (sort && sort !== 'sentDate') queryParts.push(`sort=${encodeURIComponent(sort)}`);
+    if (dir  && dir  !== 'desc')     queryParts.push(`dir=${encodeURIComponent(dir)}`);
 
     res.render('repairs/index', {
       title:   'Repairs & RMAs',
       repairs: result.rows,
       filters: { status },
+      sort,
+      dir,
       pagination: {
         page:        result.page,
         totalPages:  result.totalPages,

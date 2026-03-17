@@ -85,20 +85,26 @@ async function update(scheduleID, data, auditContext = {}) {
   const pool = await getPool();
   const old  = await getByID(scheduleID);
 
-  await pool.request()
-    .input('ScheduleID',      sql.Int,            scheduleID)
-    .input('SiteID',          sql.Int,            siteID            || null)
-    .input('Title',           sql.NVarChar(300),  title)
-    .input('FrequencyDays',   sql.Int,            frequencyDays)
-    .input('LastPerformedAt', sql.DateTime2,      lastPerformedAt ? new Date(lastPerformedAt) : null)
-    .input('AssignedUserID',  sql.Int,            assignedUserID    || null)
-    .input('Notes',           sql.NVarChar(sql.MAX), notes          || null)
-    .query(`
+  const req = pool.request()
+    .input('ScheduleID',    sql.Int,               scheduleID)
+    .input('Title',         sql.NVarChar(300),     title)
+    .input('FrequencyDays', sql.Int,               frequencyDays)
+    .input('AssignedUserID',sql.Int,               assignedUserID || null)
+    .input('Notes',         sql.NVarChar(sql.MAX), notes          || null);
+
+  // Only overwrite LastPerformedAt if a new next PM date was explicitly provided;
+  // undefined means "leave it unchanged".
+  let lastPerformedCol = 'LastPerformedAt';
+  if (lastPerformedAt !== undefined) {
+    req.input('LastPerformedAt', sql.DateTime2, lastPerformedAt ? new Date(lastPerformedAt) : null);
+    lastPerformedCol = '@LastPerformedAt';
+  }
+
+  await req.query(`
       UPDATE PMSchedules SET
-        SiteID          = @SiteID,
         Title           = @Title,
         FrequencyDays   = @FrequencyDays,
-        LastPerformedAt = @LastPerformedAt,
+        LastPerformedAt = ${lastPerformedCol},
         AssignedUserID  = @AssignedUserID,
         Notes           = @Notes
       WHERE ScheduleID = @ScheduleID

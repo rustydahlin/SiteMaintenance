@@ -6,6 +6,7 @@ const inventoryModel     = require('../models/inventoryModel');
 const lookupModel        = require('../models/lookupModel');
 const documentModel      = require('../models/documentModel');
 const siteInventoryModel = require('../models/siteInventoryModel');
+const siteModel          = require('../models/siteModel');
 const userModel          = require('../models/userModel');
 const repairModel        = require('../models/repairModel');
 const { isAuthenticated, isAdmin } = require('../middleware/auth');
@@ -16,10 +17,10 @@ router.use(isAuthenticated);
 // ── GET / — list inventory ────────────────────────────────────────────────────
 router.get('/', async (req, res, next) => {
   try {
-    const { categoryID, statusID, search, locationID, page = 1 } = req.query;
+    const { categoryID, statusID, search, locationID, page = 1, sort = 'commonName', dir = 'asc' } = req.query;
 
     const [result, categories, statuses, locations] = await Promise.all([
-      inventoryModel.getAll({ categoryID, statusID, search, locationID, page: parseInt(page, 10) }),
+      inventoryModel.getAll({ categoryID, statusID, search, locationID, page: parseInt(page, 10), sort, dir }),
       lookupModel.getInventoryCategories(),
       lookupModel.getInventoryStatuses(),
       lookupModel.getStockLocations(),
@@ -30,6 +31,8 @@ router.get('/', async (req, res, next) => {
     if (statusID)   queryParts.push(`statusID=${encodeURIComponent(statusID)}`);
     if (search)     queryParts.push(`search=${encodeURIComponent(search)}`);
     if (locationID) queryParts.push(`locationID=${encodeURIComponent(locationID)}`);
+    if (sort && sort !== 'commonName') queryParts.push(`sort=${encodeURIComponent(sort)}`);
+    if (dir  && dir  !== 'asc')        queryParts.push(`dir=${encodeURIComponent(dir)}`);
 
     res.render('inventory/index', {
       title:      'Inventory',
@@ -38,6 +41,8 @@ router.get('/', async (req, res, next) => {
       statuses,
       locations,
       filters:    { categoryID, statusID, search, locationID },
+      sort,
+      dir,
       pagination: {
         page:        result.page,
         totalPages:  result.totalPages,
@@ -53,18 +58,21 @@ router.get('/', async (req, res, next) => {
 // ── GET /new — create form ────────────────────────────────────────────────────
 router.get('/new', isAdmin, async (req, res, next) => {
   try {
-    const [categories, statuses, locations] = await Promise.all([
+    const [categories, statuses, locations, systems] = await Promise.all([
       lookupModel.getInventoryCategories(),
       lookupModel.getInventoryStatuses(),
       lookupModel.getStockLocations(),
+      inventoryModel.getSystemsList(),
     ]);
     res.render('inventory/form', {
-      title:      'Add Inventory Item',
-      item:       null,
-      action:     '/inventory',
+      title:          'Add Inventory Item',
+      item:           null,
+      action:         '/inventory',
       categories,
       statuses,
       locations,
+      systems,
+      presetSystemID: req.query.relatedSystemID ? parseInt(req.query.relatedSystemID, 10) : null,
     });
   } catch (err) {
     next(err);
@@ -77,8 +85,8 @@ router.post('/', isAdmin, async (req, res, next) => {
     const { trackingType, serialNumber, categoryID, statusID } = req.body;
     const isBulk = trackingType === 'bulk';
 
-    if (!isBulk && (!serialNumber || !serialNumber.trim())) {
-      req.flash('error', 'Serial Number is required for serialized items.');
+    if (!req.body.commonName || !req.body.commonName.trim()) {
+      req.flash('error', 'Common Name is required.');
       return res.redirect('/inventory/new');
     }
     if (!categoryID) {
@@ -93,12 +101,16 @@ router.post('/', isAdmin, async (req, res, next) => {
     const item = await inventoryModel.create({
       trackingType:    isBulk ? 'bulk' : 'serialized',
       serialNumber:    isBulk ? null : serialNumber.trim(),
+      assetTag:        isBulk ? null : (req.body.assetTag || null),
+      commonName:      req.body.commonName      || null,
+      partNumber:      req.body.partNumber      || null,
       modelNumber:     req.body.modelNumber     || null,
       manufacturer:    req.body.manufacturer    || null,
       categoryID:      categoryID,
       statusID:        statusID,
       stockLocationID: isBulk ? null : (req.body.stockLocationID || null),
       quantityTotal:   isBulk ? (parseInt(req.body.quantityTotal, 10) || 1) : 1,
+      relatedSystemID: req.body.relatedSystemID || null,
       description:     req.body.description     || null,
       purchaseDate:    req.body.purchaseDate     || null,
       warrantyExpires: req.body.warrantyExpires  || null,
@@ -117,32 +129,34 @@ router.get('/:id', async (req, res, next) => {
   try {
     const itemID = parseInt(req.params.id, 10);
 
-    const [item, possessionHistory, documents, siteHistory, repairResult] = await Promise.all([
+    const [item, possessionHistory, documents, siteHistory, repairResult,
+           stockLocations, allUsers, sites, relatedParts] = await Promise.all([
       inventoryModel.getByID(itemID),
       inventoryModel.getPossessionHistory(itemID),
       documentModel.getByItem(itemID),
       siteInventoryModel.getItemHistory(itemID),
       repairModel.getAll({ itemID }),
+      lookupModel.getStockLocations(),
+      userModel.getAll(),
+      siteModel.getSimpleList(),
+      inventoryModel.getRelatedParts(itemID),
     ]);
-    const [stockDistribution, stockLocations, allUsers] = item && item.TrackingType === 'bulk'
-      ? await Promise.all([
-          inventoryModel.getStock(itemID),
-          lookupModel.getStockLocations(),
-          require('../models/userModel').getAll(),
-        ])
-      : [[], [], []];
 
     if (!item) {
       req.flash('error', 'Inventory item not found.');
       return res.redirect('/inventory');
     }
 
+    const stockDistribution = item.TrackingType === 'bulk'
+      ? await inventoryModel.getStock(itemID)
+      : [];
+
     const isAdminUser = req.user && req.user.roles && req.user.roles.includes('Admin');
     const canWriteFlag = req.user && req.user.roles &&
       (req.user.roles.includes('Admin') || req.user.roles.includes('Technician') || req.user.roles.includes('Contractor'));
 
     res.render('inventory/detail', {
-      title:          item.TrackingType === 'bulk' ? (item.ModelNumber || 'Bulk Item') : item.SerialNumber,
+      title:          item.CommonName || (item.TrackingType === 'bulk' ? (item.ModelNumber || 'Bulk Item') : item.SerialNumber),
       item,
       possessionHistory,
       siteHistory,
@@ -150,7 +164,9 @@ router.get('/:id', async (req, res, next) => {
       stockDistribution,
       stockLocations,
       allUsers,
+      sites,
       repairs: repairResult.rows,
+      relatedParts,
       isAdminUser,
       canWrite:        canWriteFlag,
       uploadUrl:       `/documents/upload`,
@@ -165,11 +181,12 @@ router.get('/:id', async (req, res, next) => {
 router.get('/:id/edit', isAdmin, async (req, res, next) => {
   try {
     const itemID = parseInt(req.params.id, 10);
-    const [item, categories, statuses, locations] = await Promise.all([
+    const [item, categories, statuses, locations, systems] = await Promise.all([
       inventoryModel.getByID(itemID),
       lookupModel.getInventoryCategories(),
       lookupModel.getInventoryStatuses(),
       lookupModel.getStockLocations(),
+      inventoryModel.getSystemsList(itemID),
     ]);
 
     if (!item) {
@@ -178,12 +195,13 @@ router.get('/:id/edit', isAdmin, async (req, res, next) => {
     }
 
     res.render('inventory/form', {
-      title:      `Edit — ${item.SerialNumber}`,
+      title:      `Edit — ${item.SerialNumber || item.CommonName || item.ModelNumber}`,
       item,
       action:     `/inventory/${itemID}`,
       categories,
       statuses,
       locations,
+      systems,
     });
   } catch (err) {
     next(err);
@@ -198,19 +216,23 @@ router.post('/:id', isAdmin, async (req, res, next) => {
     const isBulk = existing && existing.TrackingType === 'bulk';
     const { serialNumber, categoryID, statusID } = req.body;
 
-    if (!isBulk && (!serialNumber || !serialNumber.trim())) {
-      req.flash('error', 'Serial Number is required for serialized items.');
+    if (!req.body.commonName || !req.body.commonName.trim()) {
+      req.flash('error', 'Common Name is required.');
       return res.redirect(`/inventory/${itemID}/edit`);
     }
 
     const item = await inventoryModel.update(itemID, {
       serialNumber:    isBulk ? null : (serialNumber?.trim() || null),
+      assetTag:        isBulk ? null : (req.body.assetTag || null),
+      commonName:      req.body.commonName      || null,
+      partNumber:      req.body.partNumber      || null,
       modelNumber:     req.body.modelNumber     || null,
       manufacturer:    req.body.manufacturer    || null,
       categoryID:      categoryID               || null,
       statusID:        statusID                 || null,
       stockLocationID: isBulk ? null : (req.body.stockLocationID || null),
       quantityTotal:   isBulk ? (parseInt(req.body.quantityTotal, 10) || 1) : 1,
+      relatedSystemID: req.body.relatedSystemID || null,
       description:     req.body.description     || null,
       purchaseDate:    req.body.purchaseDate     || null,
       warrantyExpires: req.body.warrantyExpires  || null,
@@ -308,6 +330,48 @@ router.post('/:id/checkin', isAdmin, async (req, res, next) => {
     );
 
     req.flash('success', 'Item checked in successfully.');
+    res.redirect(`/inventory/${itemID}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── POST /:id/deploy — deploy item to a site (replaces old checkout-to-user) ──
+router.post('/:id/deploy', isAdmin, async (req, res, next) => {
+  try {
+    const itemID  = parseInt(req.params.id, 10);
+    const siteID  = parseInt(req.body.siteID, 10);
+    const quantity = parseInt(req.body.quantity, 10) || 1;
+    const { pulledFrom, installNotes } = req.body;
+
+    if (!siteID) {
+      req.flash('error', 'Please select a site.');
+      return res.redirect(`/inventory/${itemID}`);
+    }
+
+    let pulledFromLocationID = null;
+    let pulledFromUserID     = null;
+    if (pulledFrom && pulledFrom.startsWith('location:')) {
+      pulledFromLocationID = parseInt(pulledFrom.split(':')[1], 10) || null;
+    } else if (pulledFrom && pulledFrom.startsWith('user:')) {
+      pulledFromUserID = parseInt(pulledFrom.split(':')[1], 10) || null;
+    }
+
+    await siteInventoryModel.installItem(
+      siteID,
+      itemID,
+      {
+        installedAt:          new Date(),
+        installedByUserID:    req.user?.UserID,
+        installNotes:         installNotes || null,
+        pulledFromLocationID,
+        pulledFromUserID,
+        quantity,
+      },
+      req.auditContext,
+    );
+
+    req.flash('success', 'Item deployed to site successfully.');
     res.redirect(`/inventory/${itemID}`);
   } catch (err) {
     next(err);

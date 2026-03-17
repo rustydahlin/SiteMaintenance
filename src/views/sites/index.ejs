@@ -8,6 +8,15 @@
     if (daysLeft <= 90) return '<span class="badge bg-warning text-dark">Expiring Soon</span>';
     return '<span class="badge bg-success">In Warranty</span>';
   }
+  function pmBadge(dateStr) {
+    if (!dateStr) return '<span class="text-muted small">—</span>';
+    const now = new Date();
+    const due = new Date(dateStr);
+    const daysLeft = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0)   return `<span class="badge bg-danger">Overdue</span>`;
+    if (daysLeft <= 14) return `<span class="badge bg-warning text-dark">${due.toLocaleDateString()}</span>`;
+    return `<span class="small text-muted">${due.toLocaleDateString()}</span>`;
+  }
   function statusDot(statusName) {
     const map = {
       'Active':      'bg-success',
@@ -17,6 +26,26 @@
     };
     const cls = map[statusName] || 'bg-secondary';
     return `<span class="badge rounded-pill ${cls}" style="width:.65rem;height:.65rem;padding:0;vertical-align:middle;display:inline-block;">&nbsp;</span>`;
+  }
+  // Build a sortable header link
+  const curSort = typeof sort !== 'undefined' ? sort : 'siteName';
+  const curDir  = typeof dir  !== 'undefined' ? dir  : 'asc';
+  function sortLink(col) {
+    const newDir = (curSort === col && curDir === 'asc') ? 'desc' : 'asc';
+    const f = typeof filters !== 'undefined' ? filters : {};
+    const parts = [];
+    if (f.typeID)   parts.push(`typeID=${encodeURIComponent(f.typeID)}`);
+    if (f.statusID) parts.push(`statusID=${encodeURIComponent(f.statusID)}`);
+    if (f.search)   parts.push(`search=${encodeURIComponent(f.search)}`);
+    if (f.pmDue)    parts.push(`pmDue=${encodeURIComponent(f.pmDue)}`);
+    parts.push(`sort=${col}`, `dir=${newDir}`);
+    return `/sites?${parts.join('&')}`;
+  }
+  function sortIcon(col) {
+    if (curSort !== col) return '<i class="bi bi-arrow-down-up text-muted ms-1 small opacity-50"></i>';
+    return curDir === 'asc'
+      ? '<i class="bi bi-sort-up ms-1 small"></i>'
+      : '<i class="bi bi-sort-down ms-1 small"></i>';
   }
 %>
 
@@ -33,10 +62,12 @@
 <div class="card mb-3 shadow-sm">
   <div class="card-body py-2">
     <form method="GET" action="/sites" class="row g-2 align-items-end">
+      <input type="hidden" name="sort" value="<%= curSort %>" />
+      <input type="hidden" name="dir"  value="<%= curDir %>" />
       <div class="col-sm-4 col-lg-3">
         <label class="form-label small mb-1">Search</label>
         <input type="text" name="search" class="form-control form-control-sm"
-               placeholder="Name, city, address…"
+               placeholder="Name, site #, city, address…"
                value="<%= typeof filters !== 'undefined' && filters.search ? filters.search : '' %>" />
       </div>
       <div class="col-sm-3 col-lg-2">
@@ -88,17 +119,19 @@
   <table class="table table-hover table-sm align-middle mb-0">
     <thead>
       <tr>
-        <th>Site Name</th>
-        <th>Type</th>
-        <th>Status</th>
-        <th>City / State</th>
-        <th>Warranty</th>
-        <th>Created</th>
+        <th><a href="<%- sortLink('siteNumber') %>" class="text-decoration-none text-body">Site #<%- sortIcon('siteNumber') %></a></th>
+        <th><a href="<%- sortLink('siteName') %>" class="text-decoration-none text-body">Site Name<%- sortIcon('siteName') %></a></th>
+        <th><a href="<%- sortLink('type') %>" class="text-decoration-none text-body">Type<%- sortIcon('type') %></a></th>
+        <th><a href="<%- sortLink('status') %>" class="text-decoration-none text-body">Status<%- sortIcon('status') %></a></th>
+        <th><a href="<%- sortLink('city') %>" class="text-decoration-none text-body">City / State<%- sortIcon('city') %></a></th>
+        <th><a href="<%- sortLink('warranty') %>" class="text-decoration-none text-body">Warranty<%- sortIcon('warranty') %></a></th>
+        <th><a href="<%- sortLink('nextPM') %>" class="text-decoration-none text-body">Next PM<%- sortIcon('nextPM') %></a></th>
       </tr>
     </thead>
     <tbody>
       <% sites.forEach(site => { %>
       <tr>
+        <td class="small text-muted"><%= site.SiteNumber || '—' %></td>
         <td>
           <a href="/sites/<%= site.SiteID %>" class="fw-semibold text-decoration-none">
             <%= site.SiteName %>
@@ -113,9 +146,7 @@
           <%= [site.City, site.State].filter(Boolean).join(', ') || '—' %>
         </td>
         <td><%- warrantyBadge(site.WarrantyExpires) %></td>
-        <td class="small text-muted">
-          <%= site.CreatedAt ? new Date(site.CreatedAt).toLocaleDateString() : '—' %>
-        </td>
+        <td><%- pmBadge(site.NextPMDate) %></td>
       </tr>
       <% }) %>
     </tbody>

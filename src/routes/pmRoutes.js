@@ -13,16 +13,25 @@ router.use(isAuthenticated);
 router.post('/sites/:siteID/pm', isAdmin, async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.siteID);
-    const { title, frequencyDays, assignedUserID, notes } = req.body;
+    const { title, frequencyDays, nextPMDate, assignedUserID, notes } = req.body;
 
     if (!title?.trim() || !frequencyDays) {
       req.flash('error', 'Title and frequency are required.');
       return res.redirect(`/sites/${siteID}?tab=pm`);
     }
 
+    const freqDays = parseInt(frequencyDays);
+    let lastPerformedAt = null;
+    if (nextPMDate) {
+      const d = new Date(nextPMDate);
+      d.setDate(d.getDate() - freqDays);
+      lastPerformedAt = d;
+    }
+
     await pmModel.create({
       siteID, title: title.trim(),
-      frequencyDays: parseInt(frequencyDays),
+      frequencyDays: freqDays,
+      lastPerformedAt,
       assignedUserID: assignedUserID ? parseInt(assignedUserID) : null,
       notes: notes || null,
     }, req.auditContext);
@@ -37,7 +46,7 @@ router.post('/sites/:siteID/pm/:scheduleID', isAdmin, async (req, res, next) => 
   try {
     const siteID     = parseInt(req.params.siteID);
     const scheduleID = parseInt(req.params.scheduleID);
-    const { action, title, frequencyDays, assignedUserID, notes, performedDate } = req.body;
+    const { action, title, frequencyDays, nextPMDate, assignedUserID, notes, performedDate } = req.body;
 
     if (action === 'delete') {
       await pmModel.delete(scheduleID, req.auditContext);
@@ -61,8 +70,16 @@ router.post('/sites/:siteID/pm/:scheduleID', isAdmin, async (req, res, next) => 
       }
       req.flash('success', 'PM marked as completed and log entry created.');
     } else {
+      const freqDays = parseInt(frequencyDays);
+      let lastPerformedAt = undefined; // undefined = keep existing value
+      if (nextPMDate) {
+        const d = new Date(nextPMDate);
+        d.setDate(d.getDate() - freqDays);
+        lastPerformedAt = d;
+      }
       await pmModel.update(scheduleID, {
-        title: title?.trim(), frequencyDays: parseInt(frequencyDays),
+        title: title?.trim(), frequencyDays: freqDays,
+        lastPerformedAt,
         assignedUserID: assignedUserID ? parseInt(assignedUserID) : null,
         notes: notes || null,
       }, req.auditContext);

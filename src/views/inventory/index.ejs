@@ -11,14 +11,24 @@
     return `<span class="badge ${cls}">${statusName || '—'}</span>`;
   }
 
-  function warrantyBadge(dateStr) {
-    if (!dateStr) return '<span class="badge bg-secondary">N/A</span>';
-    const now = new Date();
-    const exp = new Date(dateStr);
-    const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
-    if (daysLeft < 0)   return '<span class="badge bg-danger">Expired</span>';
-    if (daysLeft <= 90) return '<span class="badge bg-warning text-dark">Expiring Soon</span>';
-    return '<span class="badge bg-success">In Warranty</span>';
+  const curSort = typeof sort !== 'undefined' ? sort : 'commonName';
+  const curDir  = typeof dir  !== 'undefined' ? dir  : 'asc';
+  function sortLink(col) {
+    const newDir = (curSort === col && curDir === 'asc') ? 'desc' : 'asc';
+    const f = typeof filters !== 'undefined' ? filters : {};
+    const parts = [];
+    if (f.categoryID) parts.push(`categoryID=${encodeURIComponent(f.categoryID)}`);
+    if (f.statusID)   parts.push(`statusID=${encodeURIComponent(f.statusID)}`);
+    if (f.search)     parts.push(`search=${encodeURIComponent(f.search)}`);
+    if (f.locationID) parts.push(`locationID=${encodeURIComponent(f.locationID)}`);
+    parts.push(`sort=${col}`, `dir=${newDir}`);
+    return `/inventory?${parts.join('&')}`;
+  }
+  function sortIcon(col) {
+    if (curSort !== col) return '<i class="bi bi-arrow-down-up text-muted ms-1 small opacity-50"></i>';
+    return curDir === 'asc'
+      ? '<i class="bi bi-sort-up ms-1 small"></i>'
+      : '<i class="bi bi-sort-down ms-1 small"></i>';
   }
 %>
 
@@ -35,6 +45,8 @@
 <div class="card mb-3 shadow-sm">
   <div class="card-body py-2">
     <form method="GET" action="/inventory" class="row g-2 align-items-end">
+      <input type="hidden" name="sort" value="<%= curSort %>" />
+      <input type="hidden" name="dir"  value="<%= curDir %>" />
       <div class="col-sm-4 col-lg-3">
         <label class="form-label small mb-1">Search</label>
         <input type="text" name="search" class="form-control form-control-sm"
@@ -95,12 +107,12 @@
   <table class="table table-hover table-sm align-middle mb-0">
     <thead>
       <tr>
-        <th>Item</th>
-        <th>Category</th>
-        <th>Status</th>
+        <th><a href="<%- sortLink('commonName') %>" class="text-decoration-none text-body">Item<%- sortIcon('commonName') %></a></th>
+        <th><a href="<%- sortLink('serialNumber') %>" class="text-decoration-none text-body">Serial #<%- sortIcon('serialNumber') %></a></th>
+        <th><a href="<%- sortLink('category') %>" class="text-decoration-none text-body">Category<%- sortIcon('category') %></a></th>
+        <th><a href="<%- sortLink('status') %>" class="text-decoration-none text-body">Status<%- sortIcon('status') %></a></th>
         <th class="text-center">In Stock</th>
-        <th>Location / Assigned To</th>
-        <th>Warranty</th>
+        <th><a href="<%- sortLink('location') %>" class="text-decoration-none text-body">Location / Assigned To<%- sortIcon('location') %></a></th>
       </tr>
     </thead>
     <tbody>
@@ -108,20 +120,19 @@
       <tr>
         <td>
           <a href="/inventory/<%= item.ItemID %>" class="fw-semibold text-decoration-none">
-            <% if (item.TrackingType === 'bulk') { %>
-              <%= item.ModelNumber || item.Manufacturer || ('Item #' + item.ItemID) %>
-            <% } else { %>
-              <%= item.SerialNumber || ('Item #' + item.ItemID) %>
-            <% } %>
+            <%= item.CommonName || item.ModelNumber || item.Manufacturer || item.SerialNumber || ('Item #' + item.ItemID) %>
           </a>
           <% if (item.TrackingType === 'bulk') { %>
             <span class="badge bg-info text-dark ms-1 small">FRU</span>
-            <% if (item.ModelNumber && item.Manufacturer) { %>
-              <div class="small text-muted"><%= item.Manufacturer %></div>
-            <% } %>
-          <% } else { %>
-            <% if (item.ModelNumber) { %><div class="small text-muted"><%= item.ModelNumber %><% if (item.Manufacturer) { %> / <%= item.Manufacturer %><% } %></div><% } %>
           <% } %>
+          <% if (item.ModelNumber) { %>
+            <div class="small text-muted"><%= item.ModelNumber %><% if (item.Manufacturer) { %> / <%= item.Manufacturer %><% } %></div>
+          <% } else if (item.Manufacturer) { %>
+            <div class="small text-muted"><%= item.Manufacturer %></div>
+          <% } %>
+        </td>
+        <td class="small text-muted">
+          <%= item.TrackingType === 'bulk' ? '—' : (item.SerialNumber || '—') %>
         </td>
         <td class="small"><%= item.CategoryName || '—' %></td>
         <td><%- statusBadge(item.StatusName) %></td>
@@ -135,10 +146,27 @@
             <span class="text-muted">—</span>
           <% } %>
         </td>
-        <td class="small text-muted">
-          <%= item.StockLocationName || item.AssignedToUserName || '—' %>
+        <td class="small">
+          <% if (item.TrackingType === 'bulk') { %>
+            <% if (item.BulkLocationCount > 1) { %>
+              <span class="text-muted"><i class="bi bi-box me-1"></i><%= item.BulkPrimaryLocation %> +<%= item.BulkLocationCount - 1 %> more</span>
+            <% } else if (item.BulkPrimaryLocation) { %>
+              <span class="text-muted"><i class="bi bi-box me-1"></i><%= item.BulkPrimaryLocation %></span>
+            <% } else { %>
+              <span class="text-muted">—</span>
+            <% } %>
+          <% } else if (item.CurrentSiteName) { %>
+            <a href="/sites/<%= item.CurrentSiteID %>" class="text-decoration-none text-muted">
+              <i class="bi bi-geo-alt me-1"></i><%= item.CurrentSiteName %>
+            </a>
+          <% } else if (item.StockLocationName) { %>
+            <span class="text-muted"><i class="bi bi-box me-1"></i><%= item.StockLocationName %></span>
+          <% } else if (item.AssignedToUserName) { %>
+            <span class="text-muted"><i class="bi bi-person me-1"></i><%= item.AssignedToUserName %></span>
+          <% } else { %>
+            <span class="text-muted">—</span>
+          <% } %>
         </td>
-        <td><%- warrantyBadge(item.WarrantyExpires) %></td>
       </tr>
       <% }) %>
     </tbody>

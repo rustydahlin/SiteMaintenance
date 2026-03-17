@@ -3,10 +3,20 @@
 const { getPool, sql } = require('../config/database');
 const { writeAudit }   = require('./auditModel');
 
-async function getAll({ typeID, statusID, search, pmDue, page = 1, pageSize = 25 } = {}) {
+const SORT_COLUMNS = {
+  siteNumber: 's.SiteNumber',
+  siteName:   's.SiteName',
+  type:       't.TypeName',
+  status:     'ss.StatusName',
+  city:       's.City',
+  warranty:   's.WarrantyExpires',
+  nextPM:     'NextPMDate',
+};
+
+async function getAll({ typeID, statusID, search, pmDue, page = 1, pageSize = 25, sort = 'siteName', dir = 'asc' } = {}) {
   const pool = await getPool();
   const request = pool.request();
-  const conditions = ['s.IsActive = 1'];
+  const conditions = ['s.IsActive = 1', 's.ParentSiteID IS NULL'];
 
   if (typeID) {
     conditions.push('s.SiteTypeID = @TypeID');
@@ -17,7 +27,7 @@ async function getAll({ typeID, statusID, search, pmDue, page = 1, pageSize = 25
     request.input('StatusID', sql.Int, statusID);
   }
   if (search) {
-    conditions.push('(s.SiteName LIKE @Search OR s.City LIKE @Search OR s.Address LIKE @Search)');
+    conditions.push('(s.SiteName LIKE @Search OR s.City LIKE @Search OR s.Address LIKE @Search OR s.SiteNumber LIKE @Search)');
     request.input('Search', sql.NVarChar(200), `%${search}%`);
   }
   if (pmDue == 1 || pmDue === true) {
@@ -27,6 +37,9 @@ async function getAll({ typeID, statusID, search, pmDue, page = 1, pageSize = 25
         AND DATEADD(DAY, pm.FrequencyDays, pm.LastPerformedAt) <= GETUTCDATE()
     )`);
   }
+
+  const orderCol = SORT_COLUMNS[sort] || 's.SiteName';
+  const orderDir = dir === 'desc' ? 'DESC' : 'ASC';
 
   const where = conditions.join(' AND ');
   const offset = (page - 1) * pageSize;
@@ -47,16 +60,20 @@ async function getAll({ typeID, statusID, search, pmDue, page = 1, pageSize = 25
 
   const result = await request.query(`
     SELECT
-      s.SiteID, s.SiteName, s.Address, s.City, s.State, s.ZipCode,
+      s.SiteID, s.SiteName, s.SiteNumber, s.Address, s.City, s.State, s.ZipCode,
       s.Latitude, s.Longitude, s.Description, s.WarrantyExpires,
       s.IsActive, s.CreatedAt,
-      t.TypeName   AS SiteTypeName,
-      ss.StatusName AS SiteStatusName
+      t.TypeName    AS SiteTypeName,
+      ss.StatusName AS SiteStatusName,
+      (SELECT MIN(DATEADD(DAY, pm.FrequencyDays, pm.LastPerformedAt))
+       FROM PMSchedules pm
+       WHERE pm.SiteID = s.SiteID AND pm.IsActive = 1 AND pm.LastPerformedAt IS NOT NULL
+      ) AS NextPMDate
     FROM Sites s
     LEFT JOIN SiteTypes    t  ON t.SiteTypeID   = s.SiteTypeID
     LEFT JOIN SiteStatuses ss ON ss.SiteStatusID = s.SiteStatusID
     WHERE ${where}
-    ORDER BY s.SiteName
+    ORDER BY ${orderCol} ${orderDir}
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
   `);
 
@@ -75,14 +92,18 @@ async function getByID(siteID) {
     .input('SiteID', sql.Int, siteID)
     .query(`
       SELECT
-        s.SiteID, s.SiteName, s.SiteTypeID, s.SiteStatusID,
+        s.SiteID, s.SiteName, s.SiteNumber, s.ContractNumber,
+        s.SiteTypeID, s.SiteStatusID,
         s.Address, s.City, s.State, s.ZipCode,
         s.Latitude, s.Longitude, s.Description, s.WarrantyExpires,
         s.IsActive, s.CreatedAt, s.CreatedByUserID,
+        s.ParentSiteID,
+        p.SiteName    AS ParentSiteName,
         t.TypeName    AS SiteTypeName,
         ss.StatusName AS SiteStatusName,
         u.DisplayName AS CreatedByName
       FROM Sites s
+      LEFT JOIN Sites         p  ON p.SiteID       = s.ParentSiteID
       LEFT JOIN SiteTypes    t  ON t.SiteTypeID   = s.SiteTypeID
       LEFT JOIN SiteStatuses ss ON ss.SiteStatusID = s.SiteStatusID
       LEFT JOIN Users        u  ON u.UserID        = s.CreatedByUserID
@@ -93,31 +114,37 @@ async function getByID(siteID) {
 
 async function create(data, auditContext = {}) {
   const {
-    siteName, siteTypeID, siteStatusID, address, city, state, zipCode,
-    latitude, longitude, description, warrantyExpires,
+    siteName, siteNumber, contractNumber, siteTypeID, siteStatusID,
+    address, city, state, zipCode, latitude, longitude, description,
+    warrantyExpires, parentSiteID,
   } = data;
 
   const pool = await getPool();
   const result = await pool.request()
-    .input('SiteName',       sql.NVarChar(200),  siteName)
-    .input('SiteTypeID',     sql.Int,             siteTypeID   || null)
-    .input('SiteStatusID',   sql.Int,             siteStatusID || null)
-    .input('Address',        sql.NVarChar(255),   address      || null)
-    .input('City',           sql.NVarChar(100),   city         || null)
-    .input('State',          sql.NVarChar(50),    state        || null)
-    .input('ZipCode',        sql.NVarChar(20),    zipCode      || null)
-    .input('Latitude',       sql.Decimal(10, 7),  latitude     ?? null)
-    .input('Longitude',      sql.Decimal(10, 7),  longitude    ?? null)
-    .input('Description',    sql.NVarChar(sql.MAX), description || null)
-    .input('WarrantyExpires',sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
-    .input('CreatedByUserID',sql.Int,             auditContext.userID || null)
+    .input('SiteName',        sql.NVarChar(200),   siteName)
+    .input('SiteNumber',      sql.NVarChar(100),   siteNumber      || null)
+    .input('ContractNumber',  sql.NVarChar(100),   contractNumber  || null)
+    .input('SiteTypeID',      sql.Int,             siteTypeID      || null)
+    .input('SiteStatusID',    sql.Int,             siteStatusID    || null)
+    .input('Address',         sql.NVarChar(255),   address         || null)
+    .input('City',            sql.NVarChar(100),   city            || null)
+    .input('State',           sql.NVarChar(50),    state           || null)
+    .input('ZipCode',         sql.NVarChar(20),    zipCode         || null)
+    .input('Latitude',        sql.Decimal(10, 7),  latitude        ?? null)
+    .input('Longitude',       sql.Decimal(10, 7),  longitude       ?? null)
+    .input('Description',     sql.NVarChar(sql.MAX), description   || null)
+    .input('WarrantyExpires', sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
+    .input('CreatedByUserID', sql.Int,             auditContext.userID || null)
+    .input('ParentSiteID',    sql.Int,             parentSiteID    || null)
     .query(`
       INSERT INTO Sites
-        (SiteName, SiteTypeID, SiteStatusID, Address, City, State, ZipCode,
-         Latitude, Longitude, Description, WarrantyExpires, CreatedByUserID)
+        (SiteName, SiteNumber, ContractNumber, SiteTypeID, SiteStatusID,
+         Address, City, State, ZipCode, Latitude, Longitude, Description,
+         WarrantyExpires, CreatedByUserID, ParentSiteID)
       VALUES
-        (@SiteName, @SiteTypeID, @SiteStatusID, @Address, @City, @State, @ZipCode,
-         @Latitude, @Longitude, @Description, @WarrantyExpires, @CreatedByUserID);
+        (@SiteName, @SiteNumber, @ContractNumber, @SiteTypeID, @SiteStatusID,
+         @Address, @City, @State, @ZipCode, @Latitude, @Longitude, @Description,
+         @WarrantyExpires, @CreatedByUserID, @ParentSiteID);
       SELECT SCOPE_IDENTITY() AS NewID
     `);
 
@@ -132,39 +159,46 @@ async function create(data, auditContext = {}) {
 
 async function update(siteID, data, auditContext = {}) {
   const {
-    siteName, siteTypeID, siteStatusID, address, city, state, zipCode,
-    latitude, longitude, description, warrantyExpires,
+    siteName, siteNumber, contractNumber, siteTypeID, siteStatusID,
+    address, city, state, zipCode, latitude, longitude, description,
+    warrantyExpires, parentSiteID,
   } = data;
 
   const pool = await getPool();
   const old  = await getByID(siteID);
 
   await pool.request()
-    .input('SiteID',         sql.Int,             siteID)
-    .input('SiteName',       sql.NVarChar(200),   siteName)
-    .input('SiteTypeID',     sql.Int,             siteTypeID   || null)
-    .input('SiteStatusID',   sql.Int,             siteStatusID || null)
-    .input('Address',        sql.NVarChar(255),   address      || null)
-    .input('City',           sql.NVarChar(100),   city         || null)
-    .input('State',          sql.NVarChar(50),    state        || null)
-    .input('ZipCode',        sql.NVarChar(20),    zipCode      || null)
-    .input('Latitude',       sql.Decimal(10, 7),  latitude     ?? null)
-    .input('Longitude',      sql.Decimal(10, 7),  longitude    ?? null)
-    .input('Description',    sql.NVarChar(sql.MAX), description || null)
-    .input('WarrantyExpires',sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
+    .input('SiteID',          sql.Int,             siteID)
+    .input('SiteName',        sql.NVarChar(200),   siteName)
+    .input('SiteNumber',      sql.NVarChar(100),   siteNumber      || null)
+    .input('ContractNumber',  sql.NVarChar(100),   contractNumber  || null)
+    .input('SiteTypeID',      sql.Int,             siteTypeID      || null)
+    .input('SiteStatusID',    sql.Int,             siteStatusID    || null)
+    .input('Address',         sql.NVarChar(255),   address         || null)
+    .input('City',            sql.NVarChar(100),   city            || null)
+    .input('State',           sql.NVarChar(50),    state           || null)
+    .input('ZipCode',         sql.NVarChar(20),    zipCode         || null)
+    .input('Latitude',        sql.Decimal(10, 7),  latitude        ?? null)
+    .input('Longitude',       sql.Decimal(10, 7),  longitude       ?? null)
+    .input('Description',     sql.NVarChar(sql.MAX), description   || null)
+    .input('WarrantyExpires', sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
+    .input('ParentSiteID',    sql.Int,             parentSiteID    || null)
     .query(`
       UPDATE Sites SET
-        SiteName       = @SiteName,
-        SiteTypeID     = @SiteTypeID,
-        SiteStatusID   = @SiteStatusID,
-        Address        = @Address,
-        City           = @City,
-        State          = @State,
-        ZipCode        = @ZipCode,
-        Latitude       = @Latitude,
-        Longitude      = @Longitude,
-        Description    = @Description,
-        WarrantyExpires = @WarrantyExpires
+        SiteName        = @SiteName,
+        SiteNumber      = @SiteNumber,
+        ContractNumber  = @ContractNumber,
+        SiteTypeID      = @SiteTypeID,
+        SiteStatusID    = @SiteStatusID,
+        Address         = @Address,
+        City            = @City,
+        State           = @State,
+        ZipCode         = @ZipCode,
+        Latitude        = @Latitude,
+        Longitude       = @Longitude,
+        Description     = @Description,
+        WarrantyExpires = @WarrantyExpires,
+        ParentSiteID    = @ParentSiteID
       WHERE SiteID = @SiteID
     `);
 
@@ -174,6 +208,24 @@ async function update(siteID, data, auditContext = {}) {
     userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent,
   });
   return getByID(siteID);
+}
+
+async function getSubsites(parentSiteID) {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('ParentSiteID', sql.Int, parentSiteID)
+    .query(`
+      SELECT
+        s.SiteID, s.SiteName, s.SiteStatusID, s.SiteTypeID, s.IsActive,
+        ss.StatusName,
+        t.TypeName AS SiteTypeName
+      FROM Sites s
+      LEFT JOIN SiteStatuses ss ON ss.SiteStatusID = s.SiteStatusID
+      LEFT JOIN SiteTypes    t  ON t.SiteTypeID    = s.SiteTypeID
+      WHERE s.ParentSiteID = @ParentSiteID
+      ORDER BY s.SiteName
+    `);
+  return result.recordset;
 }
 
 async function softDelete(siteID, auditContext = {}) {
@@ -188,4 +240,17 @@ async function softDelete(siteID, auditContext = {}) {
   });
 }
 
-module.exports = { getAll, getByID, create, update, softDelete };
+async function getSimpleList() {
+  const pool = await getPool();
+  const result = await pool.request().query(`
+    SELECT s.SiteID, s.SiteName,
+           p.SiteName AS ParentSiteName
+    FROM Sites s
+    LEFT JOIN Sites p ON p.SiteID = s.ParentSiteID
+    WHERE s.IsActive = 1
+    ORDER BY p.SiteName, s.SiteName
+  `);
+  return result.recordset;
+}
+
+module.exports = { getAll, getByID, getSubsites, getSimpleList, create, update, softDelete };

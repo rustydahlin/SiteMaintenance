@@ -1,3 +1,18 @@
+<%
+  const curSort = typeof sort !== 'undefined' ? sort : 'displayName';
+  const curDir  = typeof dir  !== 'undefined' ? dir  : 'asc';
+  function sortLink(col) {
+    const newDir = (curSort === col && curDir === 'asc') ? 'desc' : 'asc';
+    return `/admin/users?sort=${col}&dir=${newDir}`;
+  }
+  function sortIcon(col) {
+    if (curSort !== col) return '<i class="bi bi-arrow-down-up text-muted ms-1 small opacity-50"></i>';
+    return curDir === 'asc'
+      ? '<i class="bi bi-sort-up ms-1 small"></i>'
+      : '<i class="bi bi-sort-down ms-1 small"></i>';
+  }
+%>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1 class="h3 mb-0"><i class="bi bi-people me-2"></i>Users</h1>
   <div class="d-flex gap-2">
@@ -11,13 +26,13 @@
     <table class="table table-hover mb-0">
       <thead>
         <tr>
-          <th>Display Name</th>
-          <th>Username</th>
-          <th>Email</th>
-          <th>Auth</th>
+          <th><a href="<%- sortLink('displayName') %>" class="text-decoration-none text-body">Display Name<%- sortIcon('displayName') %></a></th>
+          <th><a href="<%- sortLink('username') %>" class="text-decoration-none text-body">Username<%- sortIcon('username') %></a></th>
+          <th><a href="<%- sortLink('email') %>" class="text-decoration-none text-body">Email<%- sortIcon('email') %></a></th>
+          <th><a href="<%- sortLink('auth') %>" class="text-decoration-none text-body">Auth<%- sortIcon('auth') %></a></th>
           <th>Roles</th>
-          <th>Status</th>
-          <th>Last Login</th>
+          <th><a href="<%- sortLink('status') %>" class="text-decoration-none text-body">Status<%- sortIcon('status') %></a></th>
+          <th><a href="<%- sortLink('lastLogin') %>" class="text-decoration-none text-body">Last Login<%- sortIcon('lastLogin') %></a></th>
           <th></th>
         </tr>
       </thead>

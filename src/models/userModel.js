@@ -58,11 +58,22 @@ async function findByExternalID(externalID) {
   return _attachRoles(result.recordset[0] || null);
 }
 
-async function getAll({ includeInactive = false } = {}) {
+const USER_SORT_COLUMNS = {
+  displayName: 'u.DisplayName',
+  username:    'u.Username',
+  email:       'u.Email',
+  auth:        'u.AuthProvider',
+  status:      'u.IsActive',
+  lastLogin:   'u.LastLoginAt',
+};
+
+async function getAll({ includeInactive = false, sort = 'displayName', dir = 'asc' } = {}) {
   const pool = await getPool();
   const where = includeInactive ? '' : 'WHERE u.IsActive = 1';
+  const orderCol = USER_SORT_COLUMNS[sort] || 'u.DisplayName';
+  const orderDir = dir === 'desc' ? 'DESC' : 'ASC';
   const result = await pool.request()
-    .query(`SELECT ${USER_COLS}, ${ROLES_JSON} FROM Users u ${where} ORDER BY u.DisplayName`);
+    .query(`SELECT ${USER_COLS}, ${ROLES_JSON} FROM Users u ${where} ORDER BY ${orderCol} ${orderDir}`);
   return Promise.all(result.recordset.map(_attachRoles));
 }
 

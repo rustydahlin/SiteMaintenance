@@ -14,7 +14,7 @@ async function getCurrentItems(siteID) {
         si.InstalledAt, si.InstalledByUserID, si.InstallNotes, si.PulledFromLocationID,
         si.RemovedAt,   si.RemovedByUserID,   si.RemovalNotes,
         si.InstallLogEntryID, si.RemovalLogEntryID,
-        i.TrackingType, i.SerialNumber, i.ModelNumber, i.Manufacturer,
+        i.TrackingType, i.SerialNumber, i.CommonName, i.ModelNumber, i.Manufacturer,
         c.CategoryName,
         s.StatusName,
         ib.DisplayName AS InstalledByName,

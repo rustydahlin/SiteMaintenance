@@ -64,16 +64,25 @@
   <% } %>
 </div>
 
+<% if (site.ParentSiteID) { %>
+<a href="/sites/<%= site.ParentSiteID %>" class="text-decoration-none text-muted small">
+  <i class="bi bi-arrow-left me-1"></i>Back to <%= site.ParentSiteName || 'Parent Site' %>
+</a>
+<% } else { %>
 <a href="/sites" class="text-decoration-none text-muted small">
   <i class="bi bi-arrow-left me-1"></i>Back to Sites
 </a>
+<% } %>
 
 <!-- Tabs -->
 <ul class="nav nav-tabs mt-3" id="siteTab" role="tablist">
   <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#overview">Overview</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#logs" id="logs-tab">Log Entries</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#equipment">Installed Equipment</a></li>
+  <% if (!site.ParentSiteID) { %>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#subsites">Sub-Sites</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#pm">PM Schedules</a></li>
+  <% } %>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#docs">Documents & Photos</a></li>
 </ul>
 
@@ -122,6 +131,16 @@
 
               <dt class="col-sm-5 text-muted">Type</dt>
               <dd class="col-sm-7"><%= site.SiteTypeName || '—' %></dd>
+
+              <% if (site.SiteNumber) { %>
+              <dt class="col-sm-5 text-muted">Site #</dt>
+              <dd class="col-sm-7"><%= site.SiteNumber %></dd>
+              <% } %>
+
+              <% if (site.ContractNumber) { %>
+              <dt class="col-sm-5 text-muted">Contract #</dt>
+              <dd class="col-sm-7"><%= site.ContractNumber %></dd>
+              <% } %>
 
               <dt class="col-sm-5 text-muted">Warranty</dt>
               <dd class="col-sm-7">
@@ -234,18 +253,16 @@
           <% inventory.forEach(item => { %>
           <tr>
             <td>
+              <a href="/inventory/<%= item.ItemID %>" class="text-decoration-none fw-semibold">
+                <%= item.CommonName || item.ModelNumber || item.SerialNumber || '(no name)' %>
+              </a>
               <% if (item.TrackingType === 'bulk') { %>
-                <a href="/inventory/<%= item.ItemID %>" class="text-decoration-none fw-semibold">
-                  <%= item.ModelNumber || '(no model)' %>
-                </a>
-                <% if (item.Manufacturer) { %><div class="small text-muted"><%= item.Manufacturer %></div><% } %>
-                <span class="badge bg-info text-dark small">FRU</span>
-              <% } else { %>
-                <a href="/inventory/<%= item.ItemID %>" class="text-decoration-none fw-semibold">
-                  <%= item.SerialNumber %>
-                </a>
-                <% if (item.ModelNumber) { %><div class="small text-muted"><%= item.ModelNumber %></div><% } %>
+                <span class="badge bg-info text-dark small ms-1">FRU</span>
               <% } %>
+              <div class="small text-muted">
+                <% if (item.TrackingType !== 'bulk' && item.SerialNumber) { %><%= item.SerialNumber %><% if (item.Manufacturer) { %> &bull; <% } %><% } %>
+                <%= item.Manufacturer || '' %>
+              </div>
             </td>
             <td class="small"><%= item.CategoryName || '—' %></td>
             <td class="text-center small fw-semibold"><%= item.Quantity || 1 %></td>
@@ -260,14 +277,14 @@
                 <button type="button" class="btn btn-sm btn-outline-danger"
                         data-bs-toggle="modal" data-bs-target="#removeBulkModal"
                         data-item-id="<%= item.ItemID %>"
-                        data-item-name="<%= (item.ModelNumber || item.Manufacturer || 'Item') %>"
+                        data-item-name="<%= (item.CommonName || item.ModelNumber || item.Manufacturer || 'Item') %>"
                         data-max-qty="<%= item.Quantity %>">
                   <i class="bi bi-dash-circle me-1"></i>Remove
                 </button>
                 <button type="button" class="btn btn-sm btn-outline-warning"
                         data-bs-toggle="modal" data-bs-target="#replaceBulkModal"
                         data-item-id="<%= item.ItemID %>"
-                        data-item-name="<%= (item.ModelNumber || item.Manufacturer || 'Item') %>"
+                        data-item-name="<%= (item.CommonName || item.ModelNumber || item.Manufacturer || 'Item') %>"
                         data-max-qty="<%= item.Quantity %>">
                   <i class="bi bi-arrow-repeat me-1"></i>Replace
                 </button>
@@ -289,6 +306,100 @@
               </div>
             </td>
             <% } %>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+
+    <!-- Sub-site equipment (parent sites only) -->
+    <% if (subsiteInventory && subsiteInventory.some(s => s.items.length > 0)) { %>
+      <% subsiteInventory.forEach(({ sub, items }) => { %>
+        <% if (items.length > 0) { %>
+        <h6 class="mt-4 mb-2 d-flex align-items-center gap-2">
+          <i class="bi bi-diagram-2 text-muted"></i>
+          <a href="/sites/<%= sub.SiteID %>" class="text-decoration-none"><%= sub.SiteName %></a>
+          <% if (sub.SiteTypeName) { %>
+            <span class="badge bg-body-secondary text-body fw-normal" style="font-size:.7rem"><%= sub.SiteTypeName %></span>
+          <% } %>
+        </h6>
+        <div class="table-responsive mb-2">
+          <table class="table table-hover table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th class="text-center">Qty</th>
+                <th>Installed</th>
+                <th>Installed By</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% items.forEach(item => { %>
+              <tr>
+                <td>
+                  <a href="/inventory/<%= item.ItemID %>" class="text-decoration-none fw-semibold">
+                    <%= item.CommonName || item.ModelNumber || item.SerialNumber || '(no name)' %>
+                  </a>
+                  <% if (item.TrackingType === 'bulk') { %>
+                    <span class="badge bg-info text-dark small ms-1">FRU</span>
+                  <% } %>
+                  <div class="small text-muted">
+                    <% if (item.TrackingType !== 'bulk' && item.SerialNumber) { %><%= item.SerialNumber %><% if (item.Manufacturer) { %> &bull; <% } %><% } %>
+                    <%= item.Manufacturer || '' %>
+                  </div>
+                </td>
+                <td class="small"><%= item.CategoryName || '—' %></td>
+                <td class="text-center small fw-semibold"><%= item.Quantity || 1 %></td>
+                <td class="small text-muted text-nowrap">
+                  <%= item.InstalledAt ? new Date(item.InstalledAt).toLocaleDateString() : '—' %>
+                </td>
+                <td class="small text-muted"><%= item.InstalledByName || '—' %></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+      <% }) %>
+    <% } %>
+  </div>
+
+  <!-- ── Sub-Sites (parent sites only) ───────────────────────────────────── -->
+  <% if (!site.ParentSiteID) { %>
+  <div class="tab-pane fade" id="subsites">
+    <div class="d-flex justify-content-between align-items-center mt-2 mb-3">
+      <h6 class="mb-0">Sub-Sites</h6>
+      <% if (isAdminUser) { %>
+        <a href="/sites/new?parentSiteID=<%= site.SiteID %>" class="btn btn-sm btn-primary">
+          <i class="bi bi-plus-lg me-1"></i>Add Sub-Site
+        </a>
+      <% } %>
+    </div>
+
+    <% if (!subsites || subsites.length === 0) { %>
+      <p class="text-muted">No sub-sites yet.</p>
+    <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% subsites.forEach(sub => { %>
+          <tr>
+            <td>
+              <a href="/sites/<%= sub.SiteID %>" class="text-decoration-none fw-semibold">
+                <%= sub.SiteName %>
+              </a>
+            </td>
+            <td><%- statusBadge(sub.StatusName) %></td>
+            <td class="small text-muted"><%= sub.SiteTypeName || '—' %></td>
           </tr>
           <% }) %>
         </tbody>
@@ -353,7 +464,8 @@
                         data-title="<%= pm.Title %>"
                         data-frequency="<%= pm.FrequencyDays %>"
                         data-assigned-user-id="<%= pm.AssignedUserID || '' %>"
-                        data-notes="<%= pm.Notes || '' %>">
+                        data-notes="<%= pm.Notes || '' %>"
+                        data-next-due-date="<%= pm.NextDueDate ? new Date(pm.NextDueDate).toISOString().split('T')[0] : '' %>">
                   <i class="bi bi-pencil"></i>
                 </button>
                 <form method="POST" action="/sites/<%= site.SiteID %>/pm/<%= pm.ScheduleID %>"
@@ -373,6 +485,7 @@
     </div>
     <% } %>
   </div>
+  <% } %>
 
   <!-- ── Documents & Photos ───────────────────────────────────────────────── -->
   <div class="tab-pane fade" id="docs">
@@ -382,7 +495,8 @@
         uploadUrl:  `/documents/upload`,
         canUpload:  canWriteUser,
         entityType: 'site',
-        entityId:   site.SiteID
+        entityId:   site.SiteID,
+        returnTo:   `/sites/${site.SiteID}#docs`
       }) %>
     </div>
   </div>
@@ -567,7 +681,7 @@
 <% } %>
 
 <!-- ── PM Add Modal ───────────────────────────────────────────────────────── -->
-<% if (isAdminUser) { %>
+<% if (isAdminUser && !site.ParentSiteID) { %>
 <div class="modal fade" id="pmModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -584,8 +698,13 @@
           </div>
           <div class="col-sm-6">
             <label class="form-label">Frequency (days) <span class="text-danger">*</span></label>
-            <input type="number" name="frequencyDays" class="form-control" required min="1"
+            <input type="number" name="frequencyDays" id="pmAddFreq" class="form-control" required min="1"
                    placeholder="e.g. 365" />
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Next PM Date</label>
+            <input type="date" name="nextPMDate" id="pmAddNextDate" class="form-control" />
+            <div class="form-text">Leave blank to mark as due immediately.</div>
           </div>
           <div class="col-sm-6">
             <label class="form-label">Assigned To</label>
@@ -651,6 +770,11 @@
           <div class="col-sm-6">
             <label class="form-label">Frequency (days) <span class="text-danger">*</span></label>
             <input type="number" name="frequencyDays" id="pmEditFreq" class="form-control" required min="1" />
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Next PM Date</label>
+            <input type="date" name="nextPMDate" id="pmEditNextDate" class="form-control" />
+            <div class="form-text">Leave blank to keep current schedule.</div>
           </div>
           <div class="col-sm-6">
             <label class="form-label">Assigned To</label>
@@ -896,10 +1020,11 @@
   if (pmEditModal) {
     pmEditModal.addEventListener('show.bs.modal', function (e) {
       var btn = e.relatedTarget;
-      document.getElementById('pmEditTitle').value = btn.dataset.title;
-      document.getElementById('pmEditFreq').value  = btn.dataset.frequency;
-      document.getElementById('pmEditNotes').value = btn.dataset.notes;
-      document.getElementById('pmEditUser').value  = btn.dataset.assignedUserId || '';
+      document.getElementById('pmEditTitle').value    = btn.dataset.title;
+      document.getElementById('pmEditFreq').value     = btn.dataset.frequency;
+      document.getElementById('pmEditNotes').value    = btn.dataset.notes;
+      document.getElementById('pmEditUser').value     = btn.dataset.assignedUserId || '';
+      document.getElementById('pmEditNextDate').value = btn.dataset.nextDueDate || '';
       document.getElementById('pmEditForm').action =
         '/sites/<%= site.SiteID %>/pm/' + btn.dataset.scheduleId;
     });

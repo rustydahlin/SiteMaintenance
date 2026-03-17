@@ -9,10 +9,19 @@ const REPAIR_SELECT = `
   rt.ManufacturerContact, rt.Reason, rt.ExpectedReturnDate, rt.FollowUpDate,
   rt.ReceivedDate, rt.ReturnCondition, rt.ReturnNotes, rt.RepairStatus,
   rt.SentByUserID, rt.ReceivedByUserID, rt.CreatedAt,
-  i.SerialNumber, i.ModelNumber, i.Manufacturer,
+  i.CommonName, i.SerialNumber, i.ModelNumber, i.Manufacturer,
   sb.DisplayName AS SentByName,
   rb.DisplayName AS ReceivedByName
 `;
+
+const REPAIR_SORT_COLUMNS = {
+  item:           'COALESCE(i.CommonName, i.SerialNumber, i.ModelNumber)',
+  manufacturer:   'i.Manufacturer',
+  sentDate:       'rt.SentDate',
+  expectedReturn: 'rt.ExpectedReturnDate',
+  followUp:       'rt.FollowUpDate',
+  sentBy:         'sb.DisplayName',
+};
 
 const REPAIR_JOINS = `
   FROM RepairTracking rt
@@ -21,21 +30,25 @@ const REPAIR_JOINS = `
   LEFT JOIN Users    rb  ON rb.UserID = rt.ReceivedByUserID
 `;
 
-async function getAll({ status, itemID, page = 1, pageSize = 25 } = {}) {
+async function getAll({ status, itemID, page = 1, pageSize = 25, sort = 'sentDate', dir = 'desc' } = {}) {
   const pool = await getPool();
   const request = pool.request();
   const conditions = ['1=1'];
 
   if (status === 'open') {
     conditions.push('rt.ReceivedDate IS NULL');
-  } else if (status) {
+  } else if (status && status !== 'all') {
     conditions.push('rt.RepairStatus = @Status');
     request.input('Status', sql.NVarChar(50), status);
   }
+  // status === 'all' — no filter, return everything
   if (itemID) {
     conditions.push('rt.ItemID = @ItemID');
     request.input('ItemID', sql.Int, itemID);
   }
+
+  const orderCol = REPAIR_SORT_COLUMNS[sort] || 'rt.SentDate';
+  const orderDir = dir === 'asc' ? 'ASC' : 'DESC';
 
   const where = conditions.join(' AND ');
   const offset = (page - 1) * pageSize;
@@ -43,8 +56,8 @@ async function getAll({ status, itemID, page = 1, pageSize = 25 } = {}) {
   request.input('PageSize', sql.Int, pageSize);
 
   const countReq = pool.request();
-  if (status && status !== 'open') countReq.input('Status', sql.NVarChar(50), status);
-  if (itemID)                       countReq.input('ItemID', sql.Int,          itemID);
+  if (status && status !== 'open' && status !== 'all') countReq.input('Status', sql.NVarChar(50), status);
+  if (itemID) countReq.input('ItemID', sql.Int, itemID);
 
   const countResult = await countReq.query(`SELECT COUNT(*) AS Total ${REPAIR_JOINS} WHERE ${where}`);
   const total = countResult.recordset[0].Total;
@@ -53,7 +66,7 @@ async function getAll({ status, itemID, page = 1, pageSize = 25 } = {}) {
     SELECT ${REPAIR_SELECT}
     ${REPAIR_JOINS}
     WHERE ${where}
-    ORDER BY rt.SentDate DESC
+    ORDER BY ${orderCol} ${orderDir}
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
   `);
 

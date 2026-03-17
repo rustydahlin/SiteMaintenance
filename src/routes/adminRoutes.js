@@ -107,10 +107,11 @@ router.post('/stock-locations', async (req, res, next) => {
 });
 
 // ── Users ─────────────────────────────────────────────────────────────────────
-router.get('/users', async (_req, res, next) => {
+router.get('/users', async (req, res, next) => {
   try {
-    const users = await userModel.getAll({ includeInactive: true });
-    res.render('admin/users/index', { title: 'Users', users });
+    const { sort = 'displayName', dir = 'asc' } = req.query;
+    const users = await userModel.getAll({ includeInactive: true, sort, dir });
+    res.render('admin/users/index', { title: 'Users', users, sort, dir });
   } catch (err) { next(err); }
 });
 

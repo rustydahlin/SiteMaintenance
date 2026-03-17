@@ -43,14 +43,34 @@
 
       <div class="row g-3">
 
+        <!-- Common Name (required for all) -->
+        <div class="col-md-4">
+          <label for="commonName" class="form-label">
+            Common Name <span class="text-danger">*</span>
+          </label>
+          <input type="text" id="commonName" name="commonName"
+                 class="form-control"
+                 value="<%= item && item.CommonName ? item.CommonName : '' %>"
+                 maxlength="150"
+                 placeholder="e.g. Spare VMS Server NIC"
+                 required />
+        </div>
+
         <!-- Serial Number (serialized only) -->
         <div class="col-md-4" id="fieldSerialNumber">
-          <label for="serialNumber" class="form-label">
-            Serial Number <span class="text-danger" id="serialRequired">*</span>
-          </label>
+          <label for="serialNumber" class="form-label">Serial Number</label>
           <input type="text" id="serialNumber" name="serialNumber"
                  class="form-control"
                  value="<%= item ? (item.SerialNumber || '') : '' %>"
+                 maxlength="100" />
+        </div>
+
+        <!-- Asset Tag (serialized only) -->
+        <div class="col-md-4" id="fieldAssetTag">
+          <label for="assetTag" class="form-label">Asset Tag #</label>
+          <input type="text" id="assetTag" name="assetTag"
+                 class="form-control"
+                 value="<%= item ? (item.AssetTag || '') : '' %>"
                  maxlength="100" />
         </div>
 
@@ -63,6 +83,15 @@
                  class="form-control" min="1"
                  value="<%= item && item.QuantityTotal ? item.QuantityTotal : 1 %>" />
           <div class="form-text">Total units owned. Available = Total − Deployed.</div>
+        </div>
+
+        <!-- Part Number -->
+        <div class="col-md-4">
+          <label for="partNumber" class="form-label">Part #</label>
+          <input type="text" id="partNumber" name="partNumber"
+                 class="form-control"
+                 value="<%= item && item.PartNumber ? item.PartNumber : '' %>"
+                 maxlength="100" />
         </div>
 
         <!-- Model Number -->
@@ -81,6 +110,22 @@
                  class="form-control"
                  value="<%= item && item.Manufacturer ? item.Manufacturer : '' %>"
                  maxlength="150" />
+        </div>
+
+        <!-- Related System -->
+        <div class="col-md-4">
+          <label for="relatedSystemID" class="form-label">Related System</label>
+          <select id="relatedSystemID" name="relatedSystemID" class="form-select">
+            <option value="">— None —</option>
+            <% (systems || []).forEach(s => { %>
+              <option value="<%= s.ItemID %>"
+                <%= ((item && item.RelatedSystemID == s.ItemID) || (!item && typeof presetSystemID !== 'undefined' && presetSystemID == s.ItemID)) ? 'selected' : '' %>>
+                <%= s.DisplayLabel %>
+                <% if (s.Manufacturer) { %> (<%= s.Manufacturer %>)<% } %>
+              </option>
+            <% }) %>
+          </select>
+          <div class="form-text">Optional — link this item to a parent system it belongs to.</div>
         </div>
 
         <!-- Category -->
@@ -185,6 +230,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var typeBulk    = document.getElementById('typeBulk');
   var typeSerial  = document.getElementById('typeSerial');
   var fieldSN     = document.getElementById('fieldSerialNumber');
+  var fieldAT     = document.getElementById('fieldAssetTag');
   var fieldQty    = document.getElementById('fieldQuantity');
   var inputSN     = document.getElementById('serialNumber');
   var inputQty    = document.getElementById('quantityTotal');
@@ -195,8 +241,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var bulk = typeBulk && typeBulk.checked;
 
     if (fieldSN)  fieldSN.style.display  = bulk ? 'none' : 'block';
+    if (fieldAT)  fieldAT.style.display  = bulk ? 'none' : 'block';
     if (fieldQty) fieldQty.style.display = bulk ? 'block' : 'none';
-    if (inputSN)  inputSN.required       = !bulk;
     if (inputQty) inputQty.required      = bulk;
 
     if (locGroup && statusSel) {

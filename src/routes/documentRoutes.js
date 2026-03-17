@@ -51,11 +51,11 @@ router.post('/upload', canWrite, upload.single('file'), async (req, res, next) =
     }, req.auditContext);
 
     req.flash('success', 'File uploaded successfully.');
-    res.redirect('back');
+    res.redirect(req.body.returnTo || 'back');
   } catch (err) {
     if (err instanceof multer.MulterError || err.message?.includes('File type not allowed')) {
       req.flash('error', err.message);
-      return res.redirect('back');
+      return res.redirect(req.body.returnTo || 'back');
     }
     next(err);
   }
@@ -97,7 +97,7 @@ router.post('/:id/delete', canWrite, async (req, res, next) => {
 
     await documentModel.delete(docID, req.auditContext);
     req.flash('success', 'File deleted.');
-    res.redirect('back');
+    res.redirect(req.body.returnTo || 'back');
   } catch (err) { next(err); }
 });
 

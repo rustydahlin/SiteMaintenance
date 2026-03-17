@@ -226,8 +226,21 @@ For production deployments:
 When new database migrations are released:
 
 1. Back up your database
-2. Run the migration scripts in `database/migrations/` in order (e.g. `002_description.sql`)
+2. Run the migration scripts in `database/migrations/` in order
 3. Pull the latest code and restart the application
+
+### Migration history
+
+| File | Description |
+|------|-------------|
+| `002_bulk_inventory.sql` | Adds `TrackingType` and `QuantityTotal` to Inventory; adds `Quantity` to SiteInventory |
+| `003_inventory_stock.sql` | Creates `InventoryStock` table for bulk quantity tracking; adds `PulledFromUserID` to SiteInventory |
+| `004_settings_encryption.sql` | Adds `IsEncrypted` column to AppSettings for encrypted sensitive values |
+| `005_site_parent.sql` | Adds `ParentSiteID` to Sites for parent/child (simulcast) site hierarchy |
+| `006_inventory_extended.sql` | Adds `PartNumber`, `CommonName`, and `RelatedSystemID` to Inventory |
+| `007_site_fields.sql` | Adds `SiteNumber` and `ContractNumber` to Sites |
+
+> **Note:** `database/schema.sql` always reflects the current full schema. Fresh installs only need to run `schema.sql` + `seed.sql` — migrations are only needed when upgrading an existing database.
 
 ---
 

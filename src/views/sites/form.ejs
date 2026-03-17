@@ -12,6 +12,20 @@
   <div class="card-body">
     <form method="POST" action="<%= action %>" novalidate>
 
+      <input type="hidden" name="parentSiteID" value="<%= parentSiteID || '' %>" />
+
+      <% if (parentSiteID && parentSiteName) { %>
+      <div class="alert alert-info py-2 mb-3 small">
+        <i class="bi bi-diagram-3 me-1"></i>
+        Sub-site of: <a href="/sites/<%= parentSiteID %>" class="alert-link fw-semibold"><%= parentSiteName %></a>
+      </div>
+      <% } else if (parentSiteID) { %>
+      <div class="alert alert-info py-2 mb-3 small">
+        <i class="bi bi-diagram-3 me-1"></i>
+        Sub-site of site #<%= parentSiteID %>
+      </div>
+      <% } %>
+
       <div class="row g-3">
 
         <!-- Site Name -->
@@ -23,6 +37,24 @@
                  class="form-control"
                  value="<%= site ? site.SiteName : '' %>"
                  maxlength="200" required />
+        </div>
+
+        <!-- Site Number -->
+        <div class="col-md-3">
+          <label for="siteNumber" class="form-label">Site #</label>
+          <input type="text" id="siteNumber" name="siteNumber"
+                 class="form-control"
+                 value="<%= site && site.SiteNumber ? site.SiteNumber : '' %>"
+                 maxlength="100" />
+        </div>
+
+        <!-- Contract Number -->
+        <div class="col-md-3">
+          <label for="contractNumber" class="form-label">Contract #</label>
+          <input type="text" id="contractNumber" name="contractNumber"
+                 class="form-control"
+                 value="<%= site && site.ContractNumber ? site.ContractNumber : '' %>"
+                 maxlength="100" />
         </div>
 
         <!-- Site Type -->

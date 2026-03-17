@@ -19,10 +19,10 @@ router.use(isAuthenticated);
 // ── GET / — list sites ────────────────────────────────────────────────────────
 router.get('/', async (req, res, next) => {
   try {
-    const { typeID, statusID, search, pmDue, page = 1 } = req.query;
+    const { typeID, statusID, search, pmDue, page = 1, sort = 'siteName', dir = 'asc' } = req.query;
 
     const [result, siteTypes, siteStatuses] = await Promise.all([
-      siteModel.getAll({ typeID, statusID, search, pmDue, page: parseInt(page, 10) }),
+      siteModel.getAll({ typeID, statusID, search, pmDue, page: parseInt(page, 10), sort, dir }),
       lookupModel.getSiteTypes(),
       lookupModel.getSiteStatuses(),
     ]);
@@ -32,6 +32,8 @@ router.get('/', async (req, res, next) => {
     if (statusID) queryParts.push(`statusID=${encodeURIComponent(statusID)}`);
     if (search)   queryParts.push(`search=${encodeURIComponent(search)}`);
     if (pmDue)    queryParts.push(`pmDue=${encodeURIComponent(pmDue)}`);
+    if (sort && sort !== 'siteName') queryParts.push(`sort=${encodeURIComponent(sort)}`);
+    if (dir  && dir  !== 'asc')     queryParts.push(`dir=${encodeURIComponent(dir)}`);
 
     res.render('sites/index', {
       title: 'Sites',
@@ -39,6 +41,8 @@ router.get('/', async (req, res, next) => {
       siteTypes,
       siteStatuses,
       filters: { typeID, statusID, search, pmDue },
+      sort,
+      dir,
       pagination: {
         page:        result.page,
         totalPages:  result.totalPages,
@@ -54,16 +58,26 @@ router.get('/', async (req, res, next) => {
 // ── GET /new — create form ────────────────────────────────────────────────────
 router.get('/new', isAdmin, async (req, res, next) => {
   try {
+    const parentSiteID = req.query.parentSiteID ? parseInt(req.query.parentSiteID, 10) : null;
+
     const [siteTypes, siteStatuses] = await Promise.all([
       lookupModel.getSiteTypes(),
       lookupModel.getSiteStatuses(),
     ]);
+
+    let parentSite = null;
+    if (parentSiteID) {
+      parentSite = await siteModel.getByID(parentSiteID);
+    }
+
     res.render('sites/form', {
       title:       'New Site',
       site:        null,
       action:      '/sites',
       siteTypes,
       siteStatuses,
+      parentSiteID: parentSiteID || null,
+      parentSiteName: parentSite ? parentSite.SiteName : null,
     });
   } catch (err) {
     next(err);
@@ -81,16 +95,19 @@ router.post('/', isAdmin, async (req, res, next) => {
 
     const site = await siteModel.create({
       siteName:        siteName.trim(),
-      siteTypeID:      req.body.siteTypeID   || null,
-      siteStatusID:    req.body.siteStatusID  || null,
-      address:         req.body.address       || null,
-      city:            req.body.city          || null,
-      state:           req.body.state         || null,
-      zipCode:         req.body.zipCode       || null,
-      latitude:        req.body.latitude      || null,
-      longitude:       req.body.longitude     || null,
-      description:     req.body.description   || null,
+      siteNumber:      req.body.siteNumber     || null,
+      contractNumber:  req.body.contractNumber || null,
+      siteTypeID:      req.body.siteTypeID     || null,
+      siteStatusID:    req.body.siteStatusID   || null,
+      address:         req.body.address        || null,
+      city:            req.body.city           || null,
+      state:           req.body.state          || null,
+      zipCode:         req.body.zipCode        || null,
+      latitude:        req.body.latitude       || null,
+      longitude:       req.body.longitude      || null,
+      description:     req.body.description    || null,
       warrantyExpires: req.body.warrantyExpires || null,
+      parentSiteID:    req.body.parentSiteID   || null,
     }, req.auditContext);
 
     req.flash('success', `Site "${site.SiteName}" created successfully.`);
@@ -117,6 +134,18 @@ router.get('/:id', async (req, res, next) => {
       userModel.getAll(),
     ]);
 
+    // Fetch subsites for parent sites; subsites themselves get an empty array
+    const subsites = (site && !site.ParentSiteID)
+      ? await siteModel.getSubsites(siteID)
+      : [];
+
+    // For parent sites, also fetch each subsite's installed equipment
+    const subsiteInventory = subsites.length
+      ? await Promise.all(subsites.map(sub =>
+          siteInventoryModel.getCurrentItems(sub.SiteID).then(items => ({ sub, items }))
+        ))
+      : [];
+
     // Load stock distribution for each bulk item so the install modal can show pull-from options
     const bulkItemIDs = inStockItems.filter(i => i.TrackingType === 'bulk').map(i => i.ItemID);
     const stockRows   = bulkItemIDs.length
@@ -141,6 +170,8 @@ router.get('/:id', async (req, res, next) => {
       recentLogs,
       documents,
       pmSchedules,
+      subsites,
+      subsiteInventory,
       inStockItems,
       stockByItem,
       categories,
@@ -177,6 +208,8 @@ router.get('/:id/edit', isAdmin, async (req, res, next) => {
       action:      `/sites/${siteID}`,
       siteTypes,
       siteStatuses,
+      parentSiteID:   site.ParentSiteID   || null,
+      parentSiteName: site.ParentSiteName || null,
     });
   } catch (err) {
     next(err);
@@ -196,16 +229,19 @@ router.post('/:id', isAdmin, async (req, res, next) => {
 
     const site = await siteModel.update(siteID, {
       siteName:        siteName.trim(),
-      siteTypeID:      req.body.siteTypeID   || null,
-      siteStatusID:    req.body.siteStatusID  || null,
-      address:         req.body.address       || null,
-      city:            req.body.city          || null,
-      state:           req.body.state         || null,
-      zipCode:         req.body.zipCode       || null,
-      latitude:        req.body.latitude      || null,
-      longitude:       req.body.longitude     || null,
-      description:     req.body.description   || null,
+      siteNumber:      req.body.siteNumber     || null,
+      contractNumber:  req.body.contractNumber || null,
+      siteTypeID:      req.body.siteTypeID     || null,
+      siteStatusID:    req.body.siteStatusID   || null,
+      address:         req.body.address        || null,
+      city:            req.body.city           || null,
+      state:           req.body.state          || null,
+      zipCode:         req.body.zipCode        || null,
+      latitude:        req.body.latitude       || null,
+      longitude:       req.body.longitude      || null,
+      description:     req.body.description    || null,
       warrantyExpires: req.body.warrantyExpires || null,
+      parentSiteID:    req.body.parentSiteID   || null,
     }, req.auditContext);
 
     req.flash('success', `Site "${site.SiteName}" updated successfully.`);
@@ -255,12 +291,13 @@ router.post('/:id/inventory/install', isAdmin, async (req, res, next) => {
         req.flash('error', 'Serial number is required.');
         return res.redirect(`/sites/${siteID}#equipment`);
       }
+      const deployedStatus = await lookupModel.getInventoryStatusByName('Deployed');
       const newItem = await inventoryModel.create({
         serialNumber:    serialNumber.trim(),
         modelNumber:     modelNumber     || null,
         manufacturer:    manufacturer    || null,
         categoryID:      categoryID      || null,
-        statusID:        null,
+        statusID:        deployedStatus?.StatusID || null,
         purchaseDate:    purchaseDate    || null,
         warrantyExpires: warrantyExpires || null,
       }, req.auditContext);

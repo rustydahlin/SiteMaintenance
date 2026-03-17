@@ -3,7 +3,15 @@
 const { getPool, sql } = require('../config/database');
 const { writeAudit }   = require('./auditModel');
 
-async function getAll({ categoryID, statusID, search, locationID, assignedUserID, page = 1, pageSize = 25 } = {}) {
+const SORT_COLUMNS = {
+  commonName:   'COALESCE(i.CommonName, i.ModelNumber, i.SerialNumber)',
+  serialNumber: 'i.SerialNumber',
+  category:     'c.CategoryName',
+  status:       's.StatusName',
+  location:     'l.LocationName',
+};
+
+async function getAll({ categoryID, statusID, search, locationID, assignedUserID, page = 1, pageSize = 25, sort = 'commonName', dir = 'asc' } = {}) {
   const pool = await getPool();
   const request = pool.request();
   const conditions = ['i.IsActive = 1'];
@@ -17,7 +25,7 @@ async function getAll({ categoryID, statusID, search, locationID, assignedUserID
     request.input('StatusID', sql.Int, statusID);
   }
   if (search) {
-    conditions.push('(i.SerialNumber LIKE @Search OR i.ModelNumber LIKE @Search OR i.Manufacturer LIKE @Search)');
+    conditions.push('(i.SerialNumber LIKE @Search OR i.AssetTag LIKE @Search OR i.CommonName LIKE @Search OR i.PartNumber LIKE @Search OR i.ModelNumber LIKE @Search OR i.Manufacturer LIKE @Search)');
     request.input('Search', sql.NVarChar(200), `%${search}%`);
   }
   if (locationID) {
@@ -29,6 +37,9 @@ async function getAll({ categoryID, statusID, search, locationID, assignedUserID
     request.input('AssignedUserID', sql.Int, assignedUserID);
   }
 
+  const orderCol = SORT_COLUMNS[sort] || 'COALESCE(i.CommonName, i.ModelNumber, i.SerialNumber)';
+  const orderDir = dir === 'desc' ? 'DESC' : 'ASC';
+
   const where = conditions.join(' AND ');
   const offset = (page - 1) * pageSize;
   request.input('Offset',   sql.Int, offset);
@@ -38,6 +49,7 @@ async function getAll({ categoryID, statusID, search, locationID, assignedUserID
   if (categoryID)    countReq.input('CategoryID',    sql.Int,           categoryID);
   if (statusID)      countReq.input('StatusID',      sql.Int,           statusID);
   if (search)        countReq.input('Search',        sql.NVarChar(200), `%${search}%`);
+
   if (locationID)    countReq.input('LocationID',    sql.Int,           locationID);
   if (assignedUserID) countReq.input('AssignedUserID', sql.Int,         assignedUserID);
 
@@ -46,9 +58,10 @@ async function getAll({ categoryID, statusID, search, locationID, assignedUserID
 
   const result = await request.query(`
     SELECT
-      i.ItemID, i.TrackingType, i.SerialNumber, i.ModelNumber, i.Manufacturer,
+      i.ItemID, i.TrackingType, i.SerialNumber, i.AssetTag, i.CommonName, i.PartNumber,
+      i.ModelNumber, i.Manufacturer,
       i.CategoryID, i.StatusID, i.StockLocationID, i.AssignedToUserID,
-      i.QuantityTotal,
+      i.QuantityTotal, i.RelatedSystemID,
       i.QuantityTotal - ISNULL((
         SELECT SUM(si.Quantity) FROM SiteInventory si
         WHERE si.ItemID = i.ItemID AND si.RemovedAt IS NULL
@@ -58,14 +71,28 @@ async function getAll({ categoryID, statusID, search, locationID, assignedUserID
       c.CategoryName,
       s.StatusName,
       l.LocationName AS StockLocationName,
-      u.DisplayName  AS AssignedToUserName
+      u.DisplayName  AS AssignedToUserName,
+      (SELECT TOP 1 st.SiteName FROM SiteInventory si2
+       JOIN Sites st ON st.SiteID = si2.SiteID
+       WHERE si2.ItemID = i.ItemID AND si2.RemovedAt IS NULL) AS CurrentSiteName,
+      (SELECT TOP 1 si2.SiteID FROM SiteInventory si2
+       WHERE si2.ItemID = i.ItemID AND si2.RemovedAt IS NULL) AS CurrentSiteID,
+      -- Bulk stock summary from InventoryStock
+      (SELECT COUNT(*) FROM InventoryStock isk WHERE isk.ItemID = i.ItemID AND isk.Quantity > 0) AS BulkLocationCount,
+      (SELECT TOP 1 sl2.LocationName FROM InventoryStock isk
+       JOIN StockLocations sl2 ON sl2.LocationID = isk.LocationID
+       WHERE isk.ItemID = i.ItemID AND isk.Quantity > 0
+       ORDER BY isk.Quantity DESC) AS BulkPrimaryLocation,
+      rs.CommonName  AS RelatedSystemCommonName,
+      COALESCE(rs.CommonName, rs.ModelNumber, rs.SerialNumber) AS RelatedSystemName
     FROM Inventory i
     LEFT JOIN InventoryCategories c  ON c.CategoryID      = i.CategoryID
     LEFT JOIN InventoryStatuses   s  ON s.StatusID        = i.StatusID
     LEFT JOIN StockLocations      l  ON l.LocationID      = i.StockLocationID
     LEFT JOIN Users               u  ON u.UserID          = i.AssignedToUserID
+    LEFT JOIN Inventory           rs ON rs.ItemID         = i.RelatedSystemID
     WHERE ${where}
-    ORDER BY i.Manufacturer, i.ModelNumber, i.SerialNumber
+    ORDER BY ${orderCol} ${orderDir}
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
   `);
 
@@ -78,9 +105,10 @@ async function getByID(itemID) {
     .input('ItemID', sql.Int, itemID)
     .query(`
       SELECT
-        i.ItemID, i.TrackingType, i.SerialNumber, i.ModelNumber, i.Manufacturer,
+        i.ItemID, i.TrackingType, i.SerialNumber, i.AssetTag, i.CommonName, i.PartNumber,
+        i.ModelNumber, i.Manufacturer,
         i.CategoryID, i.StatusID, i.StockLocationID, i.AssignedToUserID,
-        i.QuantityTotal,
+        i.QuantityTotal, i.RelatedSystemID,
         i.QuantityTotal - ISNULL((
           SELECT SUM(si.Quantity) FROM SiteInventory si
           WHERE si.ItemID = i.ItemID AND si.RemovedAt IS NULL
@@ -91,13 +119,15 @@ async function getByID(itemID) {
         s.StatusName,
         l.LocationName AS StockLocationName,
         u.DisplayName  AS AssignedToUserName,
-        cb.DisplayName AS CreatedByName
+        cb.DisplayName AS CreatedByName,
+        COALESCE(rs.CommonName, rs.ModelNumber, rs.SerialNumber) AS RelatedSystemName
       FROM Inventory i
       LEFT JOIN InventoryCategories c  ON c.CategoryID  = i.CategoryID
       LEFT JOIN InventoryStatuses   s  ON s.StatusID    = i.StatusID
       LEFT JOIN StockLocations      l  ON l.LocationID  = i.StockLocationID
       LEFT JOIN Users               u  ON u.UserID      = i.AssignedToUserID
       LEFT JOIN Users               cb ON cb.UserID     = i.CreatedByUserID
+      LEFT JOIN Inventory           rs ON rs.ItemID     = i.RelatedSystemID
       WHERE i.ItemID = @ItemID
     `);
   return result.recordset[0] || null;
@@ -105,33 +135,40 @@ async function getByID(itemID) {
 
 async function create(data, auditContext = {}) {
   const {
-    trackingType, serialNumber, modelNumber, manufacturer, categoryID, statusID,
-    stockLocationID, quantityTotal, description, purchaseDate, warrantyExpires, notes,
+    trackingType, serialNumber, assetTag, commonName, partNumber, modelNumber, manufacturer,
+    categoryID, statusID, stockLocationID, quantityTotal, relatedSystemID,
+    description, purchaseDate, warrantyExpires, notes,
   } = data;
 
   const isBulk = trackingType === 'bulk';
   const pool = await getPool();
   const result = await pool.request()
-    .input('TrackingType',    sql.NVarChar(20),    isBulk ? 'bulk' : 'serialized')
-    .input('SerialNumber',    sql.NVarChar(100),   serialNumber    || null)
-    .input('ModelNumber',     sql.NVarChar(100),   modelNumber     || null)
-    .input('Manufacturer',    sql.NVarChar(150),   manufacturer    || null)
-    .input('CategoryID',      sql.Int,             categoryID      || null)
-    .input('StatusID',        sql.Int,             statusID        || null)
-    .input('StockLocationID', sql.Int,             isBulk ? null : (stockLocationID || null))
-    .input('QuantityTotal',   sql.Int,             isBulk ? (parseInt(quantityTotal, 10) || 1) : 1)
-    .input('Description',     sql.NVarChar(sql.MAX), description   || null)
-    .input('PurchaseDate',    sql.Date,            purchaseDate    ? new Date(purchaseDate)    : null)
-    .input('WarrantyExpires', sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
-    .input('Notes',           sql.NVarChar(sql.MAX), notes         || null)
-    .input('CreatedByUserID', sql.Int,             auditContext.userID || null)
+    .input('TrackingType',     sql.NVarChar(20),    isBulk ? 'bulk' : 'serialized')
+    .input('SerialNumber',     sql.NVarChar(100),   serialNumber       || null)
+    .input('AssetTag',         sql.NVarChar(100),   isBulk ? null : (assetTag || null))
+    .input('CommonName',       sql.NVarChar(150),   commonName         || null)
+    .input('PartNumber',       sql.NVarChar(100),   partNumber         || null)
+    .input('ModelNumber',      sql.NVarChar(100),   modelNumber        || null)
+    .input('Manufacturer',     sql.NVarChar(150),   manufacturer       || null)
+    .input('CategoryID',       sql.Int,             categoryID         || null)
+    .input('StatusID',         sql.Int,             statusID           || null)
+    .input('StockLocationID',  sql.Int,             isBulk ? null : (stockLocationID || null))
+    .input('QuantityTotal',    sql.Int,             isBulk ? (parseInt(quantityTotal, 10) || 1) : 1)
+    .input('RelatedSystemID',  sql.Int,             relatedSystemID    || null)
+    .input('Description',      sql.NVarChar(sql.MAX), description      || null)
+    .input('PurchaseDate',     sql.Date,            purchaseDate    ? new Date(purchaseDate)    : null)
+    .input('WarrantyExpires',  sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
+    .input('Notes',            sql.NVarChar(sql.MAX), notes            || null)
+    .input('CreatedByUserID',  sql.Int,             auditContext.userID || null)
     .query(`
       INSERT INTO Inventory
-        (TrackingType, SerialNumber, ModelNumber, Manufacturer, CategoryID, StatusID, StockLocationID,
-         QuantityTotal, Description, PurchaseDate, WarrantyExpires, Notes, CreatedByUserID)
+        (TrackingType, SerialNumber, AssetTag, CommonName, PartNumber, ModelNumber, Manufacturer,
+         CategoryID, StatusID, StockLocationID, QuantityTotal, RelatedSystemID,
+         Description, PurchaseDate, WarrantyExpires, Notes, CreatedByUserID)
       VALUES
-        (@TrackingType, @SerialNumber, @ModelNumber, @Manufacturer, @CategoryID, @StatusID, @StockLocationID,
-         @QuantityTotal, @Description, @PurchaseDate, @WarrantyExpires, @Notes, @CreatedByUserID);
+        (@TrackingType, @SerialNumber, @AssetTag, @CommonName, @PartNumber, @ModelNumber, @Manufacturer,
+         @CategoryID, @StatusID, @StockLocationID, @QuantityTotal, @RelatedSystemID,
+         @Description, @PurchaseDate, @WarrantyExpires, @Notes, @CreatedByUserID);
       SELECT SCOPE_IDENTITY() AS NewID
     `);
 
@@ -146,8 +183,8 @@ async function create(data, auditContext = {}) {
 
 async function update(itemID, data, auditContext = {}) {
   const {
-    serialNumber, modelNumber, manufacturer, categoryID, statusID,
-    stockLocationID, quantityTotal, description, purchaseDate, warrantyExpires, notes,
+    serialNumber, assetTag, commonName, partNumber, modelNumber, manufacturer, categoryID, statusID,
+    stockLocationID, quantityTotal, relatedSystemID, description, purchaseDate, warrantyExpires, notes,
   } = data;
 
   const pool = await getPool();
@@ -155,27 +192,35 @@ async function update(itemID, data, auditContext = {}) {
   const isBulk = old && old.TrackingType === 'bulk';
 
   await pool.request()
-    .input('ItemID',          sql.Int,             itemID)
-    .input('SerialNumber',    sql.NVarChar(100),   isBulk ? null : (serialNumber || null))
-    .input('ModelNumber',     sql.NVarChar(100),   modelNumber     || null)
-    .input('Manufacturer',    sql.NVarChar(150),   manufacturer    || null)
-    .input('CategoryID',      sql.Int,             categoryID      || null)
-    .input('StatusID',        sql.Int,             statusID        || null)
-    .input('StockLocationID', sql.Int,             isBulk ? null : (stockLocationID || null))
-    .input('QuantityTotal',   sql.Int,             isBulk ? (parseInt(quantityTotal, 10) || old.QuantityTotal) : 1)
-    .input('Description',     sql.NVarChar(sql.MAX), description   || null)
-    .input('PurchaseDate',    sql.Date,            purchaseDate    ? new Date(purchaseDate)    : null)
-    .input('WarrantyExpires', sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
-    .input('Notes',           sql.NVarChar(sql.MAX), notes         || null)
+    .input('ItemID',           sql.Int,             itemID)
+    .input('SerialNumber',     sql.NVarChar(100),   isBulk ? null : (serialNumber || null))
+    .input('AssetTag',         sql.NVarChar(100),   isBulk ? null : (assetTag || null))
+    .input('CommonName',       sql.NVarChar(150),   commonName         || null)
+    .input('PartNumber',       sql.NVarChar(100),   partNumber         || null)
+    .input('ModelNumber',      sql.NVarChar(100),   modelNumber        || null)
+    .input('Manufacturer',     sql.NVarChar(150),   manufacturer       || null)
+    .input('CategoryID',       sql.Int,             categoryID         || null)
+    .input('StatusID',         sql.Int,             statusID           || null)
+    .input('StockLocationID',  sql.Int,             isBulk ? null : (stockLocationID || null))
+    .input('QuantityTotal',    sql.Int,             isBulk ? (parseInt(quantityTotal, 10) || old.QuantityTotal) : 1)
+    .input('RelatedSystemID',  sql.Int,             relatedSystemID    || null)
+    .input('Description',      sql.NVarChar(sql.MAX), description      || null)
+    .input('PurchaseDate',     sql.Date,            purchaseDate    ? new Date(purchaseDate)    : null)
+    .input('WarrantyExpires',  sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
+    .input('Notes',            sql.NVarChar(sql.MAX), notes            || null)
     .query(`
       UPDATE Inventory SET
         SerialNumber    = @SerialNumber,
+        AssetTag        = @AssetTag,
+        CommonName      = @CommonName,
+        PartNumber      = @PartNumber,
         ModelNumber     = @ModelNumber,
         Manufacturer    = @Manufacturer,
         CategoryID      = @CategoryID,
         StatusID        = @StatusID,
         StockLocationID = @StockLocationID,
         QuantityTotal   = @QuantityTotal,
+        RelatedSystemID = @RelatedSystemID,
         Description     = @Description,
         PurchaseDate    = @PurchaseDate,
         WarrantyExpires = @WarrantyExpires,
@@ -434,6 +479,48 @@ async function adjustStock(itemID, locationID, userID, delta) {
   }
 }
 
+async function getRelatedParts(systemItemID) {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('SystemItemID', sql.Int, systemItemID)
+    .query(`
+      SELECT
+        i.ItemID, i.TrackingType, i.SerialNumber, i.AssetTag, i.CommonName, i.PartNumber,
+        i.ModelNumber, i.Manufacturer, i.QuantityTotal,
+        i.QuantityTotal - ISNULL((
+          SELECT SUM(si.Quantity) FROM SiteInventory si
+          WHERE si.ItemID = i.ItemID AND si.RemovedAt IS NULL
+        ), 0) AS QuantityAvailable,
+        c.CategoryName, s.StatusName
+      FROM Inventory i
+      LEFT JOIN InventoryCategories c ON c.CategoryID = i.CategoryID
+      LEFT JOIN InventoryStatuses   s ON s.StatusID   = i.StatusID
+      WHERE i.RelatedSystemID = @SystemItemID
+        AND i.IsActive = 1
+      ORDER BY i.CommonName, i.ModelNumber, i.SerialNumber
+    `);
+  return result.recordset;
+}
+
+async function getSystemsList(excludeItemID = null) {
+  const pool = await getPool();
+  const req   = pool.request();
+  let excludeClause = '';
+  if (excludeItemID) {
+    req.input('ExcludeItemID', sql.Int, excludeItemID);
+    excludeClause = 'AND i.ItemID != @ExcludeItemID';
+  }
+  const result = await req.query(`
+    SELECT i.ItemID,
+           COALESCE(i.CommonName, i.ModelNumber, i.SerialNumber, CAST(i.ItemID AS NVARCHAR)) AS DisplayLabel,
+           i.CommonName, i.ModelNumber, i.SerialNumber, i.Manufacturer, i.TrackingType
+    FROM Inventory i
+    WHERE i.IsActive = 1 ${excludeClause}
+    ORDER BY i.Manufacturer, i.ModelNumber, i.CommonName, i.SerialNumber
+  `);
+  return result.recordset;
+}
+
 async function getInStock() {
   const pool = await getPool();
   const result = await pool.request().query(`
@@ -470,6 +557,6 @@ module.exports = {
   getAll, getByID, create, update, softDelete,
   updateStatus, checkOut, checkIn,
   getPossessionHistory, getCurrentHolder,
-  getInStock,
+  getInStock, getRelatedParts, getSystemsList,
   getStock, upsertStock, removeStock, adjustStock,
 };
