@@ -26,7 +26,7 @@
             <% logTypes.forEach(t => { %>
             <tr class="<%= t.IsActive ? '' : 'text-muted' %>">
               <td><%= t.TypeName %></td>
-              <td><%= t.IsAutomatic ? '<span class="badge bg-info text-dark">System</span>' : '' %></td>
+              <td><%- t.IsAutomatic ? '<span class="badge bg-info text-dark">System</span>' : '' %></td>
               <td><span class="badge <%= t.IsActive ? 'bg-success' : 'bg-secondary' %>"><%= t.IsActive ? 'Active' : 'Inactive' %></span></td>
               <td class="text-end">
                 <% if (!t.IsAutomatic) { %>
