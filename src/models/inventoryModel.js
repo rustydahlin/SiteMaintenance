@@ -281,92 +281,6 @@ async function updateStatus(itemID, statusName, { stockLocationID = null, assign
   });
 }
 
-async function checkOut(itemID, userID, pulledFromLocationID, notes, auditContext = {}) {
-  const pool = await getPool();
-
-  // Update Inventory status atomically
-  await updateStatus(itemID, 'Checked-Out', { stockLocationID: null, assignedToUserID: userID }, auditContext);
-
-  // Insert open possession record
-  await pool.request()
-    .input('ItemID',               sql.Int,              itemID)
-    .input('UserID',               sql.Int,              userID)
-    .input('PulledFromLocationID', sql.Int,              pulledFromLocationID ?? null)
-    .input('Notes',                sql.NVarChar(sql.MAX), notes               || null)
-    .query(`
-      INSERT INTO UserInventoryPossession (ItemID, UserID, PulledFromLocationID, Notes, CheckedOutAt)
-      VALUES (@ItemID, @UserID, @PulledFromLocationID, @Notes, GETUTCDATE())
-    `);
-
-  await writeAudit({
-    tableName: 'UserInventoryPossession', recordID: itemID, action: 'CHECK_OUT',
-    newValues: { itemID, userID, pulledFromLocationID, notes },
-    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent,
-  });
-}
-
-async function checkIn(itemID, stockLocationID, notes, auditContext = {}) {
-  const pool = await getPool();
-
-  // Close the open possession record
-  await pool.request()
-    .input('ItemID', sql.Int,              itemID)
-    .input('Notes',  sql.NVarChar(sql.MAX), notes || null)
-    .query(`
-      UPDATE UserInventoryPossession
-      SET CheckedInAt = GETUTCDATE(),
-          Notes       = COALESCE(@Notes, Notes)
-      WHERE ItemID = @ItemID
-        AND CheckedInAt IS NULL
-    `);
-
-  // Update Inventory status
-  await updateStatus(itemID, 'In-Stock', { stockLocationID, assignedToUserID: null }, auditContext);
-
-  await writeAudit({
-    tableName: 'UserInventoryPossession', recordID: itemID, action: 'CHECK_IN',
-    newValues: { itemID, stockLocationID, notes },
-    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent,
-  });
-}
-
-async function getPossessionHistory(itemID) {
-  const pool = await getPool();
-  const result = await pool.request()
-    .input('ItemID', sql.Int, itemID)
-    .query(`
-      SELECT
-        p.PossessionID, p.ItemID, p.UserID, p.CheckedOutAt, p.CheckedInAt,
-        p.PulledFromLocationID, p.Notes,
-        u.DisplayName AS UserName,
-        l.LocationName AS PulledFromLocationName
-      FROM UserInventoryPossession p
-      LEFT JOIN Users         u ON u.UserID     = p.UserID
-      LEFT JOIN StockLocations l ON l.LocationID = p.PulledFromLocationID
-      WHERE p.ItemID = @ItemID
-      ORDER BY p.CheckedOutAt DESC
-    `);
-  return result.recordset;
-}
-
-async function getCurrentHolder(itemID) {
-  const pool = await getPool();
-  const result = await pool.request()
-    .input('ItemID', sql.Int, itemID)
-    .query(`
-      SELECT
-        p.PossessionID, p.ItemID, p.UserID, p.CheckedOutAt,
-        p.PulledFromLocationID, p.Notes,
-        u.DisplayName AS UserName,
-        l.LocationName AS PulledFromLocationName
-      FROM UserInventoryPossession p
-      LEFT JOIN Users         u ON u.UserID     = p.UserID
-      LEFT JOIN StockLocations l ON l.LocationID = p.PulledFromLocationID
-      WHERE p.ItemID = @ItemID
-        AND p.CheckedInAt IS NULL
-    `);
-  return result.recordset[0] || null;
-}
 
 // ── InventoryStock helpers (bulk quantity distribution) ───────────────────────
 
@@ -575,8 +489,7 @@ async function findByImportKey(trackingType, serialNumber, commonName, modelNumb
 
 module.exports = {
   getAll, getByID, create, update, softDelete,
-  updateStatus, checkOut, checkIn,
-  getPossessionHistory, getCurrentHolder,
+  updateStatus,
   getInStock, getRelatedParts, getSystemsList,
   getStock, upsertStock, removeStock, adjustStock,
   findByImportKey,

@@ -368,10 +368,9 @@ router.get('/:id', async (req, res, next) => {
   try {
     const itemID = parseInt(req.params.id, 10);
 
-    const [item, possessionHistory, documents, siteHistory, repairResult,
+    const [item, documents, siteHistory, repairResult,
            stockLocations, allUsers, sites, relatedParts] = await Promise.all([
       inventoryModel.getByID(itemID),
-      inventoryModel.getPossessionHistory(itemID),
       documentModel.getByItem(itemID),
       siteInventoryModel.getItemHistory(itemID),
       repairModel.getAll({ itemID }),
@@ -397,7 +396,6 @@ router.get('/:id', async (req, res, next) => {
     res.render('inventory/detail', {
       title:          item.CommonName || (item.TrackingType === 'bulk' ? (item.ModelNumber || 'Bulk Item') : item.SerialNumber),
       item,
-      possessionHistory,
       siteHistory,
       documents,
       stockDistribution,
@@ -503,77 +501,6 @@ router.post('/:id/delete', isAdmin, async (req, res, next) => {
   }
 });
 
-// ── GET /:id/checkout — checkout form ─────────────────────────────────────────
-router.get('/:id/checkout', isAdmin, async (req, res, next) => {
-  try {
-    const itemID = parseInt(req.params.id, 10);
-    const [item, users, locations] = await Promise.all([
-      inventoryModel.getByID(itemID),
-      userModel.getAll(),
-      lookupModel.getStockLocations(),
-    ]);
-
-    if (!item) {
-      req.flash('error', 'Inventory item not found.');
-      return res.redirect('/inventory');
-    }
-
-    res.render('inventory/checkout', {
-      title:     `Check Out — ${item.SerialNumber}`,
-      item,
-      users,
-      locations,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// ── POST /:id/checkout — check out to user ────────────────────────────────────
-router.post('/:id/checkout', isAdmin, async (req, res, next) => {
-  try {
-    const itemID = parseInt(req.params.id, 10);
-    const { userID, checkoutDate, notes } = req.body;
-
-    if (!userID) {
-      req.flash('error', 'A user must be selected for checkout.');
-      return res.redirect(`/inventory/${itemID}/checkout`);
-    }
-
-    await inventoryModel.checkOut(
-      itemID,
-      parseInt(userID, 10),
-      req.body.pulledFromLocationID ? parseInt(req.body.pulledFromLocationID, 10) : null,
-      notes || null,
-      req.auditContext,
-    );
-
-    req.flash('success', 'Item checked out successfully.');
-    res.redirect(`/inventory/${itemID}`);
-  } catch (err) {
-    next(err);
-  }
-});
-
-// ── POST /:id/checkin — check in item ────────────────────────────────────────
-router.post('/:id/checkin', isAdmin, async (req, res, next) => {
-  try {
-    const itemID = parseInt(req.params.id, 10);
-    const { stockLocationID, notes } = req.body;
-
-    await inventoryModel.checkIn(
-      itemID,
-      stockLocationID ? parseInt(stockLocationID, 10) : null,
-      notes || null,
-      req.auditContext,
-    );
-
-    req.flash('success', 'Item checked in successfully.');
-    res.redirect(`/inventory/${itemID}`);
-  } catch (err) {
-    next(err);
-  }
-});
 
 // ── POST /:id/deploy — deploy item to a site (replaces old checkout-to-user) ──
 router.post('/:id/deploy', isAdmin, async (req, res, next) => {

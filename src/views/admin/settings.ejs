@@ -179,10 +179,6 @@
         <input type="number" name="email.warrantyReminderDays" class="form-control" value="<%= settings['email.warrantyReminderDays'] || '30' %>" min="1" />
       </div>
       <div class="col-md-4">
-        <label class="form-label">Checkout Reminder (days before alert)</label>
-        <input type="number" name="email.checkoutReminderDays" class="form-control" value="<%= settings['email.checkoutReminderDays'] || '30' %>" min="1" />
-      </div>
-      <div class="col-md-4">
         <label class="form-label">Repair Overdue Reminder (repeat every N days)</label>
         <input type="number" name="email.repairReminderIntervalDays" class="form-control" value="<%= settings['email.repairReminderIntervalDays'] || '3' %>" min="1" />
         <div class="form-text">After Expected Return Date passes, send a reminder every this many days until received.</div>

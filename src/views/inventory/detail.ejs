@@ -63,14 +63,6 @@
           <i class="bi bi-box-arrow-right me-1"></i>Deploy to Site
         </button>
       <% } %>
-      <% if (item.StatusName === 'Checked-Out') { %>
-        <form method="POST" action="/inventory/<%= item.ItemID %>/checkin"
-              data-confirm="Check this item back in to stock?">
-          <button type="submit" class="btn btn-sm btn-outline-success">
-            <i class="bi bi-box-arrow-in-left me-1"></i>Check In
-          </button>
-        </form>
-      <% } %>
     <% } %>
   </div>
 </div>
@@ -181,8 +173,6 @@
               <dt class="col-sm-5 text-muted">Location</dt>
               <dd class="col-sm-7"><%= item.StockLocationName || '—' %></dd>
 
-              <dt class="col-sm-5 text-muted">Assigned To</dt>
-              <dd class="col-sm-7"><%= item.AssignedToUserName || '—' %></dd>
               <% } %>
 
               <dt class="col-sm-5 text-muted">Warranty</dt>
@@ -393,64 +383,38 @@
 
   <!-- ── History ───────────────────────────────────────────────────────────── -->
   <div class="tab-pane fade" id="history">
-    <h6 class="mt-2 mb-3">Combined Timeline</h6>
+    <h6 class="mt-2 mb-3">Site Install History</h6>
 
-    <%
-      // Merge and sort site history + possession history by date descending
-      const timeline = [];
-      if (siteHistory) siteHistory.forEach(h => timeline.push({ ...h, _kind: 'site' }));
-      if (possessionHistory) possessionHistory.forEach(h => timeline.push({ ...h, _kind: 'possession' }));
-      timeline.sort((a, b) => {
-        const da = new Date(a.StartDate || a.InstalledAt || a.CheckedOutAt || 0);
-        const db = new Date(b.StartDate || b.InstalledAt || b.CheckedOutAt || 0);
-        return db - da;
-      });
-    %>
-
-    <% if (timeline.length === 0) { %>
-      <p class="text-muted">No history on record for this item.</p>
+    <% if (!siteHistory || siteHistory.length === 0) { %>
+      <p class="text-muted">No site install history on record for this item.</p>
     <% } else { %>
     <div class="table-responsive">
       <table class="table table-sm align-middle">
         <thead>
           <tr>
-            <th>Type</th>
-            <th>Date</th>
-            <th>Details</th>
-            <th>End Date</th>
+            <th>Site</th>
+            <th>Installed</th>
+            <th>Installed By</th>
+            <th>Removed</th>
           </tr>
         </thead>
         <tbody>
-          <% timeline.forEach(entry => { %>
+          <% siteHistory.forEach(entry => { %>
           <tr>
-            <% if (entry._kind === 'site') { %>
-              <td><span class="badge bg-primary">Site Install</span></td>
-              <td class="small text-muted text-nowrap">
-                <%= entry.InstalledAt ? new Date(entry.InstalledAt).toLocaleDateString() : '—' %>
-              </td>
-              <td class="small">
-                <a href="/sites/<%= entry.SiteID %>" class="text-decoration-none">
-                  <%= entry.SiteName || `Site #${entry.SiteID}` %>
-                </a>
-                <% if (entry.InstalledByName) { %>
-                  <span class="text-muted"> — by <%= entry.InstalledByName %></span>
-                <% } %>
-              </td>
-              <td class="small text-muted text-nowrap">
-                <%= entry.RemovedAt ? new Date(entry.RemovedAt).toLocaleDateString() : (entry.IsActive ? 'Present' : '—') %>
-              </td>
-            <% } else { %>
-              <td><span class="badge bg-warning text-dark">Checkout</span></td>
-              <td class="small text-muted text-nowrap">
-                <%= entry.CheckedOutAt ? new Date(entry.CheckedOutAt).toLocaleDateString() : '—' %>
-              </td>
-              <td class="small">
-                <%= entry.CheckedOutToName || `User #${entry.CheckedOutToUserID}` %>
-              </td>
-              <td class="small text-muted text-nowrap">
-                <%= entry.ReturnedAt ? new Date(entry.ReturnedAt).toLocaleDateString() : 'Still Out' %>
-              </td>
-            <% } %>
+            <td class="small">
+              <a href="/sites/<%= entry.SiteID %>" class="text-decoration-none">
+                <%= entry.SiteName || `Site #${entry.SiteID}` %>
+              </a>
+            </td>
+            <td class="small text-muted text-nowrap">
+              <%= entry.InstalledAt ? new Date(entry.InstalledAt).toLocaleDateString() : '—' %>
+            </td>
+            <td class="small text-muted">
+              <%= entry.InstalledByName || '—' %>
+            </td>
+            <td class="small text-muted text-nowrap">
+              <%= entry.RemovedAt ? new Date(entry.RemovedAt).toLocaleDateString() : (entry.IsActive ? 'Present' : '—') %>
+            </td>
           </tr>
           <% }) %>
         </tbody>

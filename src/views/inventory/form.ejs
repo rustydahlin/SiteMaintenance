@@ -151,7 +151,7 @@
           </label>
           <select id="statusID" name="statusID" class="form-select" required>
             <option value="">— Select Status —</option>
-            <% statuses.forEach(s => { %>
+            <% statuses.filter(s => s.StatusName !== 'Checked-Out' && s.StatusName !== 'Deployed').forEach(s => { %>
               <option value="<%= s.StatusID %>"
                 data-name="<%= s.StatusName %>"
                 <%= (item && item.StatusID == s.StatusID) ? 'selected' : '' %>>

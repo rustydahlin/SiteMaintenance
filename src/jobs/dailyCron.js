@@ -30,7 +30,6 @@ async function runDailyChecks() {
   try { await checkPMsDue();        } catch (e) { logger.error('Cron PM check failed:', e.message); }
   try { await checkRepairOverdue(); } catch (e) { logger.error('Cron repair overdue failed:', e.message); }
   try { await checkWarranties();    } catch (e) { logger.error('Cron warranty check failed:', e.message); }
-  try { await checkLongCheckouts(); } catch (e) { logger.error('Cron checkout check failed:', e.message); }
 
   logger.info('Daily cron: completed');
 }
@@ -133,29 +132,6 @@ async function checkWarranties() {
   if (total) logger.info(`Daily cron: sent ${total} warranty expiry notice(s)`);
 }
 
-async function checkLongCheckouts() {
-  const { getPool, sql } = require('../config/database');
-  const reminderDays = parseInt(await settingsModel.getSetting('email.checkoutReminderDays') || '30', 10);
-
-  const pool = await getPool();
-  const result = await pool.request()
-    .input('Days', sql.Int, reminderDays)
-    .query(`
-      SELECT i.ItemID, i.SerialNumber, i.ModelNumber,
-             u.DisplayName, u.Email,
-             uip.CheckedOutAt
-      FROM UserInventoryPossession uip
-      JOIN Inventory i ON i.ItemID = uip.ItemID
-      JOIN Users u ON u.UserID = uip.UserID
-      WHERE uip.CheckedInAt IS NULL
-        AND DATEDIFF(day, uip.CheckedOutAt, GETUTCDATE()) >= @Days
-    `);
-
-  for (const row of result.recordset) {
-    await email.sendCheckoutReminder(row, { DisplayName: row.DisplayName });
-  }
-  if (result.recordset.length) logger.info(`Daily cron: sent ${result.recordset.length} checkout reminder(s)`);
-}
 
 function start() {
   cron.schedule(SCHEDULE, runDailyChecks, { timezone: 'America/Chicago' });
