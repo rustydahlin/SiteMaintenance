@@ -52,7 +52,7 @@
         <i class="bi bi-pencil me-1"></i>Edit
       </a>
       <form method="POST" action="/inventory/<%= item.ItemID %>/delete"
-            onsubmit="return confirm('Delete this item? This cannot be undone.')">
+            data-confirm="Delete this item? This cannot be undone.">
         <button type="submit" class="btn btn-sm btn-outline-danger">
           <i class="bi bi-trash me-1"></i>Delete
         </button>
@@ -65,7 +65,7 @@
       <% } %>
       <% if (item.StatusName === 'Checked-Out') { %>
         <form method="POST" action="/inventory/<%= item.ItemID %>/checkin"
-              onsubmit="return confirm('Check this item back in to stock?')">
+              data-confirm="Check this item back in to stock?">
           <button type="submit" class="btn btn-sm btn-outline-success">
             <i class="bi bi-box-arrow-in-left me-1"></i>Check In
           </button>
@@ -258,7 +258,7 @@
                     <% if (isAdminUser) { %>
                     <td>
                       <form method="POST" action="/inventory/<%= item.ItemID %>/stock/<%= row.StockID %>/delete"
-                            onsubmit="return confirm('Remove this stock entry?')">
+                            data-confirm="Remove this stock entry?">
                         <button type="submit" class="btn btn-sm btn-outline-danger py-0" onclick="event.stopPropagation()">
                           <i class="bi bi-trash"></i>
                         </button>

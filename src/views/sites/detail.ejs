@@ -55,7 +55,7 @@
       <i class="bi bi-pencil me-1"></i>Edit
     </a>
     <form method="POST" action="/sites/<%= site.SiteID %>/delete"
-          onsubmit="return confirm('Delete this site? This action cannot be undone.')">
+          data-confirm="Delete this site? This action cannot be undone.">
       <button type="submit" class="btn btn-sm btn-outline-danger">
         <i class="bi bi-trash me-1"></i>Delete
       </button>
@@ -290,7 +290,7 @@
                 </button>
               <% } else { %>
                 <form method="POST" action="/sites/<%= site.SiteID %>/inventory/<%= item.SiteInventoryID %>/remove"
-                      onsubmit="return confirm('Remove this item from the site?')">
+                      data-confirm="Remove this item from the site?">
                   <button type="submit" class="btn btn-sm btn-outline-danger">
                     <i class="bi bi-dash-circle me-1"></i>Remove
                   </button>
@@ -469,7 +469,7 @@
                   <i class="bi bi-pencil"></i>
                 </button>
                 <form method="POST" action="/sites/<%= site.SiteID %>/pm/<%= pm.ScheduleID %>"
-                      onsubmit="return confirm('Delete this PM schedule?')">
+                      data-confirm="Delete this PM schedule?">
                   <input type="hidden" name="action" value="delete" />
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0">
                     <i class="bi bi-trash"></i>

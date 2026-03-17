@@ -24,21 +24,47 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 6000);
   });
 
-  // Confirm dialogs on data-confirm elements
-  document.querySelectorAll('[data-confirm]').forEach(el => {
-    el.addEventListener('click', (e) => {
-      const msg = el.getAttribute('data-confirm') || 'Are you sure?';
-      if (!confirm(msg)) e.preventDefault();
-    });
-  });
+  // Bootstrap confirmation modal for data-confirm elements
+  const confirmModal    = document.getElementById('confirmModal');
+  const confirmMessage  = document.getElementById('confirmModalMessage');
+  const confirmOkBtn    = document.getElementById('confirmModalOk');
 
-  // Confirm on delete forms without onsubmit already set
-  document.querySelectorAll('form[data-confirm]').forEach(form => {
-    form.addEventListener('submit', (e) => {
-      const msg = form.getAttribute('data-confirm') || 'Are you sure?';
-      if (!confirm(msg)) e.preventDefault();
+  if (confirmModal && confirmOkBtn) {
+    const bsConfirmModal = bootstrap.Modal.getOrCreateInstance(confirmModal);
+    let pendingAction = null;
+
+    confirmOkBtn.addEventListener('click', () => {
+      bsConfirmModal.hide();
+      if (pendingAction) { pendingAction(); pendingAction = null; }
     });
-  });
+
+    confirmModal.addEventListener('hidden.bs.modal', () => { pendingAction = null; });
+
+    function showConfirm(message, onConfirm) {
+      confirmMessage.textContent = message || 'Are you sure?';
+      pendingAction = onConfirm;
+      bsConfirmModal.show();
+    }
+
+    // Forms with data-confirm: intercept submit
+    document.querySelectorAll('form[data-confirm]').forEach(form => {
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        showConfirm(form.dataset.confirm, () => form.submit());
+      });
+    });
+
+    // Non-form elements with data-confirm: intercept click
+    document.querySelectorAll('[data-confirm]:not(form)').forEach(el => {
+      el.addEventListener('click', e => {
+        e.preventDefault();
+        showConfirm(el.dataset.confirm, () => {
+          el.removeAttribute('data-confirm');
+          el.click();
+        });
+      });
+    });
+  }
 
   // Activate Bootstrap tooltips
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {

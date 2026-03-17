@@ -66,7 +66,7 @@
       </div>
       <% if (canUpload) { %>
       <form action="/documents/<%= doc.DocumentID %>/delete" method="POST" class="ms-2"
-            onsubmit="return confirm('Delete this attachment?')">
+            data-confirm="Delete this attachment?">
         <input type="hidden" name="_csrf"    value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" />
         <input type="hidden" name="returnTo" value="<%= typeof returnTo !== 'undefined' ? returnTo : '' %>" />
         <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
