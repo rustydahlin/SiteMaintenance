@@ -1,6 +1,8 @@
 'use strict';
 
 const express    = require('express');
+const path       = require('path');
+const fs         = require('fs');
 const { isAdmin } = require('../middleware/auth');
 const lookupModel   = require('../models/lookupModel');
 const userModel     = require('../models/userModel');
@@ -8,7 +10,12 @@ const settingsModel = require('../models/settingsModel');
 const { getAuditLog } = require('../models/auditModel');
 const passportConfig  = require('../config/passport');
 const { body, validationResult } = require('express-validator');
+const XLSX = require('xlsx');
 const router = express.Router();
+
+const logDir = process.env.LOG_DIR
+  ? path.resolve(process.env.LOG_DIR)
+  : path.join(__dirname, '..', 'logs');
 
 // All admin routes require Admin role
 router.use(isAdmin);
@@ -330,6 +337,68 @@ router.get('/audit', async (req, res, next) => {
       title: 'Audit Log', ...result, users, filters: req.query,
       pagination: { page: result.page, totalPages: result.totalPages, queryString: new URLSearchParams({ ...req.query, page: undefined }).toString() },
     });
+  } catch (err) { next(err); }
+});
+
+router.get('/audit/export', async (req, res, next) => {
+  try {
+    const { tableName, userID, action, dateFrom, dateTo } = req.query;
+    const result = await getAuditLog({
+      tableName, userID: userID ? parseInt(userID) : null,
+      action, dateFrom, dateTo,
+      page: 1, pageSize: 100000,
+    });
+
+    const rows = result.rows.map(r => ({
+      Timestamp:  r.ChangedAt ? new Date(r.ChangedAt).toLocaleString() : '',
+      Table:      r.TableName || '',
+      RecordID:   r.RecordID  || '',
+      Action:     r.Action    || '',
+      User:       r.ChangedByName || 'System',
+      IPAddress:  r.IPAddress || '',
+      Notes:      r.Notes     || '',
+      Before:     r.OldValues || '',
+      After:      r.NewValues || '',
+    }));
+
+    const wb  = XLSX.utils.book_new();
+    const ws  = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'AuditLog');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Disposition', `attachment; filename="audit-log-${dateStr}.xlsx"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+  } catch (err) { next(err); }
+});
+
+// ── Log File Browser ───────────────────────────────────────────────────────────
+router.get('/logs', (_req, res, next) => {
+  try {
+    let files = [];
+    if (fs.existsSync(logDir)) {
+      files = fs.readdirSync(logDir)
+        .filter(f => f.endsWith('.log'))
+        .map(f => {
+          const stat = fs.statSync(path.join(logDir, f));
+          return { name: f, size: stat.size, mtime: stat.mtime };
+        })
+        .sort((a, b) => b.mtime - a.mtime);
+    }
+    res.render('admin/logs', { title: 'Log Files', files });
+  } catch (err) { next(err); }
+});
+
+router.get('/logs/download', (req, res, next) => {
+  try {
+    const filename = path.basename(req.query.file || '');
+    if (!filename || !/^(app|error)-\d{4}-\d{2}-\d{2}\.log$/.test(filename)) {
+      return res.status(400).send('Invalid filename.');
+    }
+    const filePath = path.join(logDir, filename);
+    if (!fs.existsSync(filePath)) return res.status(404).send('File not found.');
+    res.download(filePath, filename);
   } catch (err) { next(err); }
 });
 

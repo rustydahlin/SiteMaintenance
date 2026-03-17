@@ -1,0 +1,45 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-folder2-open me-2"></i>Log Files</h1>
+  <a href="/admin/settings" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to Settings</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold">Available Log Files</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Filename</th>
+          <th>Size</th>
+          <th>Last Modified</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (files.length === 0) { %>
+          <tr><td colspan="4" class="text-muted text-center py-3">No log files found.</td></tr>
+        <% } %>
+        <% files.forEach(f => { %>
+        <tr>
+          <td>
+            <i class="bi bi-file-text text-muted me-1"></i>
+            <% if (f.name.startsWith('error-')) { %>
+              <span class="text-danger"><%= f.name %></span>
+            <% } else { %>
+              <%= f.name %>
+            <% } %>
+          </td>
+          <td class="text-muted small"><%= (f.size / 1024).toFixed(1) %> KB</td>
+          <td class="text-muted small"><%= new Date(f.mtime).toLocaleString() %></td>
+          <td>
+            <a href="/admin/logs/download?file=<%= encodeURIComponent(f.name) %>"
+               class="btn btn-outline-primary btn-sm py-0">
+              <i class="bi bi-download me-1"></i>Download
+            </a>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

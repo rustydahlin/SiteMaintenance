@@ -190,6 +190,36 @@
     </div>
   </div>
 
+  <!-- Logs & Audit -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-journal-text me-2"></i>Logs &amp; Audit</div>
+    <div class="card-body row g-3">
+      <div class="col-md-3">
+        <label class="form-label">App Log Retention (days)</label>
+        <input type="number" name="logs.appRetentionDays" class="form-control"
+               value="<%= settings['logs.appRetentionDays'] || '30' %>" min="1" />
+        <div class="form-text">How many days to keep <code>app-*.log</code> files.</div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Error Log Retention (days)</label>
+        <input type="number" name="logs.errorRetentionDays" class="form-control"
+               value="<%= settings['logs.errorRetentionDays'] || '90' %>" min="1" />
+        <div class="form-text">How many days to keep <code>error-*.log</code> files.</div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Audit Log Retention (days)</label>
+        <input type="number" name="audit.retentionDays" class="form-control"
+               value="<%= settings['audit.retentionDays'] || '365' %>" min="0" />
+        <div class="form-text">Days to keep audit records. <code>0</code> = keep forever.</div>
+      </div>
+      <div class="col-12">
+        <a href="/admin/logs" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-folder2-open me-1"></i>Browse &amp; Download Log Files
+        </a>
+      </div>
+    </div>
+  </div>
+
   <div class="d-flex gap-2">
     <button type="submit" class="btn btn-primary"><i class="bi bi-save me-2"></i>Save All Settings</button>
     <a href="/admin" class="btn btn-outline-secondary">Cancel</a>

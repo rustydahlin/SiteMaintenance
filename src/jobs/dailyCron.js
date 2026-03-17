@@ -1,15 +1,25 @@
 'use strict';
 
 const cron    = require('node-cron');
+const path    = require('path');
+const fs      = require('fs');
 const logger  = require('../utils/logger');
 const email   = require('../services/emailService');
 const settingsModel = require('../models/settingsModel');
+
+const logDir = process.env.LOG_DIR
+  ? path.resolve(process.env.LOG_DIR)
+  : path.join(__dirname, '..', 'logs');
 
 // Runs daily at 07:00 server time
 const SCHEDULE = '0 7 * * *';
 
 async function runDailyChecks() {
   logger.info('Daily cron: starting checks');
+
+  // Retention cleanup runs regardless of email setting
+  try { await cleanAuditLog();    } catch (e) { logger.error('Cron audit cleanup failed:', e.message); }
+  try { await cleanOldLogFiles(); } catch (e) { logger.error('Cron log cleanup failed:', e.message); }
 
   const emailEnabled = await settingsModel.getSettingsBool('email.enabled', 'EMAIL_ENABLED');
   if (!emailEnabled) {
@@ -23,6 +33,42 @@ async function runDailyChecks() {
   try { await checkLongCheckouts(); } catch (e) { logger.error('Cron checkout check failed:', e.message); }
 
   logger.info('Daily cron: completed');
+}
+
+async function cleanAuditLog() {
+  const retentionDays = parseInt(await settingsModel.getSetting('audit.retentionDays') || '365', 10);
+  if (retentionDays <= 0) return; // 0 = keep forever
+
+  const { getPool, sql } = require('../config/database');
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('Days', sql.Int, retentionDays)
+    .query(`DELETE FROM AuditLog WHERE ChangedAt < DATEADD(DAY, -@Days, GETUTCDATE())`);
+  const deleted = result.rowsAffected[0];
+  if (deleted > 0) logger.info(`Daily cron: purged ${deleted} audit record(s) older than ${retentionDays} days`);
+}
+
+async function cleanOldLogFiles() {
+  if (!fs.existsSync(logDir)) return;
+
+  const appDays   = parseInt(await settingsModel.getSetting('logs.appRetentionDays')   || '30', 10);
+  const errorDays = parseInt(await settingsModel.getSetting('logs.errorRetentionDays') || '90', 10);
+
+  const now = Date.now();
+  let deleted = 0;
+
+  for (const file of fs.readdirSync(logDir)) {
+    if (!file.endsWith('.log')) continue;
+    const filePath = path.join(logDir, file);
+    const stat = fs.statSync(filePath);
+    const ageDays = (now - stat.mtimeMs) / (1000 * 60 * 60 * 24);
+    const limit = file.startsWith('error-') ? errorDays : appDays;
+    if (ageDays > limit) {
+      fs.unlinkSync(filePath);
+      deleted++;
+    }
+  }
+  if (deleted > 0) logger.info(`Daily cron: deleted ${deleted} old log file(s)`);
 }
 
 async function checkPMsDue() {
