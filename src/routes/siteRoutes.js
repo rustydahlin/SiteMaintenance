@@ -592,9 +592,9 @@ router.post('/:id/inventory/:siID/replace', isAdmin, async (req, res, next) => {
       const repair = await repairModel.create({
         itemID:          oldSI.ItemID,
         siteInventoryID: siID,
-        sentDate:        new Date(),
         reason:          repairReason || 'Replaced at site',
         sentByUserID:    req.user?.UserID,
+        assignedUserID:  req.user?.UserID,
       }, req.auditContext);
 
       req.flash('success', 'Item replaced. RMA started — please finish filling out the repair details.');
@@ -653,9 +653,9 @@ router.post('/:id/inventory/:itemID/replace-bulk', isAdmin, async (req, res, nex
       for (let i = 0; i < replaceQty; i++) {
         const repair = await repairModel.create({
           itemID,
-          sentDate:     new Date(),
-          reason:       repairReason.trim(),
-          sentByUserID: req.user?.UserID,
+          reason:        repairReason.trim(),
+          sentByUserID:  req.user?.UserID,
+          assignedUserID: req.user?.UserID,
         }, req.auditContext);
         if (i === 0) firstRepairID = repair.RepairID;
       }

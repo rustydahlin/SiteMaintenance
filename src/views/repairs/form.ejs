@@ -1,9 +1,11 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1 class="h3 mb-0">
     <i class="bi bi-wrench-adjustable me-2"></i>
-    <%= repair ? `Edit Repair — ${repair.SerialNumber}` : 'New Repair / RMA' %>
+    <% if (isEdit) { const lbl = repair.SerialNumber || repair.CommonName || repair.ModelNumber || `Item #${repair.ItemID}`; %>
+      Edit Repair — <%= lbl %>
+    <% } else { %>New Repair / RMA<% } %>
   </h1>
-  <a href="<%= repair ? `/repairs/${repair.RepairID}` : '/repairs' %>"
+  <a href="<%= isEdit ? `/repairs/${repair.RepairID}` : '/repairs' %>"
      class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-arrow-left me-1"></i>Cancel
   </a>
@@ -24,31 +26,70 @@
             <input type="hidden" name="itemID" value="<%= prefilledItem.ItemID %>" />
             <div class="form-control bg-body-secondary">
               <i class="bi bi-box-seam me-1 text-muted"></i>
-              <strong><%= prefilledItem.SerialNumber %></strong>
-              <% if (prefilledItem.ModelNumber) { %>
+              <strong><%= prefilledItem.SerialNumber || prefilledItem.CommonName || prefilledItem.ModelNumber || `Item #${prefilledItem.ItemID}` %></strong>
+              <% if (prefilledItem.SerialNumber && prefilledItem.CommonName) { %>
+                <span class="text-muted ms-1">— <%= prefilledItem.CommonName %></span>
+              <% } else if (prefilledItem.ModelNumber && (prefilledItem.SerialNumber || prefilledItem.CommonName)) { %>
                 <span class="text-muted ms-1">— <%= prefilledItem.ModelNumber %></span>
               <% } %>
             </div>
           <% } else { %>
-            <input type="text" id="itemID" name="itemID"
-                   class="form-control"
-                   placeholder="Enter Inventory Item ID or Serial Number"
-                   value="<%= repair && repair.ItemID ? repair.ItemID : '' %>"
-                   required />
-            <div class="form-text">Enter the Inventory Item ID number.</div>
+            <input type="hidden" id="itemID" name="itemID" value="" required />
+            <input type="hidden" id="siteInventoryID" name="siteInventoryID" value="" />
+            <div class="input-group">
+              <input type="text" id="itemSearch" class="form-control"
+                     placeholder="Search by serial number, model, name…"
+                     autocomplete="off" />
+              <button type="button" class="btn btn-outline-secondary" id="clearItem"
+                      style="display:none" title="Clear selection">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div id="itemResults" class="list-group mt-1" style="display:none; max-height:220px; overflow-y:auto;"></div>
+            <div id="itemChosen" class="form-control bg-body-secondary mt-1" style="display:none;"></div>
           <% } %>
+
+          <!-- Deployment warning (shown by JS when selected item is deployed) -->
+          <div id="deployedWarning" class="alert alert-warning mt-2 mb-0" style="display:none;">
+            <div class="fw-semibold mb-2">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>
+              This item is currently installed at <strong id="deployedSiteName"></strong>.
+            </div>
+            <p class="small mb-2">
+              Continuing will remove it from that site. You can optionally swap in a replacement item below.
+            </p>
+            <label class="form-label small fw-semibold mb-1">Swap in replacement (optional)</label>
+            <input type="hidden" id="replacementItemID" name="replacementItemID" value="" />
+            <div class="input-group input-group-sm">
+              <input type="text" id="replacementSearch" class="form-control"
+                     placeholder="Search In-Stock items…" autocomplete="off" />
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="clearReplacement"
+                      style="display:none" title="Clear replacement">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div id="replacementResults" class="list-group mt-1" style="display:none; max-height:180px; overflow-y:auto;"></div>
+            <div id="replacementChosen" class="form-control form-control-sm bg-body-secondary mt-1" style="display:none;"></div>
+          </div>
         </div>
+
+        <!-- Serial Number (serialized items only) -->
+        <% if (prefilledItem && prefilledItem.TrackingType === 'serialized') { %>
+        <div class="col-md-6">
+          <label class="form-label">Serial Number</label>
+          <div class="form-control bg-body-secondary"><%= prefilledItem.SerialNumber || '—' %></div>
+        </div>
+        <% } %>
 
         <!-- Sent Date -->
         <div class="col-md-3">
-          <label for="sentDate" class="form-label">
-            Sent Date <span class="text-danger">*</span>
-          </label>
+          <label for="sentDate" class="form-label">Sent Date</label>
           <input type="date" id="sentDate" name="sentDate"
-                 class="form-control" required
+                 class="form-control"
                  value="<%= repair && repair.SentDate
                    ? new Date(repair.SentDate).toISOString().split('T')[0]
-                   : new Date().toISOString().split('T')[0] %>" />
+                   : '' %>" />
+          <div class="form-text">Fill in on the day the item is physically shipped.</div>
         </div>
 
         <!-- RMA Number -->
@@ -84,6 +125,22 @@
           </select>
         </div>
 
+        <!-- Assigned To -->
+        <div class="col-md-3">
+          <label for="assignedUserID" class="form-label">Assigned To</label>
+          <select id="assignedUserID" name="assignedUserID" class="form-select">
+            <option value="">— Select User —</option>
+            <% users.forEach(u => { %>
+              <option value="<%= u.UserID %>"
+                <%= (repair && repair.AssignedUserID == u.UserID) ? 'selected' :
+                   (!isEdit && currentUserID == u.UserID) ? 'selected' : '' %>>
+                <%= u.DisplayName %>
+              </option>
+            <% }) %>
+          </select>
+          <div class="form-text">Receives overdue email reminders.</div>
+        </div>
+
         <!-- Expected Return Date -->
         <div class="col-md-3">
           <label for="expectedReturnDate" class="form-label">Expected Return Date</label>
@@ -112,12 +169,155 @@
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-floppy me-1"></i>
-          <%= repair ? 'Save Changes' : 'Create Repair Record' %>
+          <%= isEdit ? 'Save Changes' : 'Create Repair Record' %>
         </button>
-        <a href="<%= repair ? `/repairs/${repair.RepairID}` : '/repairs' %>"
+        <a href="<%= isEdit ? `/repairs/${repair.RepairID}` : '/repairs' %>"
            class="btn btn-outline-secondary">Cancel</a>
       </div>
 
     </form>
   </div>
 </div>
+
+<% if (!prefilledItem) { %>
+<script>
+(function () {
+  const searchInput   = document.getElementById('itemSearch');
+  const hiddenInput   = document.getElementById('itemID');
+  const siHidden      = document.getElementById('siteInventoryID');
+  const results       = document.getElementById('itemResults');
+  const chosen        = document.getElementById('itemChosen');
+  const clearBtn      = document.getElementById('clearItem');
+  const deployWarning = document.getElementById('deployedWarning');
+  const deployedName  = document.getElementById('deployedSiteName');
+
+  // Replacement picker elements
+  const replSearch    = document.getElementById('replacementSearch');
+  const replHidden    = document.getElementById('replacementItemID');
+  const replResults   = document.getElementById('replacementResults');
+  const replChosen    = document.getElementById('replacementChosen');
+  const replClearBtn  = document.getElementById('clearReplacement');
+
+  if (!searchInput) return;
+
+  let debounce, replDebounce;
+
+  function itemLabel(item) {
+    const primary = item.SerialNumber || item.CommonName || item.ModelNumber || `Item #${item.ItemID}`;
+    const parts = [];
+    if (item.SerialNumber && item.CommonName) parts.push(item.CommonName);
+    if (item.ModelNumber && (item.SerialNumber || item.CommonName)) parts.push(item.ModelNumber);
+    if (item.Manufacturer) parts.push(item.Manufacturer);
+    return primary + (parts.length ? ' — ' + parts.join(' / ') : '');
+  }
+
+  function buildResults(container, items, onSelect) {
+    if (!items.length) {
+      container.innerHTML     = '<div class="list-group-item text-muted small">No items found.</div>';
+      container.style.display = 'block';
+      return;
+    }
+    container.innerHTML = items.map(item => `
+      <button type="button" class="list-group-item list-group-item-action small py-1 px-2"
+              data-item='${JSON.stringify(item).replace(/'/g, '&#39;')}'>
+        <span class="fw-semibold">${itemLabel(item)}</span>
+        <span class="badge ms-1 ${item.StatusName === 'In-Stock' ? 'bg-success' : 'bg-secondary'}">${item.StatusName}</span>
+        ${item.CurrentSiteName ? `<span class="badge bg-warning text-dark ms-1">At: ${item.CurrentSiteName}</span>` : ''}
+      </button>
+    `).join('');
+    container.style.display = 'block';
+    container.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', function () {
+        onSelect(JSON.parse(this.dataset.item));
+      });
+    });
+  }
+
+  function selectItem(item) {
+    hiddenInput.value         = item.ItemID;
+    siHidden.value            = item.CurrentSiteInventoryID || '';
+    searchInput.style.display = 'none';
+    clearBtn.style.display    = 'inline-flex';
+    results.style.display     = 'none';
+    results.innerHTML         = '';
+    chosen.style.display      = 'block';
+    chosen.innerHTML = `<i class="bi bi-box-seam me-1 text-muted"></i><strong>${itemLabel(item)}</strong>`
+      + ` <span class="badge ms-2 ${item.StatusName === 'In-Stock' ? 'bg-success' : 'bg-secondary'}">${item.StatusName}</span>`;
+
+    // Show or hide the deployment warning
+    if (item.CurrentSiteID) {
+      deployedName.textContent   = item.CurrentSiteName;
+      deployWarning.style.display = 'block';
+    } else {
+      deployWarning.style.display = 'none';
+      clearReplacement();
+    }
+  }
+
+  function clearSelection() {
+    hiddenInput.value         = '';
+    siHidden.value            = '';
+    searchInput.value         = '';
+    searchInput.style.display = '';
+    clearBtn.style.display    = 'none';
+    chosen.style.display      = 'none';
+    results.style.display     = 'none';
+    results.innerHTML         = '';
+    deployWarning.style.display = 'none';
+    clearReplacement();
+    searchInput.focus();
+  }
+
+  function selectReplacement(item) {
+    replHidden.value            = item.ItemID;
+    replSearch.style.display    = 'none';
+    replClearBtn.style.display  = 'inline-flex';
+    replResults.style.display   = 'none';
+    replResults.innerHTML       = '';
+    replChosen.style.display    = 'block';
+    replChosen.innerHTML = `<i class="bi bi-box-seam me-1 text-muted"></i><strong>${itemLabel(item)}</strong>`;
+  }
+
+  function clearReplacement() {
+    replHidden.value           = '';
+    replSearch.value           = '';
+    replSearch.style.display   = '';
+    replClearBtn.style.display = 'none';
+    replChosen.style.display   = 'none';
+    replResults.style.display  = 'none';
+    replResults.innerHTML      = '';
+  }
+
+  clearBtn.addEventListener('click', clearSelection);
+  replClearBtn.addEventListener('click', clearReplacement);
+
+  searchInput.addEventListener('input', function () {
+    clearTimeout(debounce);
+    const q = this.value.trim();
+    if (!q) { results.style.display = 'none'; results.innerHTML = ''; return; }
+    debounce = setTimeout(async () => {
+      const resp  = await fetch(`/repairs/inventory-search?q=${encodeURIComponent(q)}`);
+      buildResults(results, await resp.json(), selectItem);
+    }, 250);
+  });
+
+  replSearch.addEventListener('input', function () {
+    clearTimeout(replDebounce);
+    const q = this.value.trim();
+    if (!q) { replResults.style.display = 'none'; replResults.innerHTML = ''; return; }
+    replDebounce = setTimeout(async () => {
+      const resp  = await fetch(`/repairs/inventory-search?q=${encodeURIComponent(q)}&inStock=1`);
+      buildResults(replResults, await resp.json(), selectReplacement);
+    }, 250);
+  });
+
+  // Hide dropdowns on outside click
+  document.addEventListener('click', function (e) {
+    if (!results.contains(e.target) && e.target !== searchInput)
+      results.style.display = 'none';
+    if (!replResults.contains(e.target) && e.target !== replSearch)
+      replResults.style.display = 'none';
+  });
+})();
+</script>
+<% } %>

@@ -28,6 +28,7 @@ async function runDailyChecks() {
   }
 
   try { await checkPMsDue();          } catch (e) { logger.error('Cron PM check failed:', e.message); }
+  try { await checkUnsentRmas();      } catch (e) { logger.error('Cron unsent RMA check failed:', e.message); }
   try { await checkRepairOverdue();   } catch (e) { logger.error('Cron repair overdue failed:', e.message); }
   try { await checkWarranties();      } catch (e) { logger.error('Cron warranty check failed:', e.message); }
   try { await checkSystemKeyExpiry(); } catch (e) { logger.error('Cron system key expiry failed:', e.message); }
@@ -81,6 +82,16 @@ async function checkPMsDue() {
     await email.sendPMReminder({ SiteID: s.SiteID, SiteName: s.SiteName }, s, daysUntilDue);
   }
   if (schedules.length) logger.info(`Daily cron: sent ${schedules.length} PM reminder(s)`);
+}
+
+async function checkUnsentRmas() {
+  const repairModel  = require('../models/repairModel');
+  const intervalDays = parseInt(await settingsModel.getSetting('email.unsentRmaReminderDays') || '3', 10);
+  const repairs = await repairModel.getUnsentReminders(intervalDays);
+  for (const r of repairs) {
+    await email.sendUnsentRmaReminder(r);
+  }
+  if (repairs.length) logger.info(`Daily cron: sent ${repairs.length} unsent RMA reminder(s) (interval: every ${intervalDays}d)`);
 }
 
 async function checkRepairOverdue() {

@@ -192,6 +192,11 @@
         <div class="form-text">After Expected Return Date passes, send a reminder every this many days until received.</div>
       </div>
       <div class="col-md-4">
+        <label class="form-label">Unsent RMA Reminder (repeat every N days)</label>
+        <input type="number" name="email.unsentRmaReminderDays" class="form-control" value="<%= settings['email.unsentRmaReminderDays'] || '3' %>" min="1" />
+        <div class="form-text">Remind the assigned user every this many days while an RMA has no Sent Date.</div>
+      </div>
+      <div class="col-md-4">
         <label class="form-label">System Key Expiry Reminder (days before expiry)</label>
         <input type="number" name="email.systemKeyReminderDays" class="form-control" value="<%= settings['email.systemKeyReminderDays'] || '30' %>" min="1" />
         <div class="form-text">Send an email to the key holder this many days before the key expires.</div>

@@ -121,7 +121,11 @@ async function sendRepairFollowUp(repair) {
 }
 
 async function sendRepairOverdue(repair) {
-  const to = await getOptedInEmails('repair.overdue');
+  const optedIn = await getOptedInEmails('repair.overdue');
+  // Always notify the assigned user; merge with opted-in list, dedupe
+  const toSet = new Set(optedIn);
+  if (repair.AssignedUserEmail) toSet.add(repair.AssignedUserEmail);
+  const to = [...toSet];
   if (!to.length) return;
 
   const daysSinceSent = Math.floor((Date.now() - new Date(repair.SentDate).getTime()) / 86400000);
@@ -131,10 +135,30 @@ async function sendRepairOverdue(repair) {
     <p><strong>Item:</strong> ${repair.SerialNumber} — ${repair.ModelNumber || ''}</p>
     <p><strong>Expected Return:</strong> <span style="color:red">${new Date(repair.ExpectedReturnDate).toLocaleDateString()}</span></p>
     <p><strong>Days Since Sent:</strong> ${daysSinceSent}</p>
+    ${repair.AssignedUserName ? `<p><strong>Assigned To:</strong> ${repair.AssignedUserName}</p>` : ''}
     ${repair.ManufacturerContact ? `<p><strong>Contact:</strong> ${repair.ManufacturerContact}</p>` : ''}
     <p><a href="${process.env.APP_BASE_URL || ''}/repairs/${repair.RepairID}">View Repair</a></p>
   `;
   await sendMail({ to, subject, html });
+}
+
+async function sendUnsentRmaReminder(repair) {
+  if (!repair.AssignedUserEmail) return;
+  const daysSinceCreated = Math.floor((Date.now() - new Date(repair.CreatedAt).getTime()) / 86400000);
+  const itemLabel = repair.SerialNumber || repair.CommonName || repair.ModelNumber || `Item #${repair.ItemID}`;
+  const subject = `Unsent RMA Reminder: ${itemLabel} (created ${daysSinceCreated} day(s) ago)`;
+  const html = `
+    <h3>Unsent RMA — Action Required</h3>
+    <p>The following repair/RMA record was created but the item has not been shipped yet.
+       Please ship the item and update the <strong>Sent Date</strong> in the system to stop these reminders.</p>
+    <p><strong>Item:</strong> ${itemLabel}</p>
+    ${repair.RMANumber ? `<p><strong>RMA #:</strong> ${repair.RMANumber}</p>` : ''}
+    ${repair.Manufacturer ? `<p><strong>Manufacturer:</strong> ${repair.Manufacturer}</p>` : ''}
+    <p><strong>Created:</strong> ${new Date(repair.CreatedAt).toLocaleDateString()} (${daysSinceCreated} day(s) ago)</p>
+    ${repair.ManufacturerContact ? `<p><strong>Mfr. Contact:</strong> ${repair.ManufacturerContact}</p>` : ''}
+    <p><a href="${process.env.APP_BASE_URL || ''}/repairs/${repair.RepairID}">View &amp; Update Repair</a></p>
+  `;
+  await sendMail({ to: repair.AssignedUserEmail, subject, html });
 }
 
 async function sendWarrantyExpiring(type, item, daysLeft) {
@@ -241,6 +265,7 @@ module.exports = {
   sendPMReminder,
   sendRepairFollowUp,
   sendRepairOverdue,
+  sendUnsentRmaReminder,
   sendWarrantyExpiring,
   sendCheckoutReminder,
   sendSiteStatusChange,

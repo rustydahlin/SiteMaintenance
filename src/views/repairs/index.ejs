@@ -1,6 +1,7 @@
 <%
   function statusBadge(repair) {
     if (repair.ReceivedDate) return '<span class="badge bg-success">Closed</span>';
+    if (!repair.SentDate)    return '<span class="badge bg-secondary">Not Sent</span>';
     const now = new Date();
     const exp = repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate) : null;
     if (exp && exp < now) return '<span class="badge bg-danger">Overdue</span>';
@@ -63,10 +64,11 @@
       <tr>
         <th><a href="<%- sortLink('item') %>" class="text-decoration-none text-body">Item<%- sortIcon('item') %></a></th>
         <th><a href="<%- sortLink('manufacturer') %>" class="text-decoration-none text-body">Manufacturer<%- sortIcon('manufacturer') %></a></th>
+        <th><a href="<%- sortLink('createdAt') %>" class="text-decoration-none text-body">Created<%- sortIcon('createdAt') %></a></th>
         <th><a href="<%- sortLink('sentDate') %>" class="text-decoration-none text-body">Sent Date<%- sortIcon('sentDate') %></a></th>
         <th>RMA #</th>
         <th><a href="<%- sortLink('expectedReturn') %>" class="text-decoration-none text-body">Expected Return<%- sortIcon('expectedReturn') %></a></th>
-        <th><a href="<%- sortLink('sentBy') %>" class="text-decoration-none text-body">Created By<%- sortIcon('sentBy') %></a></th>
+        <th><a href="<%- sortLink('assignedUser') %>" class="text-decoration-none text-body">Assigned To<%- sortIcon('assignedUser') %></a></th>
         <th>Status</th>
         <th>Days Open</th>
         <th></th>
@@ -90,13 +92,16 @@
         </td>
         <td class="small text-muted"><%= repair.Manufacturer || '—' %></td>
         <td class="small text-muted text-nowrap">
+          <%= repair.CreatedAt ? new Date(repair.CreatedAt).toLocaleDateString() : '—' %>
+        </td>
+        <td class="small text-muted text-nowrap">
           <%= repair.SentDate ? new Date(repair.SentDate).toLocaleDateString() : '—' %>
         </td>
         <td class="small"><%= repair.RMANumber || '—' %></td>
         <td class="small text-muted text-nowrap">
           <%= repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate).toLocaleDateString() : '—' %>
         </td>
-        <td class="small text-muted"><%= repair.SentByName || '—' %></td>
+        <td class="small text-muted"><%= repair.AssignedUserName || '—' %></td>
         <td><%- statusBadge(repair) %></td>
         <td class="small text-muted">
           <% if (!repair.ReceivedDate) { %>

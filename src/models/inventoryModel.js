@@ -487,10 +487,41 @@ async function findByImportKey(trackingType, serialNumber, commonName, modelNumb
   return null;
 }
 
+// Quick search for the repair item picker.
+// inStockOnly=true restricts to items with In-Stock status (used for replacement picker).
+async function searchForPicker(q, { inStockOnly = false } = {}) {
+  const pool = await getPool();
+  const term  = `%${q || ''}%`;
+  const stockClause = inStockOnly ? "AND s.StatusName = 'In-Stock'" : '';
+  const result = await pool.request()
+    .input('Term', sql.NVarChar(200), term)
+    .query(`
+      SELECT TOP 50
+        i.ItemID, i.TrackingType, i.SerialNumber, i.CommonName, i.ModelNumber,
+        i.Manufacturer, s.StatusName,
+        si.SiteInventoryID AS CurrentSiteInventoryID,
+        si.SiteID          AS CurrentSiteID,
+        site.SiteName      AS CurrentSiteName
+      FROM Inventory i
+      JOIN InventoryStatuses s    ON s.StatusID  = i.StatusID
+      LEFT JOIN SiteInventory si  ON si.ItemID   = i.ItemID AND si.RemovedAt IS NULL
+      LEFT JOIN Sites site        ON site.SiteID = si.SiteID
+      WHERE i.IsActive = 1 ${stockClause}
+        AND (
+          i.SerialNumber LIKE @Term OR
+          i.CommonName   LIKE @Term OR
+          i.ModelNumber  LIKE @Term OR
+          i.Manufacturer LIKE @Term
+        )
+      ORDER BY i.Manufacturer, i.ModelNumber, i.CommonName, i.SerialNumber
+    `);
+  return result.recordset;
+}
+
 module.exports = {
   getAll, getByID, create, update, softDelete,
   updateStatus,
   getInStock, getRelatedParts, getSystemsList,
   getStock, upsertStock, removeStock, adjustStock,
-  findByImportKey,
+  findByImportKey, searchForPicker,
 };

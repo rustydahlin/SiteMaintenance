@@ -287,7 +287,7 @@ CREATE TABLE RepairTracking (
     RepairID             INT           IDENTITY(1,1) PRIMARY KEY,
     ItemID               INT           NOT NULL,
     SiteInventoryID      INT           NULL,
-    SentDate             DATE          NOT NULL,
+    SentDate             DATE          NULL,
     RMANumber            NVARCHAR(100) NULL,
     ManufacturerContact  NVARCHAR(255) NULL,
     Reason               NVARCHAR(MAX) NOT NULL,
@@ -300,12 +300,14 @@ CREATE TABLE RepairTracking (
     -- 'Sent', 'FollowUp-Pending', 'Received', 'Returned-to-Inventory', 'Retired'
     SentByUserID         INT           NULL,
     ReceivedByUserID     INT           NULL,
+    AssignedUserID       INT           NULL,
     CreatedAt            DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE(),
     UpdatedAt            DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE(),
-    CONSTRAINT FK_Repair_Item    FOREIGN KEY (ItemID)           REFERENCES Inventory(ItemID),
-    CONSTRAINT FK_Repair_SI      FOREIGN KEY (SiteInventoryID)  REFERENCES SiteInventory(SiteInventoryID),
-    CONSTRAINT FK_Repair_SentBy  FOREIGN KEY (SentByUserID)     REFERENCES Users(UserID),
-    CONSTRAINT FK_Repair_RecvdBy FOREIGN KEY (ReceivedByUserID) REFERENCES Users(UserID)
+    CONSTRAINT FK_Repair_Item       FOREIGN KEY (ItemID)           REFERENCES Inventory(ItemID),
+    CONSTRAINT FK_Repair_SI         FOREIGN KEY (SiteInventoryID)  REFERENCES SiteInventory(SiteInventoryID),
+    CONSTRAINT FK_Repair_SentBy     FOREIGN KEY (SentByUserID)     REFERENCES Users(UserID),
+    CONSTRAINT FK_Repair_RecvdBy    FOREIGN KEY (ReceivedByUserID) REFERENCES Users(UserID),
+    CONSTRAINT FK_Repair_AssignedUser FOREIGN KEY (AssignedUserID) REFERENCES Users(UserID)
 );
 CREATE INDEX IX_Repair_ItemID ON RepairTracking(ItemID);
 CREATE INDEX IX_Repair_Status ON RepairTracking(RepairStatus);

@@ -3,7 +3,8 @@
   const isClosed    = !!repair.ReceivedDate;
 
   function statusBadge() {
-    if (isClosed) return '<span class="badge bg-success">Closed</span>';
+    if (isClosed)          return '<span class="badge bg-success">Closed</span>';
+    if (!repair.SentDate)  return '<span class="badge bg-secondary">Not Sent</span>';
     const now = new Date();
     const exp = repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate) : null;
     if (exp && exp < now) return '<span class="badge bg-danger">Overdue</span>';
@@ -20,7 +21,7 @@
 <div class="d-flex justify-content-between align-items-start mt-3 mb-4 flex-wrap gap-2">
   <div>
     <h1 class="h2 mb-1">
-      <i class="bi bi-wrench-adjustable me-2"></i>Repair — <%= repair.SerialNumber %>
+      <i class="bi bi-wrench-adjustable me-2"></i>Repair — <%= repair.SerialNumber || repair.CommonName || repair.ModelNumber || ('Item #' + repair.ItemID) %>
     </h1>
     <div class="d-flex gap-2 flex-wrap align-items-center">
       <%- statusBadge() %>
@@ -44,6 +45,12 @@
         <i class="bi bi-box-arrow-in-down me-1"></i>Receive Back
       </button>
     <% } %>
+    <form method="POST" action="/repairs/<%= repair.RepairID %>/delete"
+          onsubmit="return confirm('Delete this repair record? This cannot be undone.')">
+      <button type="submit" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-trash me-1"></i>Delete
+      </button>
+    </form>
   </div>
   <% } %>
 </div>
@@ -77,13 +84,25 @@
           <dt class="col-sm-5 text-muted">RMA #</dt>
           <dd class="col-sm-7"><%= repair.RMANumber || '—' %></dd>
 
+          <dt class="col-sm-5 text-muted">Created</dt>
+          <dd class="col-sm-7 text-nowrap">
+            <%= repair.CreatedAt ? new Date(repair.CreatedAt).toLocaleDateString() : '—' %>
+          </dd>
+
           <dt class="col-sm-5 text-muted">Sent Date</dt>
           <dd class="col-sm-7 text-nowrap">
-            <%= repair.SentDate ? new Date(repair.SentDate).toLocaleDateString() : '—' %>
+            <% if (repair.SentDate) { %>
+              <%= new Date(repair.SentDate).toLocaleDateString() %>
+            <% } else { %>
+              <span class="text-muted fst-italic">Not shipped yet</span>
+            <% } %>
           </dd>
 
           <dt class="col-sm-5 text-muted">Sent By</dt>
           <dd class="col-sm-7"><%= repair.SentByName || '—' %></dd>
+
+          <dt class="col-sm-5 text-muted">Assigned To</dt>
+          <dd class="col-sm-7"><%= repair.AssignedUserName || '—' %></dd>
 
           <dt class="col-sm-5 text-muted">Mfr. Contact</dt>
           <dd class="col-sm-7"><%= repair.ManufacturerContact || '—' %></dd>

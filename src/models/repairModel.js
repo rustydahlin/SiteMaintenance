@@ -8,18 +8,21 @@ const REPAIR_SELECT = `
   rt.RepairID, rt.ItemID, rt.SiteInventoryID, rt.SentDate, rt.RMANumber,
   rt.ManufacturerContact, rt.Reason, rt.ExpectedReturnDate,
   rt.ReceivedDate, rt.ReturnCondition, rt.ReturnNotes, rt.RepairStatus,
-  rt.SentByUserID, rt.ReceivedByUserID, rt.CreatedAt,
-  i.CommonName, i.SerialNumber, i.ModelNumber, i.Manufacturer,
+  rt.SentByUserID, rt.ReceivedByUserID, rt.AssignedUserID, rt.CreatedAt,
+  i.CommonName, i.SerialNumber, i.ModelNumber, i.Manufacturer, i.TrackingType AS ItemTrackingType,
   sb.DisplayName AS SentByName,
-  rb.DisplayName AS ReceivedByName
+  rb.DisplayName AS ReceivedByName,
+  au.DisplayName AS AssignedUserName,
+  au.Email       AS AssignedUserEmail
 `;
 
 const REPAIR_SORT_COLUMNS = {
   item:           'COALESCE(i.CommonName, i.SerialNumber, i.ModelNumber)',
   manufacturer:   'i.Manufacturer',
+  createdAt:      'rt.CreatedAt',
   sentDate:       'rt.SentDate',
   expectedReturn: 'rt.ExpectedReturnDate',
-  sentBy:         'sb.DisplayName',
+  assignedUser:   'au.DisplayName',
 };
 
 const REPAIR_JOINS = `
@@ -27,6 +30,7 @@ const REPAIR_JOINS = `
   LEFT JOIN Inventory i  ON i.ItemID  = rt.ItemID
   LEFT JOIN Users    sb  ON sb.UserID = rt.SentByUserID
   LEFT JOIN Users    rb  ON rb.UserID = rt.ReceivedByUserID
+  LEFT JOIN Users    au  ON au.UserID = rt.AssignedUserID
 `;
 
 async function getAll({ status, itemID, page = 1, pageSize = 25, sort = 'sentDate', dir = 'desc' } = {}) {
@@ -87,27 +91,31 @@ async function getByID(repairID) {
 async function create(data, auditContext = {}) {
   const {
     itemID, siteInventoryID, sentDate, rmaNumber, manufacturerContact,
-    reason, expectedReturnDate, followUpDate, sentByUserID,
+    reason, expectedReturnDate, followUpDate, sentByUserID, assignedUserID,
   } = data;
+
+  // Default assigned user to the sender if not explicitly set
+  const resolvedAssignedUserID = assignedUserID || sentByUserID || null;
 
   const pool = await getPool();
   const result = await pool.request()
     .input('ItemID',              sql.Int,            itemID)
     .input('SiteInventoryID',     sql.Int,            siteInventoryID     || null)
-    .input('SentDate',            sql.Date,           sentDate ? new Date(sentDate) : new Date())
+    .input('SentDate',            sql.Date,           sentDate ? new Date(sentDate) : null)
     .input('RMANumber',           sql.NVarChar(100),  rmaNumber           || null)
     .input('ManufacturerContact', sql.NVarChar(500),  manufacturerContact || null)
     .input('Reason',              sql.NVarChar(sql.MAX), reason            || null)
     .input('ExpectedReturnDate',  sql.Date,           expectedReturnDate ? new Date(expectedReturnDate) : null)
     .input('SentByUserID',        sql.Int,            sentByUserID        || null)
+    .input('AssignedUserID',      sql.Int,            resolvedAssignedUserID)
     .input('RepairStatus',        sql.NVarChar(50),   'Sent')
     .query(`
       INSERT INTO RepairTracking
         (ItemID, SiteInventoryID, SentDate, RMANumber, ManufacturerContact, Reason,
-         ExpectedReturnDate, SentByUserID, RepairStatus)
+         ExpectedReturnDate, SentByUserID, AssignedUserID, RepairStatus)
       VALUES
         (@ItemID, @SiteInventoryID, @SentDate, @RMANumber, @ManufacturerContact, @Reason,
-         @ExpectedReturnDate, @SentByUserID, @RepairStatus);
+         @ExpectedReturnDate, @SentByUserID, @AssignedUserID, @RepairStatus);
       SELECT SCOPE_IDENTITY() AS NewID
     `);
 
@@ -127,7 +135,7 @@ async function create(data, auditContext = {}) {
 async function update(repairID, data, auditContext = {}) {
   const {
     itemID, siteInventoryID, sentDate, rmaNumber, manufacturerContact,
-    reason, expectedReturnDate, sentByUserID,
+    reason, expectedReturnDate, sentByUserID, assignedUserID,
   } = data;
 
   const pool = await getPool();
@@ -143,6 +151,7 @@ async function update(repairID, data, auditContext = {}) {
     .input('Reason',              sql.NVarChar(sql.MAX), reason            || null)
     .input('ExpectedReturnDate',  sql.Date,           expectedReturnDate ? new Date(expectedReturnDate) : null)
     .input('SentByUserID',        sql.Int,            sentByUserID        || null)
+    .input('AssignedUserID',      sql.Int,            assignedUserID      || null)
     .query(`
       UPDATE RepairTracking SET
         ItemID              = @ItemID,
@@ -152,7 +161,8 @@ async function update(repairID, data, auditContext = {}) {
         ManufacturerContact = @ManufacturerContact,
         Reason              = @Reason,
         ExpectedReturnDate  = @ExpectedReturnDate,
-        SentByUserID        = @SentByUserID
+        SentByUserID        = @SentByUserID,
+        AssignedUserID      = @AssignedUserID
       WHERE RepairID = @RepairID
     `);
 
@@ -212,7 +222,8 @@ async function getOverdueExpected(intervalDays = 3) {
     .query(`
       SELECT ${REPAIR_SELECT}
       ${REPAIR_JOINS}
-      WHERE rt.ExpectedReturnDate IS NOT NULL
+      WHERE rt.SentDate IS NOT NULL
+        AND rt.ExpectedReturnDate IS NOT NULL
         AND rt.ExpectedReturnDate < CAST(GETUTCDATE() AS DATE)
         AND rt.ReceivedDate IS NULL
         AND DATEDIFF(day, rt.ExpectedReturnDate, CAST(GETUTCDATE() AS DATE)) % @IntervalDays = 0
@@ -221,7 +232,44 @@ async function getOverdueExpected(intervalDays = 3) {
   return result.recordset;
 }
 
+// Returns open RMAs with no SentDate where today falls on a reminder interval
+// boundary counted from CreatedAt (e.g. every 3 days after creation).
+async function getUnsentReminders(intervalDays = 3) {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('IntervalDays', sql.Int, Math.max(1, intervalDays))
+    .query(`
+      SELECT ${REPAIR_SELECT}
+      ${REPAIR_JOINS}
+      WHERE rt.SentDate IS NULL
+        AND rt.ReceivedDate IS NULL
+        AND DATEDIFF(day, CAST(rt.CreatedAt AS DATE), CAST(GETUTCDATE() AS DATE)) > 0
+        AND DATEDIFF(day, CAST(rt.CreatedAt AS DATE), CAST(GETUTCDATE() AS DATE)) % @IntervalDays = 0
+      ORDER BY rt.CreatedAt
+    `);
+  return result.recordset;
+}
+
+async function deleteRepair(repairID, auditContext = {}) {
+  const pool = await getPool();
+  const old  = await getByID(repairID);
+  if (!old) throw new Error(`RepairTracking record not found: ${repairID}`);
+
+  await pool.request()
+    .input('RepairID', sql.Int, repairID)
+    .query('DELETE FROM RepairTracking WHERE RepairID = @RepairID');
+
+  // Restore the item to In-Stock since the repair was cancelled, not received
+  await inventoryModel.updateStatus(old.ItemID, 'In-Stock', {}, auditContext);
+
+  await writeAudit({
+    tableName: 'RepairTracking', recordID: repairID, action: 'DELETE',
+    oldValues: old,
+    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent,
+  });
+}
+
 module.exports = {
   getAll, getByID, create, update,
-  markReceived, getOverdueExpected,
+  markReceived, getOverdueExpected, getUnsentReminders, deleteRepair,
 };
