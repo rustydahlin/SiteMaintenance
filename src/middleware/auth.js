@@ -40,4 +40,18 @@ function canManageNotifications(req, res, next) {
   return hasRole('Admin', 'Notifications')(req, res, next);
 }
 
-module.exports = { isAuthenticated, isAdmin, hasRole, canWrite, canAccessSystemKeys, canManageNotifications };
+// canAccessMaintenance — Admin, Maintenance, or Maintenance-Close
+function canAccessMaintenance(req, res, next) {
+  return hasRole('Admin', 'Maintenance', 'Maintenance-Close')(req, res, next);
+}
+
+// canManageMaintenance — Admin or Maintenance (full create/edit/delete)
+function canManageMaintenance(req, res, next) {
+  return hasRole('Admin', 'Maintenance')(req, res, next);
+}
+
+module.exports = {
+  isAuthenticated, isAdmin, hasRole,
+  canWrite, canAccessSystemKeys, canManageNotifications,
+  canAccessMaintenance, canManageMaintenance,
+};

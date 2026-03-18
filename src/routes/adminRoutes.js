@@ -167,6 +167,9 @@ simplePicklistRoute('/inventory/common-names',   'Common Names',   lookupModel.g
 simplePicklistRoute('/inventory/model-numbers',  'Model Numbers',  lookupModel.getInventoryModelNumbers,  lookupModel.upsertInventoryModelNumber,  lookupModel.toggleInventoryModelNumber,  'inventoryModelNumbers');
 simplePicklistRoute('/inventory/manufacturers',  'Manufacturers',  lookupModel.getInventoryManufacturers, lookupModel.upsertInventoryManufacturer, lookupModel.toggleInventoryManufacturer, 'inventoryManufacturers');
 
+// ── Maintenance Types ─────────────────────────────────────────────────────────
+simplePicklistRoute('/maintenance-types', 'Maintenance Types', lookupModel.getMaintenanceTypes, lookupModel.upsertMaintenanceType, lookupModel.toggleMaintenanceType, 'maintenanceTypes');
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 router.get('/users', async (req, res, next) => {
   try {

@@ -102,7 +102,8 @@ async function createApp() {
   app.use('/repairs',    require('./routes/repairRoutes'));
   app.use('/documents',  require('./routes/documentRoutes'));
   app.use('/vendors',      require('./routes/vendorRoutes'));
-  app.use('/system-keys', require('./routes/systemKeyRoutes'));
+  app.use('/system-keys',  require('./routes/systemKeyRoutes'));
+  app.use('/maintenance',  require('./routes/maintenanceRoutes'));
   app.use('/admin',        require('./routes/adminRoutes'));
   app.use('/profile',    require('./routes/profileRoutes'));
 

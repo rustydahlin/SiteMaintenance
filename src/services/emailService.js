@@ -260,6 +260,61 @@ async function notifyNewLogEntry({ site, log }) {
   await sendMail({ to, subject, html });
 }
 
+async function sendMaintenanceAssigned(item) {
+  if (!item.AssignedToUserEmail) return;
+
+  const subject = `Maintenance Assigned: ${item.SiteName}`;
+  const html = `
+    <h3>Maintenance Item Assigned to You</h3>
+    <p><strong>Site:</strong> ${item.SiteName}</p>
+    ${item.MaintenanceTypeName ? `<p><strong>Type:</strong> ${item.MaintenanceTypeName}</p>` : ''}
+    ${item.DueDate ? `<p><strong>Due:</strong> ${new Date(item.DueDate).toLocaleDateString()}</p>` : ''}
+    ${item.ExternalReference ? `<p><strong>Reference #:</strong> ${item.ExternalReference}</p>` : ''}
+    ${item.WorkToComplete ? `<p><strong>Work to Complete:</strong><br/>${item.WorkToComplete.replace(/\n/g, '<br/>')}</p>` : ''}
+    <p><a href="${process.env.APP_BASE_URL || ''}/maintenance/${item.MaintenanceID}">View Item</a></p>
+  `;
+  await sendMail({ to: item.AssignedToUserEmail, subject, html });
+}
+
+async function sendMaintenanceReminder(item) {
+  if (!item.AssignedToUserEmail) return;
+
+  const daysUntilDue = item.DaysUntilDue !== undefined ? item.DaysUntilDue : null;
+  const dueLabel = daysUntilDue !== null
+    ? (daysUntilDue <= 0
+        ? `<span style="color:red">DUE TODAY</span>`
+        : `in ${daysUntilDue} day(s)`)
+    : '';
+
+  const subject = `Maintenance Reminder: ${item.SiteName}`;
+  const html = `
+    <h3>Maintenance Reminder</h3>
+    <p><strong>Site:</strong> ${item.SiteName}</p>
+    ${item.MaintenanceTypeName ? `<p><strong>Type:</strong> ${item.MaintenanceTypeName}</p>` : ''}
+    ${item.DueDate ? `<p><strong>Due:</strong> ${new Date(item.DueDate).toLocaleDateString()} ${dueLabel}</p>` : ''}
+    ${item.ExternalReference ? `<p><strong>Reference #:</strong> ${item.ExternalReference}</p>` : ''}
+    ${item.WorkToComplete ? `<p><strong>Work to Complete:</strong><br/>${item.WorkToComplete.replace(/\n/g, '<br/>')}</p>` : ''}
+    <p><a href="${process.env.APP_BASE_URL || ''}/maintenance/${item.MaintenanceID}">View Item</a></p>
+  `;
+  await sendMail({ to: item.AssignedToUserEmail, subject, html });
+}
+
+async function sendMaintenanceOverdue(item) {
+  if (!item.AssignedToUserEmail) return;
+
+  const subject = `Maintenance OVERDUE: ${item.SiteName} (${item.DaysOverdue} day(s))`;
+  const html = `
+    <h3>Maintenance Item Overdue</h3>
+    <p><strong>Site:</strong> ${item.SiteName}</p>
+    ${item.MaintenanceTypeName ? `<p><strong>Type:</strong> ${item.MaintenanceTypeName}</p>` : ''}
+    <p><strong>Due Date:</strong> <span style="color:red">${new Date(item.DueDate).toLocaleDateString()} (${item.DaysOverdue} day(s) overdue)</span></p>
+    ${item.ExternalReference ? `<p><strong>Reference #:</strong> ${item.ExternalReference}</p>` : ''}
+    ${item.WorkToComplete ? `<p><strong>Work to Complete:</strong><br/>${item.WorkToComplete.replace(/\n/g, '<br/>')}</p>` : ''}
+    <p><a href="${process.env.APP_BASE_URL || ''}/maintenance/${item.MaintenanceID}">View Item</a></p>
+  `;
+  await sendMail({ to: item.AssignedToUserEmail, subject, html });
+}
+
 module.exports = {
   sendMail,
   sendPMReminder,
@@ -272,5 +327,8 @@ module.exports = {
   sendWelcomeEmail,
   notifyNewLogEntry,
   sendSystemKeyExpiring,
+  sendMaintenanceAssigned,
+  sendMaintenanceReminder,
+  sendMaintenanceOverdue,
   getOptedInEmails,
 };

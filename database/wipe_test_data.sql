@@ -6,9 +6,10 @@
 --
 -- KEEPS:   Users, UserRoles, Roles, AppSettings, SiteTypes, SiteStatuses,
 --          LogTypes, InventoryCategories, InventoryStatuses, StockLocations,
+--          MaintenanceTypes, KeyManufacturers,
 --          UserNotifications (per-user preferences)
 --
--- WIPES:   Sites, Inventory, SiteInventory, InventoryStock,
+-- WIPES:   Sites, MaintenanceItems, Inventory, SiteInventory, InventoryStock,
 --          UserInventoryPossession, LogEntries, Documents, DocumentData,
 --          RepairTracking, PMSchedules, Vendors, VendorContacts,
 --          SystemKeys, AuditLog, Sessions
@@ -78,6 +79,11 @@ DELETE FROM SystemKeys;
 PRINT 'SystemKeys:               ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
 
 -- KeyManufacturers is a lookup/settings table — not wiped.
+-- MaintenanceTypes is a lookup/settings table — not wiped.
+
+-- ── 7d. Maintenance items ──────────────────────────────────────────────────────
+DELETE FROM MaintenanceItems;
+PRINT 'MaintenanceItems:         ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
 
 -- ── 8. Log entries ────────────────────────────────────────────────────────────
 DELETE FROM LogEntries;
@@ -117,6 +123,7 @@ DBCC CHECKIDENT ('PMSchedules',            RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('VendorContacts',         RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('Vendors',                RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('SystemKeys',             RESEED, 0) WITH NO_INFOMSGS;
+DBCC CHECKIDENT ('MaintenanceItems',       RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('LogEntries',             RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('Inventory',              RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('Sites',                  RESEED, 0) WITH NO_INFOMSGS;

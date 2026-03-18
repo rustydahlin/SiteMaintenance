@@ -19,10 +19,12 @@
   }
   function statusDot(statusName) {
     const map = {
-      'Active':      'bg-success',
-      'Inactive':    'bg-secondary',
-      'Maintenance': 'bg-warning',
-      'Decommissioned': 'bg-danger',
+      'Current':        'bg-success',
+      'Maintenance':    'bg-warning',
+      'Past-Due':       'bg-danger',
+      'Active':         'bg-success',
+      'Inactive':       'bg-secondary',
+      'Decommissioned': 'bg-secondary',
     };
     const cls = map[statusName] || 'bg-secondary';
     return `<span class="badge rounded-pill ${cls}" style="width:.65rem;height:.65rem;padding:0;vertical-align:middle;display:inline-block;">&nbsp;</span>`;

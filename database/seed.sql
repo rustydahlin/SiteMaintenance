@@ -8,19 +8,20 @@
 -- ROLES
 -- ============================================================
 INSERT INTO Roles (RoleName, Description) VALUES
-    ('Admin',      'Full access: all CRUD, user management, settings, audit log'),
-    ('Technician', 'Create/edit log entries, install/remove inventory, upload files, view all'),
-    ('Contractor', 'Create log entries for assigned sites, upload files, view assigned sites'),
-    ('Viewer',     'Read-only: view sites, inventory, logs, and documents');
+    ('Admin',              'Full access: all CRUD, user management, settings, audit log'),
+    ('Technician',         'Create/edit log entries, install/remove inventory, upload files, view all'),
+    ('Contractor',         'Create log entries for assigned sites, upload files, view assigned sites'),
+    ('Viewer',             'Read-only: view sites, inventory, logs, and documents'),
+    ('Maintenance',        'Create, edit, close, and delete maintenance items'),
+    ('Maintenance-Close',  'Close maintenance items assigned to them; view only their own items');
 
 -- ============================================================
 -- SITE STATUSES
 -- ============================================================
 INSERT INTO SiteStatuses (StatusName) VALUES
-    ('Active'),
-    ('Offline'),
+    ('Current'),
     ('Maintenance'),
-    ('Decommissioned');
+    ('Past-Due');
 
 -- ============================================================
 -- INVENTORY STATUSES
@@ -31,6 +32,16 @@ INSERT INTO InventoryStatuses (StatusName) VALUES
     ('In-Repair'),
     ('Checked-Out'),
     ('Retired');
+
+-- ============================================================
+-- MAINTENANCE TYPES
+-- ============================================================
+INSERT INTO MaintenanceTypes (TypeName) VALUES
+    ('Inspection'),
+    ('Repair'),
+    ('Upgrade'),
+    ('Configuration'),
+    ('Other');
 
 -- ============================================================
 -- LOG TYPES

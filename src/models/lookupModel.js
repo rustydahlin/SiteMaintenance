@@ -255,6 +255,35 @@ async function toggleInventoryManufacturer(id) {
     .query('UPDATE InventoryManufacturers SET IsActive = 1 - IsActive WHERE ManufacturerID = @ID');
 }
 
+// ── Maintenance Types ─────────────────────────────────────────────────────────
+async function getMaintenanceTypes(activeOnly = true) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('ActiveOnly', sql.Bit, activeOnly ? 1 : 0)
+    .query(`SELECT * FROM MaintenanceTypes WHERE (@ActiveOnly = 0 OR IsActive = 1) ORDER BY TypeName`);
+  return r.recordset;
+}
+
+async function upsertMaintenanceType(id, typeName) {
+  const pool = await getPool();
+  if (id) {
+    await pool.request()
+      .input('ID',       sql.Int,          id)
+      .input('TypeName', sql.NVarChar(100), typeName)
+      .query('UPDATE MaintenanceTypes SET TypeName = @TypeName WHERE MaintenanceTypeID = @ID');
+  } else {
+    await pool.request()
+      .input('TypeName', sql.NVarChar(100), typeName)
+      .query('INSERT INTO MaintenanceTypes (TypeName) VALUES (@TypeName)');
+  }
+}
+
+async function toggleMaintenanceType(id) {
+  const pool = await getPool();
+  await pool.request().input('ID', sql.Int, id)
+    .query('UPDATE MaintenanceTypes SET IsActive = 1 - IsActive WHERE MaintenanceTypeID = @ID');
+}
+
 // ── Key Manufacturers ─────────────────────────────────────────────────────────
 async function getKeyManufacturers(activeOnly = true) {
   const pool = await getPool();
@@ -294,6 +323,7 @@ module.exports = {
   getInventoryCategories, upsertInventoryCategory, toggleInventoryCategory,
   getInventoryStatuses, getInventoryStatusByName,
   getStockLocations, upsertStockLocation, toggleStockLocation,
+  getMaintenanceTypes, upsertMaintenanceType, toggleMaintenanceType,
   getKeyManufacturers, upsertKeyManufacturer, toggleKeyManufacturer,
   getInventoryCommonNames, upsertInventoryCommonName, toggleInventoryCommonName,
   getInventoryModelNumbers, upsertInventoryModelNumber, toggleInventoryModelNumber,

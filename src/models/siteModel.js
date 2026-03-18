@@ -116,7 +116,7 @@ async function getByID(siteID) {
 
 async function create(data, auditContext = {}) {
   const {
-    siteName, siteNumber, contractNumber, siteTypeID, siteStatusID,
+    siteName, siteNumber, contractNumber, siteTypeID,
     address, city, state, zipCode, latitude, longitude, description,
     warrantyExpires, parentSiteID,
   } = data;
@@ -127,7 +127,6 @@ async function create(data, auditContext = {}) {
     .input('SiteNumber',      sql.NVarChar(100),   siteNumber      || null)
     .input('ContractNumber',  sql.NVarChar(100),   contractNumber  || null)
     .input('SiteTypeID',      sql.Int,             siteTypeID      || null)
-    .input('SiteStatusID',    sql.Int,             siteStatusID    || null)
     .input('Address',         sql.NVarChar(255),   address         || null)
     .input('City',            sql.NVarChar(100),   city            || null)
     .input('State',           sql.NVarChar(50),    state           || null)
@@ -140,11 +139,13 @@ async function create(data, auditContext = {}) {
     .input('ParentSiteID',    sql.Int,             parentSiteID    || null)
     .query(`
       INSERT INTO Sites
-        (SiteName, SiteNumber, ContractNumber, SiteTypeID, SiteStatusID,
+        (SiteName, SiteNumber, ContractNumber, SiteTypeID,
+         SiteStatusID,
          Address, City, State, ZipCode, Latitude, Longitude, Description,
          WarrantyExpires, CreatedByUserID, ParentSiteID)
       VALUES
-        (@SiteName, @SiteNumber, @ContractNumber, @SiteTypeID, @SiteStatusID,
+        (@SiteName, @SiteNumber, @ContractNumber, @SiteTypeID,
+         (SELECT TOP 1 SiteStatusID FROM SiteStatuses WHERE StatusName = 'Current' AND IsActive = 1),
          @Address, @City, @State, @ZipCode, @Latitude, @Longitude, @Description,
          @WarrantyExpires, @CreatedByUserID, @ParentSiteID);
       SELECT SCOPE_IDENTITY() AS NewID
@@ -161,7 +162,7 @@ async function create(data, auditContext = {}) {
 
 async function update(siteID, data, auditContext = {}) {
   const {
-    siteName, siteNumber, contractNumber, siteTypeID, siteStatusID,
+    siteName, siteNumber, contractNumber, siteTypeID,
     address, city, state, zipCode, latitude, longitude, description,
     warrantyExpires, parentSiteID,
   } = data;
@@ -175,7 +176,6 @@ async function update(siteID, data, auditContext = {}) {
     .input('SiteNumber',      sql.NVarChar(100),   siteNumber      || null)
     .input('ContractNumber',  sql.NVarChar(100),   contractNumber  || null)
     .input('SiteTypeID',      sql.Int,             siteTypeID      || null)
-    .input('SiteStatusID',    sql.Int,             siteStatusID    || null)
     .input('Address',         sql.NVarChar(255),   address         || null)
     .input('City',            sql.NVarChar(100),   city            || null)
     .input('State',           sql.NVarChar(50),    state           || null)
@@ -191,7 +191,6 @@ async function update(siteID, data, auditContext = {}) {
         SiteNumber      = @SiteNumber,
         ContractNumber  = @ContractNumber,
         SiteTypeID      = @SiteTypeID,
-        SiteStatusID    = @SiteStatusID,
         Address         = @Address,
         City            = @City,
         State           = @State,
@@ -269,4 +268,40 @@ async function findByImportKey(siteNumber, siteName) {
   return r.recordset.length ? r.recordset[0].SiteID : null;
 }
 
-module.exports = { getAll, getByID, getSubsites, getSimpleList, create, update, softDelete, findByImportKey };
+// Recomputes and sets SiteStatusID based on open MaintenanceItems.
+// Call after any maintenance item is created, closed, or deleted.
+async function updateSiteStatus(siteID) {
+  const pool = await getPool();
+  await pool.request()
+    .input('SiteID', sql.Int, siteID)
+    .query(`
+      DECLARE @OpenCount    INT;
+      DECLARE @OverdueCount INT;
+      DECLARE @CurrentID    INT;
+      DECLARE @MaintID      INT;
+      DECLARE @PastDueID    INT;
+
+      SELECT @OpenCount = COUNT(*)
+      FROM MaintenanceItems
+      WHERE SiteID = @SiteID AND ClosedAt IS NULL AND IsActive = 1;
+
+      SELECT @OverdueCount = COUNT(*)
+      FROM MaintenanceItems
+      WHERE SiteID = @SiteID AND ClosedAt IS NULL AND IsActive = 1
+        AND DueDate IS NOT NULL AND DueDate < CAST(GETUTCDATE() AS DATE);
+
+      SELECT @CurrentID  = SiteStatusID FROM SiteStatuses WHERE StatusName = 'Current'  AND IsActive = 1;
+      SELECT @MaintID    = SiteStatusID FROM SiteStatuses WHERE StatusName = 'Maintenance' AND IsActive = 1;
+      SELECT @PastDueID  = SiteStatusID FROM SiteStatuses WHERE StatusName = 'Past-Due'  AND IsActive = 1;
+
+      UPDATE Sites SET SiteStatusID =
+        CASE
+          WHEN @OverdueCount > 0 THEN @PastDueID
+          WHEN @OpenCount    > 0 THEN @MaintID
+          ELSE                        @CurrentID
+        END
+      WHERE SiteID = @SiteID;
+    `);
+}
+
+module.exports = { getAll, getByID, getSubsites, getSimpleList, create, update, softDelete, findByImportKey, updateSiteStatus };

@@ -280,10 +280,7 @@ router.get('/new', isAdmin, async (req, res, next) => {
   try {
     const parentSiteID = req.query.parentSiteID ? parseInt(req.query.parentSiteID, 10) : null;
 
-    const [siteTypes, siteStatuses] = await Promise.all([
-      lookupModel.getSiteTypes(),
-      lookupModel.getSiteStatuses(),
-    ]);
+    const siteTypes = await lookupModel.getSiteTypes();
 
     let parentSite = null;
     if (parentSiteID) {
@@ -295,7 +292,6 @@ router.get('/new', isAdmin, async (req, res, next) => {
       site:        null,
       action:      '/sites',
       siteTypes,
-      siteStatuses,
       parentSiteID: parentSiteID || null,
       parentSiteName: parentSite ? parentSite.SiteName : null,
     });
@@ -318,7 +314,6 @@ router.post('/', isAdmin, async (req, res, next) => {
       siteNumber:      req.body.siteNumber     || null,
       contractNumber:  req.body.contractNumber || null,
       siteTypeID:      req.body.siteTypeID     || null,
-      siteStatusID:    req.body.siteStatusID   || null,
       address:         req.body.address        || null,
       city:            req.body.city           || null,
       state:           req.body.state          || null,
@@ -413,10 +408,9 @@ router.get('/:id', async (req, res, next) => {
 router.get('/:id/edit', isAdmin, async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
-    const [site, siteTypes, siteStatuses] = await Promise.all([
+    const [site, siteTypes] = await Promise.all([
       siteModel.getByID(siteID),
       lookupModel.getSiteTypes(),
-      lookupModel.getSiteStatuses(),
     ]);
 
     if (!site) {
@@ -429,7 +423,6 @@ router.get('/:id/edit', isAdmin, async (req, res, next) => {
       site,
       action:      `/sites/${siteID}`,
       siteTypes,
-      siteStatuses,
       parentSiteID:   site.ParentSiteID   || null,
       parentSiteName: site.ParentSiteName || null,
     });
@@ -454,7 +447,6 @@ router.post('/:id', isAdmin, async (req, res, next) => {
       siteNumber:      req.body.siteNumber     || null,
       contractNumber:  req.body.contractNumber || null,
       siteTypeID:      req.body.siteTypeID     || null,
-      siteStatusID:    req.body.siteStatusID   || null,
       address:         req.body.address        || null,
       city:            req.body.city           || null,
       state:           req.body.state          || null,

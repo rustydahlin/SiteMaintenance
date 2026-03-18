@@ -247,6 +247,7 @@ When new database migrations are released:
 | `011_repair_assigned_user.sql` | Adds `AssignedUserID` to `RepairTracking`; back-fills from `SentByUserID` |
 | `012_repair_sentdate_nullable.sql` | Makes `SentDate` nullable on `RepairTracking` so RMAs can be created before shipment |
 | `013_inventory_picklists.sql` | Adds `InventoryCommonNames`, `InventoryModelNumbers`, `InventoryManufacturers` pick-list tables; seeds from existing data |
+| `014_maintenance.sql` | Adds `MaintenanceTypes` and `MaintenanceItems` tables; replaces site statuses (Active/Offline/Decommissioned → Current/Past-Due); adds Maintenance and Maintenance-Close roles |
 
 > **Note:** `database/schema.sql` always reflects the current full schema. Fresh installs only need to run `schema.sql` + `seed.sql` — migrations are only needed when upgrading an existing database.
 

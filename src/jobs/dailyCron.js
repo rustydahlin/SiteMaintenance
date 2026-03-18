@@ -27,11 +27,13 @@ async function runDailyChecks() {
     return;
   }
 
-  try { await checkPMsDue();          } catch (e) { logger.error('Cron PM check failed:', e.message); }
-  try { await checkUnsentRmas();      } catch (e) { logger.error('Cron unsent RMA check failed:', e.message); }
-  try { await checkRepairOverdue();   } catch (e) { logger.error('Cron repair overdue failed:', e.message); }
-  try { await checkWarranties();      } catch (e) { logger.error('Cron warranty check failed:', e.message); }
-  try { await checkSystemKeyExpiry(); } catch (e) { logger.error('Cron system key expiry failed:', e.message); }
+  try { await checkPMsDue();              } catch (e) { logger.error('Cron PM check failed:', e.message); }
+  try { await checkUnsentRmas();          } catch (e) { logger.error('Cron unsent RMA check failed:', e.message); }
+  try { await checkRepairOverdue();       } catch (e) { logger.error('Cron repair overdue failed:', e.message); }
+  try { await checkWarranties();          } catch (e) { logger.error('Cron warranty check failed:', e.message); }
+  try { await checkSystemKeyExpiry();     } catch (e) { logger.error('Cron system key expiry failed:', e.message); }
+  try { await checkMaintenanceDue();      } catch (e) { logger.error('Cron maintenance due check failed:', e.message); }
+  try { await checkMaintenanceOverdue();  } catch (e) { logger.error('Cron maintenance overdue check failed:', e.message); }
 
   logger.info('Daily cron: completed');
 }
@@ -156,6 +158,27 @@ async function checkSystemKeyExpiry() {
     await email.sendSystemKeyExpiring(key, key.DaysLeft);
   }
   if (keys.length) logger.info(`Daily cron: sent ${keys.length} system key expiry notice(s)`);
+}
+
+async function checkMaintenanceDue() {
+  const maintenanceModel = require('../models/maintenanceModel');
+  const intervalDays = parseInt(await settingsModel.getSetting('email.maintenanceReminderDays') || '3', 10);
+  const items = await maintenanceModel.getOpenForReminders(intervalDays);
+  for (const item of items) {
+    await email.sendMaintenanceReminder(item);
+  }
+  if (items.length) logger.info(`Daily cron: sent ${items.length} maintenance reminder(s) (interval: every ${intervalDays}d)`);
+}
+
+async function checkMaintenanceOverdue() {
+  const maintenanceModel = require('../models/maintenanceModel');
+  const intervalDays = parseInt(await settingsModel.getSetting('email.maintenanceOverdueDays') || '1', 10);
+  if (intervalDays <= 0) return;
+  const items = await maintenanceModel.getOverdueForReminders(intervalDays);
+  for (const item of items) {
+    await email.sendMaintenanceOverdue(item);
+  }
+  if (items.length) logger.info(`Daily cron: sent ${items.length} maintenance overdue alert(s) (interval: every ${intervalDays}d)`);
 }
 
 function start() {

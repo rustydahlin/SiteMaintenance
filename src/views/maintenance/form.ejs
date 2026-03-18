@@ -1,0 +1,101 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">
+    <i class="bi bi-tools me-2"></i>
+    <%= item ? `Edit Maintenance — ${item.SiteName}` : 'New Maintenance Item' %>
+  </h1>
+  <a href="<%= item ? `/maintenance/${item.MaintenanceID}` : '/maintenance' %>"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Cancel
+  </a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="POST" action="<%= action %>" novalidate>
+
+      <div class="row g-3">
+
+        <!-- Site -->
+        <div class="col-md-4">
+          <label for="siteID" class="form-label">
+            Site <span class="text-danger">*</span>
+          </label>
+          <select id="siteID" name="siteID" class="form-select" required>
+            <option value="">— Select Site —</option>
+            <% sites.forEach(s => { %>
+              <option value="<%= s.SiteID %>"
+                <%= ((item && item.SiteID == s.SiteID) || (!item && presetSiteID == s.SiteID)) ? 'selected' : '' %>>
+                <%= s.ParentSiteName ? `${s.ParentSiteName} / ${s.SiteName}` : s.SiteName %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Maintenance Type -->
+        <div class="col-md-4">
+          <label for="maintenanceTypeID" class="form-label">Maintenance Type</label>
+          <select id="maintenanceTypeID" name="maintenanceTypeID" class="form-select">
+            <option value="">— Select Type —</option>
+            <% maintenanceTypes.forEach(t => { %>
+              <option value="<%= t.MaintenanceTypeID %>"
+                <%= (item && item.MaintenanceTypeID == t.MaintenanceTypeID) ? 'selected' : '' %>>
+                <%= t.TypeName %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Assigned To -->
+        <div class="col-md-4">
+          <label for="assignedToUserID" class="form-label">Assigned To</label>
+          <select id="assignedToUserID" name="assignedToUserID" class="form-select">
+            <option value="">— Unassigned —</option>
+            <% allUsers.forEach(u => { %>
+              <option value="<%= u.UserID %>"
+                <%= (item && item.AssignedToUserID == u.UserID) ? 'selected' : '' %>>
+                <%= u.DisplayName %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Due Date -->
+        <div class="col-md-3">
+          <label for="dueDate" class="form-label">Due Date</label>
+          <input type="date" id="dueDate" name="dueDate" class="form-control"
+                 value="<%= item && item.DueDate ? new Date(item.DueDate).toISOString().split('T')[0] : '' %>" />
+        </div>
+
+        <!-- External Reference -->
+        <div class="col-md-3">
+          <label for="externalReference" class="form-label">External Reference #</label>
+          <input type="text" id="externalReference" name="externalReference"
+                 class="form-control" maxlength="100"
+                 value="<%= item && item.ExternalReference ? item.ExternalReference : '' %>" />
+        </div>
+
+        <!-- Work to Complete -->
+        <div class="col-12">
+          <label for="workToComplete" class="form-label">Work to Complete</label>
+          <textarea id="workToComplete" name="workToComplete"
+                    class="form-control" rows="4"
+                    maxlength="4000"><%= item && item.WorkToComplete ? item.WorkToComplete : '' %></textarea>
+          <div class="form-text">Describe the work that needs to be done.</div>
+        </div>
+
+      </div><!-- /.row -->
+
+      <hr class="my-4" />
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-floppy me-1"></i>
+          <%= item ? 'Save Changes' : 'Create Item' %>
+        </button>
+        <a href="<%= item ? `/maintenance/${item.MaintenanceID}` : '/maintenance' %>"
+           class="btn btn-outline-secondary">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+</div>

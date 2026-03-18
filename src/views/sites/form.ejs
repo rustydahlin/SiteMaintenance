@@ -73,22 +73,6 @@
           </select>
         </div>
 
-        <!-- Status -->
-        <div class="col-md-3">
-          <label for="siteStatusID" class="form-label">
-            Status <span class="text-danger">*</span>
-          </label>
-          <select id="siteStatusID" name="siteStatusID" class="form-select" required>
-            <option value="">— Select Status —</option>
-            <% siteStatuses.forEach(s => { %>
-              <option value="<%= s.SiteStatusID %>"
-                <%= (site && site.SiteStatusID == s.SiteStatusID) ? 'selected' : '' %>>
-                <%= s.StatusName %>
-              </option>
-            <% }) %>
-          </select>
-        </div>
-
         <!-- Address -->
         <div class="col-md-6">
           <label for="address" class="form-label">Address</label>

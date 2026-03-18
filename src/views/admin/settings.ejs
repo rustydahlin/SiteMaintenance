@@ -201,6 +201,16 @@
         <input type="number" name="email.systemKeyReminderDays" class="form-control" value="<%= settings['email.systemKeyReminderDays'] || '30' %>" min="1" />
         <div class="form-text">Send an email to the key holder this many days before the key expires.</div>
       </div>
+      <div class="col-md-4">
+        <label class="form-label">Maintenance Reminder (repeat every N days)</label>
+        <input type="number" name="email.maintenanceReminderDays" class="form-control" value="<%= settings['email.maintenanceReminderDays'] || '3' %>" min="1" />
+        <div class="form-text">Email the assigned user every this many days while the item is open and not yet due.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Maintenance Overdue Reminder (repeat every N days)</label>
+        <input type="number" name="email.maintenanceOverdueDays" class="form-control" value="<%= settings['email.maintenanceOverdueDays'] || '1' %>" min="0" />
+        <div class="form-text">Email the assigned user every this many days after the due date passes. Set to <code>0</code> to disable.</div>
+      </div>
     </div>
   </div>
 

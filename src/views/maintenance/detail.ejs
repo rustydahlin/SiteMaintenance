@@ -1,0 +1,151 @@
+<%
+  const isClosed = !!item.ClosedAt;
+  const due      = item.DueDate ? new Date(item.DueDate) : null;
+  const now      = new Date(); now.setHours(0, 0, 0, 0);
+  const isOverdue = due && !isClosed && due < now;
+  const daysOverdue = isOverdue ? Math.round((now - due) / 86400000) : 0;
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 mb-0">
+      <i class="bi bi-tools me-2"></i>
+      Maintenance — <a href="/sites/<%= item.SiteID %>" class="text-decoration-none"><%= item.SiteName %></a>
+    </h1>
+    <% if (item.MaintenanceTypeName) { %>
+      <div class="text-muted small mt-1"><%= item.MaintenanceTypeName %></div>
+    <% } %>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <% if (canManage) { %>
+      <a href="/maintenance/<%= item.MaintenanceID %>/edit" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-pencil me-1"></i>Edit
+      </a>
+    <% } %>
+    <a href="/maintenance" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<!-- Status alert -->
+<% if (isOverdue) { %>
+  <div class="alert alert-danger py-2 mb-3">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    This item is <strong><%= daysOverdue %> day<%= daysOverdue !== 1 ? 's' : '' %> overdue</strong>.
+  </div>
+<% } else if (isClosed) { %>
+  <div class="alert alert-secondary py-2 mb-3">
+    <i class="bi bi-check-circle me-1"></i>
+    Closed on <%= new Date(item.ClosedAt).toLocaleDateString() %>
+    <% if (item.ClosedByUserName) { %> by <%= item.ClosedByUserName %><% } %>.
+  </div>
+<% } %>
+
+<!-- Details card -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header small fw-semibold">
+    <i class="bi bi-info-circle me-1"></i>Details
+  </div>
+  <div class="card-body py-2">
+    <dl class="row mb-0 small">
+      <dt class="col-sm-3 text-muted">Site</dt>
+      <dd class="col-sm-9">
+        <a href="/sites/<%= item.SiteID %>" class="text-decoration-none fw-semibold"><%= item.SiteName %></a>
+      </dd>
+
+      <dt class="col-sm-3 text-muted">Type</dt>
+      <dd class="col-sm-9"><%= item.MaintenanceTypeName || '—' %></dd>
+
+      <dt class="col-sm-3 text-muted">Assigned To</dt>
+      <dd class="col-sm-9"><%= item.AssignedToUserName || '—' %></dd>
+
+      <dt class="col-sm-3 text-muted">Due Date</dt>
+      <dd class="col-sm-9">
+        <% if (!due) { %>
+          <span class="text-muted">—</span>
+        <% } else if (isOverdue) { %>
+          <span class="text-danger fw-semibold"><%= due.toLocaleDateString() %> (overdue)</span>
+        <% } else { %>
+          <%= due.toLocaleDateString() %>
+        <% } %>
+      </dd>
+
+      <% if (item.ExternalReference) { %>
+      <dt class="col-sm-3 text-muted">Reference #</dt>
+      <dd class="col-sm-9"><%= item.ExternalReference %></dd>
+      <% } %>
+
+      <dt class="col-sm-3 text-muted">Status</dt>
+      <dd class="col-sm-9">
+        <% if (isClosed) { %>
+          <span class="badge bg-secondary">Closed</span>
+        <% } else if (isOverdue) { %>
+          <span class="badge bg-danger">Past-Due</span>
+        <% } else { %>
+          <span class="badge bg-warning text-dark">Open</span>
+        <% } %>
+      </dd>
+
+      <dt class="col-sm-3 text-muted">Created</dt>
+      <dd class="col-sm-9">
+        <%= new Date(item.CreatedAt).toLocaleDateString() %>
+        <% if (item.CreatedByUserName) { %> by <%= item.CreatedByUserName %><% } %>
+      </dd>
+    </dl>
+  </div>
+</div>
+
+<!-- Work to Complete -->
+<% if (item.WorkToComplete) { %>
+<div class="card shadow-sm mb-4">
+  <div class="card-header small fw-semibold">
+    <i class="bi bi-card-text me-1"></i>Work to Complete
+  </div>
+  <div class="card-body small" style="white-space: pre-wrap;"><%= item.WorkToComplete %></div>
+</div>
+<% } %>
+
+<!-- Closure notes -->
+<% if (isClosed && item.ClosureNotes) { %>
+<div class="card shadow-sm mb-4">
+  <div class="card-header small fw-semibold">
+    <i class="bi bi-check-circle me-1"></i>Closure Notes
+  </div>
+  <div class="card-body small" style="white-space: pre-wrap;"><%= item.ClosureNotes %></div>
+</div>
+<% } %>
+
+<!-- Close form -->
+<% if (canClose) { %>
+<div class="card shadow-sm mb-4 border-success">
+  <div class="card-header small fw-semibold text-success">
+    <i class="bi bi-check-lg me-1"></i>Close This Item
+  </div>
+  <div class="card-body">
+    <form method="POST" action="/maintenance/<%= item.MaintenanceID %>/close">
+      <div class="mb-3">
+        <label for="closureNotes" class="form-label small">Closure Notes</label>
+        <textarea id="closureNotes" name="closureNotes"
+                  class="form-control form-control-sm" rows="3"
+                  placeholder="Describe work performed…" maxlength="4000"></textarea>
+      </div>
+      <button type="submit" class="btn btn-success btn-sm">
+        <i class="bi bi-check-lg me-1"></i>Mark as Closed
+      </button>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<!-- Delete -->
+<% if (canManage) { %>
+<div class="mt-3">
+  <form method="POST" action="/maintenance/<%= item.MaintenanceID %>/delete"
+        onsubmit="return confirm('Delete this maintenance item? This cannot be undone.')">
+    <button type="submit" class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-trash me-1"></i>Delete
+    </button>
+  </form>
+</div>
+<% } %>

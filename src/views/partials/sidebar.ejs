@@ -37,6 +37,14 @@
           <span class="nav-label">Repairs / RMA</span>
         </a>
       </li>
+      <% if (user.roles && (user.roles.includes('Admin') || user.roles.includes('Maintenance') || user.roles.includes('Maintenance-Close'))) { %>
+      <li class="nav-item">
+        <a class="nav-link <%= currentPath.startsWith('/maintenance') ? 'active' : '' %>" href="/maintenance" title="Maintenance">
+          <i class="bi bi-tools"></i>
+          <span class="nav-label">Maintenance</span>
+        </a>
+      </li>
+      <% } %>
 
       <li class="nav-item mt-2">
         <span class="sidebar-section-label">Vendors</span>

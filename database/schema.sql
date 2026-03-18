@@ -85,6 +85,13 @@ CREATE TABLE SiteStatuses (
     IsActive     BIT           NOT NULL DEFAULT 1
 );
 
+CREATE TABLE MaintenanceTypes (
+    MaintenanceTypeID INT           IDENTITY(1,1) PRIMARY KEY,
+    TypeName          NVARCHAR(100) NOT NULL,
+    IsActive          BIT           NOT NULL DEFAULT 1,
+    CONSTRAINT UQ_MaintenanceTypes_TypeName UNIQUE (TypeName)
+);
+
 CREATE TABLE LogTypes (
     LogTypeID   INT           IDENTITY(1,1) PRIMARY KEY,
     TypeName    NVARCHAR(100) NOT NULL UNIQUE,
@@ -478,6 +485,33 @@ CREATE TABLE UserNotifications (
     CONSTRAINT UQ_UN_UserType UNIQUE (UserID, NotificationType)
 );
 CREATE INDEX IX_UN_UserID ON UserNotifications(UserID);
+
+-- ============================================================
+-- MAINTENANCE ITEMS
+-- ============================================================
+CREATE TABLE MaintenanceItems (
+    MaintenanceID       INT IDENTITY(1,1) PRIMARY KEY,
+    SiteID              INT NOT NULL,
+    AssignedToUserID    INT NULL,
+    MaintenanceTypeID   INT NULL,
+    DueDate             DATE NULL,
+    ExternalReference   NVARCHAR(100) NULL,
+    WorkToComplete      NVARCHAR(MAX) NULL,
+    ClosedAt            DATETIME2 NULL,
+    ClosedByUserID      INT NULL,
+    ClosureNotes        NVARCHAR(MAX) NULL,
+    IsActive            BIT NOT NULL DEFAULT 1,
+    CreatedAt           DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    CreatedByUserID     INT NULL,
+    CONSTRAINT FK_MaintenanceItems_Site     FOREIGN KEY (SiteID)            REFERENCES Sites(SiteID),
+    CONSTRAINT FK_MaintenanceItems_User     FOREIGN KEY (AssignedToUserID)  REFERENCES Users(UserID),
+    CONSTRAINT FK_MaintenanceItems_ClosedBy FOREIGN KEY (ClosedByUserID)    REFERENCES Users(UserID),
+    CONSTRAINT FK_MaintenanceItems_Type     FOREIGN KEY (MaintenanceTypeID) REFERENCES MaintenanceTypes(MaintenanceTypeID),
+    CONSTRAINT FK_MaintenanceItems_Creator  FOREIGN KEY (CreatedByUserID)   REFERENCES Users(UserID)
+);
+CREATE INDEX IX_MI_SiteID   ON MaintenanceItems(SiteID);
+CREATE INDEX IX_MI_Assigned ON MaintenanceItems(AssignedToUserID);
+CREATE INDEX IX_MI_DueDate  ON MaintenanceItems(DueDate) WHERE DueDate IS NOT NULL;
 
 -- ============================================================
 -- AUDIT LOG
