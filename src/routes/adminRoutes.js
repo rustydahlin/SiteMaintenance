@@ -281,6 +281,183 @@ router.post('/settings', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Email Settings ────────────────────────────────────────────────────────────
+router.get('/email-settings', async (_req, res, next) => {
+  try {
+    const settings = await settingsModel.getAllSettings();
+    res.render('admin/emailSettings', { title: 'Email Settings', settings });
+  } catch (err) { next(err); }
+});
+
+router.post('/email-settings', async (req, res, next) => {
+  try {
+    const secretKeys = ['email.password'];
+    const keys = Object.keys(req.body).filter(k => k !== '_csrf');
+    for (const key of keys) {
+      if (secretKeys.includes(key) && !req.body[key]) continue;
+      await settingsModel.upsert(key, req.body[key] || '', req.user.UserID, req.auditContext);
+    }
+    req.flash('success', 'Email settings saved.');
+    res.redirect('/admin/email-settings');
+  } catch (err) { next(err); }
+});
+
+// ── Email Templates ───────────────────────────────────────────────────────────
+const EMAIL_TEMPLATE_KEYS = [
+  { key: 'maintenance.assigned',  label: 'Maintenance Assigned',        vars: '{{siteName}}, {{typeName}}, {{dueDate}}, {{reference}}, {{workToComplete}}, {{url}}' },
+  { key: 'maintenance.reminder',  label: 'Maintenance Reminder',         vars: '{{siteName}}, {{typeName}}, {{dueDate}}, {{daysUntilDue}}, {{reference}}, {{workToComplete}}, {{url}}' },
+  { key: 'maintenance.overdue',   label: 'Maintenance Overdue',          vars: '{{siteName}}, {{typeName}}, {{dueDate}}, {{daysOverdue}}, {{reference}}, {{url}}' },
+  { key: 'pm.reminder',           label: 'PM Reminder',                  vars: '{{siteName}}, {{taskTitle}}, {{daysUntilDue}}, {{assignedTo}}, {{url}}' },
+  { key: 'repair.overdue',        label: 'Repair Overdue',               vars: '{{serialNumber}}, {{modelNumber}}, {{expectedReturn}}, {{daysSinceSent}}, {{assignedTo}}, {{url}}' },
+  { key: 'repair.unsent',         label: 'Unsent RMA Reminder',          vars: '{{itemLabel}}, {{rmaNumber}}, {{manufacturer}}, {{daysSinceCreated}}, {{contact}}, {{url}}' },
+  { key: 'warranty.expiring',     label: 'Warranty Expiring',            vars: '{{label}}, {{expiresDate}}, {{daysLeft}}, {{url}}' },
+  { key: 'systemKey.expiring',    label: 'System Key Expiring',          vars: '{{issuedTo}}, {{organization}}, {{serialNumber}}, {{keyCode}}, {{expiresDate}}, {{daysLeft}}, {{url}}' },
+  { key: 'log.new',               label: 'New Log Entry',                vars: '{{siteName}}, {{logType}}, {{subject}}, {{date}}, {{url}}' },
+  { key: 'welcome',               label: 'Welcome / New Account',        vars: '{{displayName}}, {{username}}, {{temporaryPassword}}, {{loginUrl}}' },
+  { key: 'site.statusChange',     label: 'Site Status Change',           vars: '{{siteName}}, {{oldStatus}}, {{newStatus}}, {{url}}' },
+];
+
+const EMAIL_TEMPLATE_DEFAULTS = {
+  'emailTemplate.maintenance.assigned': `<h3>Maintenance Item Assigned to You</h3>
+<p><strong>Site:</strong> {{siteName}}</p>
+<p><strong>Type:</strong> {{typeName}}</p>
+<p><strong>Due:</strong> {{dueDate}}</p>
+<p><strong>Reference #:</strong> {{reference}}</p>
+<p><strong>Work to Complete:</strong><br/>{{workToComplete}}</p>
+<p><a href="{{url}}">View Item</a></p>`,
+
+  'emailTemplate.maintenance.reminder': `<h3>Maintenance Reminder</h3>
+<p><strong>Site:</strong> {{siteName}}</p>
+<p><strong>Type:</strong> {{typeName}}</p>
+<p><strong>Due:</strong> {{dueDate}} ({{daysUntilDue}})</p>
+<p><strong>Reference #:</strong> {{reference}}</p>
+<p><strong>Work to Complete:</strong><br/>{{workToComplete}}</p>
+<p><a href="{{url}}">View Item</a></p>`,
+
+  'emailTemplate.maintenance.overdue': `<h3>Maintenance Item Overdue</h3>
+<p><strong>Site:</strong> {{siteName}}</p>
+<p><strong>Type:</strong> {{typeName}}</p>
+<p><strong>Due Date:</strong> <span style="color:red">{{dueDate}} ({{daysOverdue}} day(s) overdue)</span></p>
+<p><strong>Reference #:</strong> {{reference}}</p>
+<p><a href="{{url}}">View Item</a></p>`,
+
+  'emailTemplate.pm.reminder': `<h3>Preventive Maintenance Reminder</h3>
+<p><strong>Site:</strong> {{siteName}}</p>
+<p><strong>Task:</strong> {{taskTitle}}</p>
+<p><strong>Due:</strong> {{daysUntilDue}}</p>
+<p><strong>Assigned To:</strong> {{assignedTo}}</p>
+<p><a href="{{url}}">View Site</a></p>`,
+
+  'emailTemplate.repair.overdue': `<h3>Repair Return Overdue</h3>
+<p><strong>Item:</strong> {{serialNumber}} — {{modelNumber}}</p>
+<p><strong>Expected Return:</strong> <span style="color:red">{{expectedReturn}}</span></p>
+<p><strong>Days Since Sent:</strong> {{daysSinceSent}}</p>
+<p><strong>Assigned To:</strong> {{assignedTo}}</p>
+<p><a href="{{url}}">View Repair</a></p>`,
+
+  'emailTemplate.repair.unsent': `<h3>Unsent RMA — Action Required</h3>
+<p>The following repair/RMA was created but the item has not been shipped yet. Please ship the item and update the Sent Date to stop these reminders.</p>
+<p><strong>Item:</strong> {{itemLabel}}</p>
+<p><strong>RMA #:</strong> {{rmaNumber}}</p>
+<p><strong>Manufacturer:</strong> {{manufacturer}}</p>
+<p><strong>Created:</strong> {{daysSinceCreated}} day(s) ago</p>
+<p><strong>Contact:</strong> {{contact}}</p>
+<p><a href="{{url}}">View &amp; Update Repair</a></p>`,
+
+  'emailTemplate.warranty.expiring': `<h3>Warranty Expiring Soon</h3>
+<p><strong>{{label}}</strong></p>
+<p><strong>Expires:</strong> {{expiresDate}} ({{daysLeft}} day(s) remaining)</p>
+<p><a href="{{url}}">View Details</a></p>`,
+
+  'emailTemplate.systemKey.expiring': `<h3>System Key Expiring Soon</h3>
+<p><strong>Issued To:</strong> {{issuedTo}} ({{organization}})</p>
+<p><strong>Serial #:</strong> {{serialNumber}}</p>
+<p><strong>Key Code:</strong> {{keyCode}}</p>
+<p><strong>Expires:</strong> {{expiresDate}} ({{daysLeft}} day(s) remaining)</p>
+<p><a href="{{url}}">View Key</a></p>`,
+
+  'emailTemplate.log.new': `<h3>New Log Entry</h3>
+<p><strong>Site:</strong> {{siteName}}</p>
+<p><strong>Type:</strong> {{logType}}</p>
+<p><strong>Subject:</strong> {{subject}}</p>
+<p><strong>Date:</strong> {{date}}</p>
+<p><a href="{{url}}">View Log Entry</a></p>`,
+
+  'emailTemplate.welcome': `<h3>Welcome, {{displayName}}!</h3>
+<p>Your account has been created.</p>
+<p><strong>Username:</strong> {{username}}</p>
+<p><strong>Temporary Password:</strong> {{temporaryPassword}}<br/><em>Please change it after your first login.</em></p>
+<p><a href="{{loginUrl}}">Log In</a></p>`,
+
+  'emailTemplate.site.statusChange': `<h3>Site Status Change</h3>
+<p><strong>Site:</strong> {{siteName}}</p>
+<p><strong>Status:</strong> {{oldStatus}} → <strong>{{newStatus}}</strong></p>
+<p><a href="{{url}}">View Site</a></p>`,
+
+};
+
+router.get('/email-templates', async (_req, res, next) => {
+  try {
+    const settings  = await settingsModel.getAllSettings();
+    res.render('admin/emailTemplates', {
+      title: 'Email Templates',
+      settings,
+      templates: EMAIL_TEMPLATE_KEYS,
+      defaults: EMAIL_TEMPLATE_DEFAULTS,
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/email-templates', async (req, res, next) => {
+  try {
+    const keys = Object.keys(req.body).filter(k => k !== '_csrf');
+    for (const key of keys) {
+      await settingsModel.upsert(key, req.body[key] || '', req.user.UserID, req.auditContext);
+    }
+    req.flash('success', 'Email templates saved.');
+    res.redirect('/admin/email-templates');
+  } catch (err) { next(err); }
+});
+
+// Sample variable values used when sending a test email for a given template key
+const EMAIL_TEMPLATE_SAMPLES = {
+  'maintenance.assigned':  { siteName: 'Test Site', typeName: 'Inspection', dueDate: '2026-04-01', reference: 'REF-001', workToComplete: 'Check all equipment.', url: '#' },
+  'maintenance.reminder':  { siteName: 'Test Site', typeName: 'Inspection', dueDate: '2026-04-01', daysUntilDue: 'in 7 day(s)', reference: 'REF-001', workToComplete: 'Check all equipment.', url: '#' },
+  'maintenance.overdue':   { siteName: 'Test Site', typeName: 'Inspection', dueDate: '2026-03-10', daysOverdue: '8 day(s) overdue', reference: 'REF-001', url: '#' },
+  'pm.reminder':           { siteName: 'Test Site', taskTitle: 'Annual HVAC Service', daysUntilDue: 'in 14 day(s)', assignedTo: 'Jane Smith', url: '#' },
+  'repair.overdue':        { serialNumber: 'SN-12345', modelNumber: 'MX-500', expectedReturn: '2026-03-01', daysSinceSent: '25', assignedTo: 'John Doe', url: '#' },
+  'repair.unsent':         { itemLabel: 'SN-12345', rmaNumber: 'RMA-9876', manufacturer: 'Acme Corp', daysSinceCreated: '2026-03-01 (5 day(s) ago)', contact: 'support@acme.com', url: '#' },
+  'warranty.expiring':     { label: 'Site: Test Site', expiresDate: '2026-04-15', daysLeft: '28', url: '#' },
+  'systemKey.expiring':    { issuedTo: 'Jane Smith', organization: 'Acme Corp', serialNumber: 'KEY-001', keyCode: 'ABC-123', expiresDate: '2026-04-15 (28 day(s) remaining)', daysLeft: '28', url: '#' },
+  'log.new':               { siteName: 'Test Site', logType: 'Incident', subject: 'Power outage', date: '2026-03-18', url: '#' },
+  'welcome':               { displayName: 'Jane Smith', username: 'jsmith', temporaryPassword: 'Temp@1234', loginUrl: '#' },
+  'site.statusChange':     { siteName: 'Test Site', oldStatus: 'Current', newStatus: 'Past-Due', url: '#' },
+};
+
+router.post('/email-templates/test', async (req, res) => {
+  try {
+    const { renderTemplate, sendMail } = require('../services/emailService');
+    const to = req.user?.Email;
+    if (!to) return res.json({ success: false, message: 'Your account has no email address set.' });
+
+    const { key, html } = req.body;
+    if (!html) return res.json({ success: false, message: 'No template content provided.' });
+
+    // Strip 'emailTemplate.' prefix if present to look up samples
+    const shortKey = key.replace(/^emailTemplate\./, '');
+    const vars = EMAIL_TEMPLATE_SAMPLES[shortKey] || {};
+    const rendered = renderTemplate(html, vars);
+
+    const tplEntry = EMAIL_TEMPLATE_KEYS.find(t => t.key === shortKey);
+    const label = tplEntry ? tplEntry.label : shortKey;
+
+    await sendMail({ to, subject: `[Test] ${label}`, html: rendered });
+    res.json({ success: true, message: `Test sent to ${to}.` });
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
+});
+
 router.post('/settings/email/test', async (req, res) => {
   try {
     const { sendMail } = require('../services/emailService');

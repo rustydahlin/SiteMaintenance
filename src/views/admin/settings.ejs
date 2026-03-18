@@ -128,89 +128,20 @@
     </div>
   </div>
 
-  <!-- Email -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold"><i class="bi bi-envelope me-2"></i>Email / SMTP Notifications</div>
-    <div class="card-body row g-3">
-      <div class="col-md-3">
-        <label class="form-label">Enable Email</label>
-        <select name="email.enabled" class="form-select">
-          <option value="0" <%= settings['email.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
-          <option value="1" <%= settings['email.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
-        </select>
+  <!-- Email Settings link -->
+  <div class="card shadow-sm mb-4 border-0 bg-body-secondary">
+    <div class="card-body d-flex align-items-center gap-3 py-3">
+      <i class="bi bi-envelope fs-3 text-primary"></i>
+      <div class="flex-grow-1">
+        <div class="fw-semibold">Email &amp; Notification Settings</div>
+        <div class="text-muted small">Configure SMTP, reminder thresholds, and notification email templates.</div>
       </div>
-      <div class="col-md-5">
-        <label class="form-label">SMTP Host</label>
-        <input type="text" name="email.host" class="form-control" value="<%= settings['email.host'] || '' %>" placeholder="smtp.office365.com" />
-      </div>
-      <div class="col-md-2">
-        <label class="form-label">Port</label>
-        <input type="number" name="email.port" class="form-control" value="<%= settings['email.port'] || '587' %>" />
-      </div>
-      <div class="col-md-2">
-        <label class="form-label">Use TLS</label>
-        <select name="email.secure" class="form-select">
-          <option value="none" <%= settings['email.secure'] === 'none' ? 'selected' : '' %>>None (port 25)</option>
-          <option value="0" <%= (!settings['email.secure'] || settings['email.secure'] === '0') ? 'selected' : '' %>>STARTTLS (port 587)</option>
-          <option value="1" <%= settings['email.secure'] === '1' ? 'selected' : '' %>>TLS/SSL (port 465)</option>
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">SMTP Username</label>
-        <input type="text" name="email.user" class="form-control" value="<%= settings['email.user'] || '' %>" />
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">SMTP Password</label>
-        <input type="password" name="email.password" class="form-control" placeholder="<%= settings['email.password'] ? '••••••' : 'Not set' %>" autocomplete="new-password" />
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">From Address</label>
-        <input type="email" name="email.fromAddress" class="form-control" value="<%= settings['email.fromAddress'] || '' %>" />
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">From Name</label>
-        <input type="text" name="email.fromName" class="form-control" value="<%= settings['email.fromName'] || 'SiteMaintenance' %>" />
-      </div>
-      <div class="col-12">
-        <button type="button" class="btn btn-outline-secondary btn-sm" id="testEmailBtn">
-          <i class="bi bi-send me-1"></i>Send Test Email
-        </button>
-        <span id="emailTestResult" class="ms-3 small"></span>
-      </div>
-      <div class="col-12"><hr class="my-1" /><strong class="small text-muted">Reminder Thresholds</strong></div>
-      <div class="col-md-4">
-        <label class="form-label">PM Reminder (days before due)</label>
-        <input type="number" name="email.pmReminderDays" class="form-control" value="<%= settings['email.pmReminderDays'] || '14' %>" min="1" />
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Warranty Reminder (days before expiry)</label>
-        <input type="number" name="email.warrantyReminderDays" class="form-control" value="<%= settings['email.warrantyReminderDays'] || '30' %>" min="1" />
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Repair Overdue Reminder (repeat every N days)</label>
-        <input type="number" name="email.repairReminderIntervalDays" class="form-control" value="<%= settings['email.repairReminderIntervalDays'] || '3' %>" min="1" />
-        <div class="form-text">After Expected Return Date passes, send a reminder every this many days until received.</div>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Unsent RMA Reminder (repeat every N days)</label>
-        <input type="number" name="email.unsentRmaReminderDays" class="form-control" value="<%= settings['email.unsentRmaReminderDays'] || '3' %>" min="1" />
-        <div class="form-text">Remind the assigned user every this many days while an RMA has no Sent Date.</div>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">System Key Expiry Reminder (days before expiry)</label>
-        <input type="number" name="email.systemKeyReminderDays" class="form-control" value="<%= settings['email.systemKeyReminderDays'] || '30' %>" min="1" />
-        <div class="form-text">Send an email to the key holder this many days before the key expires.</div>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Maintenance Reminder (repeat every N days)</label>
-        <input type="number" name="email.maintenanceReminderDays" class="form-control" value="<%= settings['email.maintenanceReminderDays'] || '3' %>" min="1" />
-        <div class="form-text">Email the assigned user every this many days while the item is open and not yet due.</div>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Maintenance Overdue Reminder (repeat every N days)</label>
-        <input type="number" name="email.maintenanceOverdueDays" class="form-control" value="<%= settings['email.maintenanceOverdueDays'] || '1' %>" min="0" />
-        <div class="form-text">Email the assigned user every this many days after the due date passes. Set to <code>0</code> to disable.</div>
-      </div>
+      <a href="/admin/email-settings" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-envelope-gear me-1"></i>Email Settings
+      </a>
+      <a href="/admin/email-templates" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-text me-1"></i>Email Templates
+      </a>
     </div>
   </div>
 
@@ -251,24 +182,6 @@
 </form>
 
 <script>
-document.getElementById('testEmailBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('testEmailBtn');
-  const result = document.getElementById('emailTestResult');
-  btn.disabled = true;
-  result.textContent = 'Sending...';
-  try {
-    const res = await fetch('/admin/settings/email/test', { method: 'POST' });
-    const data = await res.json();
-    result.textContent = data.message;
-    result.className = 'ms-3 small ' + (data.success ? 'text-success' : 'text-danger');
-  } catch (e) {
-    result.textContent = 'Request failed.';
-    result.className = 'ms-3 small text-danger';
-  } finally {
-    btn.disabled = false;
-  }
-});
-
 document.getElementById('testLdapBtn').addEventListener('click', async () => {
   const btn      = document.getElementById('testLdapBtn');
   const result   = document.getElementById('ldapTestResult');

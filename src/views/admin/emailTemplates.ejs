@@ -1,0 +1,85 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h3 mb-0"><i class="bi bi-file-earmark-text me-2"></i>Email Templates</h1>
+    <div class="text-muted small mt-1">Customize the HTML body of each notification email. Use <code>{{variableName}}</code> placeholders — they will be replaced with live values when sent.</div>
+  </div>
+  <a href="/admin/email-settings" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<form action="/admin/email-templates" method="POST">
+
+  <% templates.forEach(tpl => {
+    const key  = 'emailTemplate.' + tpl.key;
+    const val  = settings[key] || '';
+  %>
+  <div class="card shadow-sm mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span class="fw-semibold small"><i class="bi bi-envelope me-1"></i><%= tpl.label %></span>
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small font-monospace"><%= tpl.vars %></span>
+        <button type="button" class="btn btn-outline-secondary btn-sm test-tpl-btn" data-key="<%= key %>">
+          <i class="bi bi-send me-1"></i>Send Test
+        </button>
+        <span class="test-tpl-result small"></span>
+      </div>
+    </div>
+    <div class="card-body py-2">
+      <textarea name="<%= key %>" class="form-control form-control-sm font-monospace"
+                rows="6" style="font-size:0.8rem;"><%= val %></textarea>
+    </div>
+  </div>
+  <% }) %>
+
+  <div class="d-flex gap-2 mt-3">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-2"></i>Save All Templates</button>
+    <button type="button" class="btn btn-outline-secondary" id="resetBtn">
+      <i class="bi bi-arrow-counterclockwise me-1"></i>Reset All to Defaults
+    </button>
+    <a href="/admin/email-settings" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+
+<script>
+// Default templates — mirrors the built-in email bodies
+const DEFAULTS = {
+<%
+  templates.forEach(tpl => {
+    const key = 'emailTemplate.' + tpl.key;
+%>
+  '<%= key %>': <%- JSON.stringify(settings['__default__emailTemplate.' + tpl.key] || '') %>,
+<% }) %>
+};
+
+document.getElementById('resetBtn').addEventListener('click', function () {
+  if (!confirm('Reset all templates to system defaults? Your customizations will be overwritten after saving.')) return;
+  document.querySelectorAll('textarea[name^="emailTemplate."]').forEach(function (ta) {
+    ta.value = DEFAULTS[ta.name] || '';
+  });
+});
+
+document.querySelectorAll('.test-tpl-btn').forEach(function (btn) {
+  btn.addEventListener('click', async function () {
+    const key    = btn.dataset.key;
+    const result = btn.closest('.card-header').querySelector('.test-tpl-result');
+    const html   = btn.closest('.card').querySelector('textarea').value;
+    btn.disabled = true;
+    result.textContent = 'Sending...';
+    result.className = 'test-tpl-result small text-muted';
+    try {
+      const res  = await fetch('/admin/email-templates/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, html }),
+      });
+      const data = await res.json();
+      result.textContent = data.message;
+      result.className = 'test-tpl-result small ' + (data.success ? 'text-success' : 'text-danger');
+    } catch (e) {
+      result.textContent = 'Request failed.';
+      result.className = 'test-tpl-result small text-danger';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+});
+</script>
