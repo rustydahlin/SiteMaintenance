@@ -175,19 +175,41 @@
           </select>
         </div>
 
-        <!-- Stock Location (shown when In-Stock, serialized only) -->
-        <div class="col-md-4" id="stockLocationGroup"
-             style="display: <%= (item && item.StatusName === 'In-Stock' && !isBulkItem) ? 'block' : 'none' %>">
-          <label for="stockLocationID" class="form-label">Stock Location</label>
-          <select id="stockLocationID" name="stockLocationID" class="form-select">
-            <option value="">— Select Location —</option>
-            <% locations.forEach(l => { %>
-              <option value="<%= l.LocationID %>"
-                <%= (item && item.StockLocationID == l.LocationID) ? 'selected' : '' %>>
-                <%= l.LocationName %>
-              </option>
-            <% }) %>
-          </select>
+        <!-- Stock Holder (shown when In-Stock, serialized only) -->
+        <%
+          const showHolder     = item && item.StatusName === 'In-Stock' && !isBulkItem;
+          const holderIsUser   = item && item.AssignedToUserID && !item.StockLocationID;
+          const initHolderType = holderIsUser ? 'user' : 'location';
+        %>
+        <div class="col-md-4" id="stockHolderGroup"
+             style="display: <%= showHolder ? 'block' : 'none' %>">
+          <label class="form-label">Stock Holder</label>
+          <div class="input-group">
+            <select id="holderType" name="holderType" class="form-select" style="max-width: 155px;">
+              <option value="location" <%= initHolderType === 'location' ? 'selected' : '' %>>Stock Location</option>
+              <option value="user"     <%= initHolderType === 'user'     ? 'selected' : '' %>>Person</option>
+            </select>
+            <select id="stockLocationID" name="stockLocationID" class="form-select"
+                    style="display:<%= initHolderType === 'location' ? 'block' : 'none' %>">
+              <option value="">— Select Location —</option>
+              <% locations.forEach(l => { %>
+                <option value="<%= l.LocationID %>"
+                  <%= (item && item.StockLocationID == l.LocationID) ? 'selected' : '' %>>
+                  <%= l.LocationName %>
+                </option>
+              <% }) %>
+            </select>
+            <select id="assignedToUserID" name="assignedToUserID" class="form-select"
+                    style="display:<%= initHolderType === 'user' ? 'block' : 'none' %>">
+              <option value="">— Select Person —</option>
+              <% (typeof allUsers !== 'undefined' ? allUsers : []).forEach(u => { %>
+                <option value="<%= u.UserID %>"
+                  <%= (item && item.AssignedToUserID == u.UserID) ? 'selected' : '' %>>
+                  <%= u.DisplayName %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
         </div>
 
         <!-- Purchase Date -->
@@ -241,15 +263,23 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  var typeBulk    = document.getElementById('typeBulk');
-  var typeSerial  = document.getElementById('typeSerial');
-  var fieldSN     = document.getElementById('fieldSerialNumber');
-  var fieldAT     = document.getElementById('fieldAssetTag');
-  var fieldQty    = document.getElementById('fieldQuantity');
-  var inputSN     = document.getElementById('serialNumber');
-  var inputQty    = document.getElementById('quantityTotal');
-  var statusSel   = document.getElementById('statusID');
-  var locGroup    = document.getElementById('stockLocationGroup');
+  var typeBulk        = document.getElementById('typeBulk');
+  var typeSerial      = document.getElementById('typeSerial');
+  var fieldSN         = document.getElementById('fieldSerialNumber');
+  var fieldAT         = document.getElementById('fieldAssetTag');
+  var fieldQty        = document.getElementById('fieldQuantity');
+  var inputQty        = document.getElementById('quantityTotal');
+  var statusSel       = document.getElementById('statusID');
+  var holderGroup     = document.getElementById('stockHolderGroup');
+  var holderTypeSel   = document.getElementById('holderType');
+  var locSel          = document.getElementById('stockLocationID');
+  var userSel         = document.getElementById('assignedToUserID');
+
+  function updateHolderType() {
+    var isUser = holderTypeSel && holderTypeSel.value === 'user';
+    if (locSel)  locSel.style.display  = isUser ? 'none' : 'block';
+    if (userSel) userSel.style.display = isUser ? 'block' : 'none';
+  }
 
   function updateForm() {
     var bulk = typeBulk && typeBulk.checked;
@@ -259,16 +289,19 @@ document.addEventListener('DOMContentLoaded', function () {
     if (fieldQty) fieldQty.style.display = bulk ? 'block' : 'none';
     if (inputQty) inputQty.required      = bulk;
 
-    if (locGroup && statusSel) {
+    if (holderGroup && statusSel) {
       var chosen = statusSel.options[statusSel.selectedIndex];
       var statusName = chosen ? chosen.getAttribute('data-name') : '';
-      locGroup.style.display = (!bulk && statusName === 'In-Stock') ? 'block' : 'none';
+      holderGroup.style.display = (!bulk && statusName === 'In-Stock') ? 'block' : 'none';
     }
+
+    updateHolderType();
   }
 
-  if (typeSerial) typeSerial.addEventListener('change', updateForm);
-  if (typeBulk)   typeBulk.addEventListener('change', updateForm);
-  if (statusSel)  statusSel.addEventListener('change', updateForm);
+  if (typeSerial)    typeSerial.addEventListener('change', updateForm);
+  if (typeBulk)      typeBulk.addEventListener('change', updateForm);
+  if (statusSel)     statusSel.addEventListener('change', updateForm);
+  if (holderTypeSel) holderTypeSel.addEventListener('change', updateHolderType);
 
   updateForm();
 });

@@ -133,6 +133,43 @@
     </thead>
     <tbody>
       <% items.forEach(item => { %>
+
+      <% if (item._displayType === 'group') { %>
+      <%/* ── Serialized Common Name group row ── */%>
+      <tr>
+        <td>
+          <a href="/inventory/group/<%= encodeURIComponent(item.commonName) %>" class="fw-semibold text-decoration-none">
+            <%= item.commonName %>
+          </a>
+          <% if (item.ModelNumber) { %>
+            <div class="small text-muted"><%= item.ModelNumber %><% if (item.Manufacturer) { %> / <%= item.Manufacturer %><% } %></div>
+          <% } else if (item.Manufacturer) { %>
+            <div class="small text-muted"><%= item.Manufacturer %></div>
+          <% } %>
+        </td>
+        <td class="small text-muted">—</td>
+        <td class="small"><%= item.CategoryName || '—' %></td>
+        <td>
+          <% if (item.inStockCount > 0)  { %><span class="badge bg-success me-1"><%= item.inStockCount %> In-Stock</span><% } %>
+          <% if (item.deployedCount > 0) { %><span class="badge bg-primary me-1"><%= item.deployedCount %> Deployed</span><% } %>
+          <% if (item.otherCount > 0)    { %><span class="badge bg-secondary"><%= item.otherCount %> Other</span><% } %>
+        </td>
+        <td class="text-center small fw-semibold"><%= item.totalCount %></td>
+        <td class="small text-muted">
+          <% if (item.primaryLocation && item.locationCount > 1) { %>
+            <i class="bi bi-box me-1"></i><%= item.primaryLocation %> +<%= item.locationCount - 1 %> more
+          <% } else if (item.primaryLocation) { %>
+            <i class="bi bi-box me-1"></i><%= item.primaryLocation %>
+          <% } else if (item.deployedCount > 0 && item.inStockCount === 0) { %>
+            <span class="fst-italic">All deployed</span>
+          <% } else { %>
+            —
+          <% } %>
+        </td>
+      </tr>
+
+      <% } else { %>
+      <%/* ── Bulk item or ungrouped serialized item ── */%>
       <tr>
         <td>
           <a href="/inventory/<%= item.ItemID %>" class="fw-semibold text-decoration-none">
@@ -184,6 +221,7 @@
           <% } %>
         </td>
       </tr>
+      <% } /* end if _displayType === 'group' */ %>
       <% }) %>
     </tbody>
   </table>

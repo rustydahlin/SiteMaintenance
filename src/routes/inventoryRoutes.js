@@ -30,12 +30,53 @@ router.get('/', async (req, res, next) => {
   try {
     const { categoryID, statusID, search, locationID, page = 1, sort = 'commonName', dir = 'asc' } = req.query;
 
-    const [result, categories, statuses, locations] = await Promise.all([
-      inventoryModel.getAll({ categoryID, statusID, search, locationID, page: parseInt(page, 10), sort, dir }),
+    const [{ rows }, categories, statuses, locations] = await Promise.all([
+      inventoryModel.getAll({ categoryID, statusID, search, locationID, page: 1, pageSize: 10000, sort, dir }),
       lookupModel.getInventoryCategories(),
       lookupModel.getInventoryStatuses(),
       lookupModel.getStockLocations(),
     ]);
+
+    // Build display rows: serialized items with a CommonName are collapsed into one group row
+    const displayRows = [];
+    const seenGroups  = new Set();
+    for (const item of rows) {
+      if (item.TrackingType === 'bulk') {
+        displayRows.push(item);
+      } else if (item.CommonName) {
+        if (!seenGroups.has(item.CommonName)) {
+          seenGroups.add(item.CommonName);
+          const groupItems    = rows.filter(r => r.TrackingType !== 'bulk' && r.CommonName === item.CommonName);
+          const inStockItems  = groupItems.filter(r => r.StatusName === 'In-Stock');
+          const deployedItems = groupItems.filter(r => r.StatusName === 'Deployed');
+          // Primary in-stock location: most common among in-stock units
+          const locCounts = {};
+          inStockItems.forEach(r => { if (r.StockLocationName) locCounts[r.StockLocationName] = (locCounts[r.StockLocationName] || 0) + 1; });
+          const primaryLocation = Object.keys(locCounts).sort((a, b) => locCounts[b] - locCounts[a])[0] || null;
+          displayRows.push({
+            _displayType:  'group',
+            commonName:    item.CommonName,
+            CategoryName:  item.CategoryName,
+            ModelNumber:   item.ModelNumber,
+            Manufacturer:  item.Manufacturer,
+            totalCount:    groupItems.length,
+            inStockCount:  inStockItems.length,
+            deployedCount: deployedItems.length,
+            otherCount:    groupItems.length - inStockItems.length - deployedItems.length,
+            primaryLocation,
+            locationCount: Object.keys(locCounts).length,
+          });
+        }
+      } else {
+        displayRows.push(item);
+      }
+    }
+
+    // Paginate display rows
+    const pageSize = 25;
+    const pageNum  = parseInt(page, 10) || 1;
+    const total    = displayRows.length;
+    const pagedRows = displayRows.slice((pageNum - 1) * pageSize, pageNum * pageSize);
 
     const queryParts = [];
     if (categoryID) queryParts.push(`categoryID=${encodeURIComponent(categoryID)}`);
@@ -47,7 +88,7 @@ router.get('/', async (req, res, next) => {
 
     res.render('inventory/index', {
       title:      'Inventory',
-      items:      result.rows,
+      items:      pagedRows,
       categories,
       statuses,
       locations,
@@ -55,9 +96,9 @@ router.get('/', async (req, res, next) => {
       sort,
       dir,
       pagination: {
-        page:        result.page,
-        totalPages:  result.totalPages,
-        total:       result.total,
+        page:        pageNum,
+        totalPages:  Math.ceil(total / pageSize),
+        total,
         queryString: queryParts.join('&'),
       },
     });
@@ -297,7 +338,7 @@ router.post('/import/confirm', isAdmin, async (req, res, next) => {
 // ── GET /new — create form ────────────────────────────────────────────────────
 router.get('/new', isAdmin, async (req, res, next) => {
   try {
-    const [categories, statuses, locations, systems, commonNames, modelNumbers, manufacturers] = await Promise.all([
+    const [categories, statuses, locations, systems, commonNames, modelNumbers, manufacturers, allUsers] = await Promise.all([
       lookupModel.getInventoryCategories(),
       lookupModel.getInventoryStatuses(),
       lookupModel.getStockLocations(),
@@ -305,6 +346,7 @@ router.get('/new', isAdmin, async (req, res, next) => {
       lookupModel.getInventoryCommonNames(),
       lookupModel.getInventoryModelNumbers(),
       lookupModel.getInventoryManufacturers(),
+      userModel.getAll(),
     ]);
     res.render('inventory/form', {
       title:          'Add Inventory Item',
@@ -317,6 +359,7 @@ router.get('/new', isAdmin, async (req, res, next) => {
       commonNames,
       modelNumbers,
       manufacturers,
+      allUsers,
       presetSystemID: req.query.relatedSystemID ? parseInt(req.query.relatedSystemID, 10) : null,
     });
   } catch (err) {
@@ -343,27 +386,52 @@ router.post('/', isAdmin, async (req, res, next) => {
       return res.redirect('/inventory/new');
     }
 
+    const holderType = req.body.holderType; // 'location' or 'user'
     const item = await inventoryModel.create({
-      trackingType:    isBulk ? 'bulk' : 'serialized',
-      serialNumber:    isBulk ? null : serialNumber.trim(),
-      assetTag:        isBulk ? null : (req.body.assetTag || null),
-      commonName:      req.body.commonName      || null,
-      partNumber:      req.body.partNumber      || null,
-      modelNumber:     req.body.modelNumber     || null,
-      manufacturer:    req.body.manufacturer    || null,
-      categoryID:      categoryID,
-      statusID:        statusID,
-      stockLocationID: isBulk ? null : (req.body.stockLocationID || null),
-      quantityTotal:   isBulk ? (parseInt(req.body.quantityTotal, 10) || 1) : 1,
-      relatedSystemID: req.body.relatedSystemID || null,
-      description:     req.body.description     || null,
-      purchaseDate:    req.body.purchaseDate     || null,
-      warrantyExpires: req.body.warrantyExpires  || null,
-      notes:           req.body.notes           || null,
+      trackingType:      isBulk ? 'bulk' : 'serialized',
+      serialNumber:      isBulk ? null : serialNumber.trim(),
+      assetTag:          isBulk ? null : (req.body.assetTag || null),
+      commonName:        req.body.commonName      || null,
+      partNumber:        req.body.partNumber      || null,
+      modelNumber:       req.body.modelNumber     || null,
+      manufacturer:      req.body.manufacturer    || null,
+      categoryID:        categoryID,
+      statusID:          statusID,
+      stockLocationID:   isBulk ? null : (holderType !== 'user' ? (req.body.stockLocationID || null) : null),
+      assignedToUserID:  isBulk ? null : (holderType === 'user' ? (req.body.assignedToUserID || null) : null),
+      quantityTotal:     isBulk ? (parseInt(req.body.quantityTotal, 10) || 1) : 1,
+      relatedSystemID:   req.body.relatedSystemID || null,
+      description:       req.body.description     || null,
+      purchaseDate:      req.body.purchaseDate     || null,
+      warrantyExpires:   req.body.warrantyExpires  || null,
+      notes:             req.body.notes           || null,
     }, req.auditContext);
 
     req.flash('success', `Item "${item.ModelNumber || item.SerialNumber || item.ItemID}" added successfully.`);
     res.redirect(`/inventory/${item.ItemID}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /group/:name — serialized items grouped by Common Name ────────────────
+router.get('/group/:name', async (req, res, next) => {
+  try {
+    const commonName = req.params.name;
+    const items      = await inventoryModel.getByCommonName(commonName);
+
+    const inStock  = items.filter(i => i.StatusName === 'In-Stock');
+    const deployed = items.filter(i => i.StatusName === 'Deployed');
+    const other    = items.filter(i => i.StatusName !== 'In-Stock' && i.StatusName !== 'Deployed');
+
+    res.render('inventory/byCommonName', {
+      title: commonName,
+      commonName,
+      items,
+      inStock,
+      deployed,
+      other,
+    });
   } catch (err) {
     next(err);
   }
@@ -424,7 +492,7 @@ router.get('/:id', async (req, res, next) => {
 router.get('/:id/edit', isAdmin, async (req, res, next) => {
   try {
     const itemID = parseInt(req.params.id, 10);
-    const [item, categories, statuses, locations, systems, commonNames, modelNumbers, manufacturers] = await Promise.all([
+    const [item, categories, statuses, locations, systems, commonNames, modelNumbers, manufacturers, allUsers] = await Promise.all([
       inventoryModel.getByID(itemID),
       lookupModel.getInventoryCategories(),
       lookupModel.getInventoryStatuses(),
@@ -433,6 +501,7 @@ router.get('/:id/edit', isAdmin, async (req, res, next) => {
       lookupModel.getInventoryCommonNames(),
       lookupModel.getInventoryModelNumbers(),
       lookupModel.getInventoryManufacturers(),
+      userModel.getAll(),
     ]);
 
     if (!item) {
@@ -451,6 +520,7 @@ router.get('/:id/edit', isAdmin, async (req, res, next) => {
       commonNames,
       modelNumbers,
       manufacturers,
+      allUsers,
     });
   } catch (err) {
     next(err);
@@ -470,22 +540,24 @@ router.post('/:id', isAdmin, async (req, res, next) => {
       return res.redirect(`/inventory/${itemID}/edit`);
     }
 
+    const holderType = req.body.holderType;
     const item = await inventoryModel.update(itemID, {
-      serialNumber:    isBulk ? null : (serialNumber?.trim() || null),
-      assetTag:        isBulk ? null : (req.body.assetTag || null),
-      commonName:      req.body.commonName      || null,
-      partNumber:      req.body.partNumber      || null,
-      modelNumber:     req.body.modelNumber     || null,
-      manufacturer:    req.body.manufacturer    || null,
-      categoryID:      categoryID               || null,
-      statusID:        statusID                 || null,
-      stockLocationID: isBulk ? null : (req.body.stockLocationID || null),
-      quantityTotal:   isBulk ? (parseInt(req.body.quantityTotal, 10) || 1) : 1,
-      relatedSystemID: req.body.relatedSystemID || null,
-      description:     req.body.description     || null,
-      purchaseDate:    req.body.purchaseDate     || null,
-      warrantyExpires: req.body.warrantyExpires  || null,
-      notes:           req.body.notes           || null,
+      serialNumber:     isBulk ? null : (serialNumber?.trim() || null),
+      assetTag:         isBulk ? null : (req.body.assetTag || null),
+      commonName:       req.body.commonName      || null,
+      partNumber:       req.body.partNumber      || null,
+      modelNumber:      req.body.modelNumber     || null,
+      manufacturer:     req.body.manufacturer    || null,
+      categoryID:       categoryID               || null,
+      statusID:         statusID                 || null,
+      stockLocationID:  isBulk ? null : (holderType !== 'user' ? (req.body.stockLocationID || null) : null),
+      assignedToUserID: isBulk ? null : (holderType === 'user' ? (req.body.assignedToUserID || null) : null),
+      quantityTotal:    isBulk ? (parseInt(req.body.quantityTotal, 10) || 1) : 1,
+      relatedSystemID:  req.body.relatedSystemID || null,
+      description:      req.body.description     || null,
+      purchaseDate:     req.body.purchaseDate     || null,
+      warrantyExpires:  req.body.warrantyExpires  || null,
+      notes:            req.body.notes           || null,
     }, req.auditContext);
 
     req.flash('success', `Item "${item.ModelNumber || item.SerialNumber || item.ItemID}" updated successfully.`);

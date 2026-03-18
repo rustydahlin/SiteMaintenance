@@ -1,0 +1,262 @@
+<%
+  function statusBadge(statusName) {
+    const map = {
+      'In-Stock':    'bg-success',
+      'Deployed':    'bg-primary',
+      'Checked-Out': 'bg-warning text-dark',
+      'In-Repair':   'bg-danger',
+      'Retired':     'bg-secondary',
+    };
+    const cls = map[statusName] || 'bg-secondary';
+    return `<span class="badge ${cls}">${statusName || '—'}</span>`;
+  }
+  const first = items[0] || {};
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h3 mb-0">
+      <i class="bi bi-box-seam me-2"></i><%= commonName %>
+    </h1>
+    <% if (first.ModelNumber || first.Manufacturer) { %>
+      <div class="text-muted small mt-1">
+        <%= [first.ModelNumber, first.Manufacturer].filter(Boolean).join(' / ') %>
+      </div>
+    <% } %>
+  </div>
+  <div class="d-flex gap-2">
+    <% if (user && user.roles && user.roles.includes('Admin')) { %>
+      <a href="/inventory/new" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Add Item
+      </a>
+    <% } %>
+    <a href="/inventory" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<!-- Item Details -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header small fw-semibold">
+    <i class="bi bi-tag me-1"></i>Item Details
+  </div>
+  <div class="card-body py-2">
+    <dl class="row mb-0 small">
+      <dt class="col-sm-3 text-muted">Common Name</dt>
+      <dd class="col-sm-9 fw-semibold"><%= commonName %></dd>
+      <% if (first.ModelNumber) { %>
+      <dt class="col-sm-3 text-muted">Model Number</dt>
+      <dd class="col-sm-9"><%= first.ModelNumber %></dd>
+      <% } %>
+      <% if (first.Manufacturer) { %>
+      <dt class="col-sm-3 text-muted">Manufacturer</dt>
+      <dd class="col-sm-9"><%= first.Manufacturer %></dd>
+      <% } %>
+      <% if (first.PartNumber) { %>
+      <dt class="col-sm-3 text-muted">Part #</dt>
+      <dd class="col-sm-9"><%= first.PartNumber %></dd>
+      <% } %>
+      <% if (first.CategoryName) { %>
+      <dt class="col-sm-3 text-muted">Category</dt>
+      <dd class="col-sm-9"><%= first.CategoryName %></dd>
+      <% } %>
+    </dl>
+  </div>
+</div>
+
+<% if (items.length === 0) { %>
+  <div class="alert alert-info">No active serialized items found for "<%= commonName %>".</div>
+<% } else { %>
+
+<!-- Stock Distribution -->
+<div class="card shadow-sm">
+  <div class="card-header small fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-diagram-3 me-1"></i>Stock Distribution</span>
+    <span class="text-muted fw-normal">
+      Total: <%= items.length %> &nbsp;|&nbsp;
+      In-Stock: <%= inStock.length %>
+      <% if (deployed.length > 0) { %>&nbsp;|&nbsp; Deployed: <%= deployed.length %><% } %>
+      <% if (other.length > 0) { %>&nbsp;|&nbsp; Other: <%= other.length %><% } %>
+    </span>
+  </div>
+
+  <!-- Filter row -->
+  <div class="card-body border-bottom py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-4">
+        <input type="text" id="filterSearch" class="form-control form-control-sm"
+               placeholder="Search serial, asset tag, location…" />
+      </div>
+      <div class="col-sm-3">
+        <select id="filterStatus" class="form-select form-select-sm">
+          <option value="">All Statuses</option>
+          <option value="In-Stock">In-Stock</option>
+          <option value="Deployed">Deployed</option>
+          <option value="In-Repair">In-Repair</option>
+          <option value="Retired">Retired</option>
+          <option value="Checked-Out">Checked-Out</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="button" id="filterClear" class="btn btn-sm btn-outline-secondary">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0" id="distTable">
+      <thead>
+        <tr>
+          <th class="sortable" data-col="location" style="cursor:pointer; user-select:none;">
+            Location / Site <i class="bi bi-arrow-down-up text-muted ms-1 small opacity-50" id="icon-location"></i>
+          </th>
+          <th class="sortable" data-col="serial" style="cursor:pointer; user-select:none;">
+            Serial # <i class="bi bi-arrow-down-up text-muted ms-1 small opacity-50" id="icon-serial"></i>
+          </th>
+          <th class="sortable" data-col="asset" style="cursor:pointer; user-select:none;">
+            Asset Tag <i class="bi bi-arrow-down-up text-muted ms-1 small opacity-50" id="icon-asset"></i>
+          </th>
+          <th class="sortable" data-col="status" style="cursor:pointer; user-select:none;">
+            Status <i class="bi bi-arrow-down-up text-muted ms-1 small opacity-50" id="icon-status"></i>
+          </th>
+        </tr>
+      </thead>
+      <tbody id="distBody">
+        <% items.forEach(function(i) {
+             const locationText = i.StatusName === 'In-Stock' && i.StockLocationName
+               ? i.StockLocationName
+               : i.AssignedToUserName && !i.CurrentSiteName
+               ? i.AssignedToUserName
+               : i.CurrentSiteName || '';
+             const locIcon = i.StatusName === 'In-Stock' && i.StockLocationName
+               ? 'bi-box'
+               : i.AssignedToUserName && !i.CurrentSiteName
+               ? 'bi-person'
+               : i.CurrentSiteName
+               ? 'bi-geo-alt'
+               : '';
+        %>
+        <tr data-serial="<%= (i.SerialNumber || '').toLowerCase() %>"
+            data-asset="<%= (i.AssetTag || '').toLowerCase() %>"
+            data-location="<%= locationText.toLowerCase() %>"
+            data-status="<%= i.StatusName || '' %>">
+          <td class="small">
+            <% if (i.StatusName === 'In-Stock' && i.StockLocationName) { %>
+              <i class="bi bi-box text-muted me-1"></i><%= i.StockLocationName %>
+            <% } else if (i.AssignedToUserName && !i.CurrentSiteName) { %>
+              <i class="bi bi-person text-muted me-1"></i><%= i.AssignedToUserName %>
+            <% } else if (i.CurrentSiteName) { %>
+              <a href="/sites/<%= i.CurrentSiteID %>" class="text-decoration-none">
+                <i class="bi bi-geo-alt text-muted me-1"></i><%= i.CurrentSiteName %>
+              </a>
+            <% } else { %>
+              <span class="text-muted">—</span>
+            <% } %>
+          </td>
+          <td>
+            <a href="/inventory/<%= i.ItemID %>" class="text-decoration-none fw-semibold">
+              <%= i.SerialNumber || '—' %>
+            </a>
+          </td>
+          <td class="small text-muted"><%= i.AssetTag || '—' %></td>
+          <td><%- statusBadge(i.StatusName) %></td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <div id="noResults" class="text-center text-muted py-3" style="display:none;">No items match your filters.</div>
+  </div>
+</div>
+
+<% } %>
+
+<script>
+(function () {
+  var searchInput  = document.getElementById('filterSearch');
+  var statusSelect = document.getElementById('filterStatus');
+  var clearBtn     = document.getElementById('filterClear');
+  var tbody        = document.getElementById('distBody');
+  var noResults    = document.getElementById('noResults');
+
+  // ── Filtering ──────────────────────────────────────────────────────────────
+  function applyFilter() {
+    var term   = (searchInput.value || '').toLowerCase().trim();
+    var status = (statusSelect.value || '').toLowerCase();
+    var rows   = tbody ? tbody.querySelectorAll('tr') : [];
+    var visible = 0;
+    rows.forEach(function (row) {
+      var serial   = row.dataset.serial   || '';
+      var asset    = row.dataset.asset    || '';
+      var location = row.dataset.location || '';
+      var rowStat  = (row.dataset.status || '').toLowerCase();
+      var matchTerm   = !term   || serial.includes(term) || asset.includes(term) || location.includes(term);
+      var matchStatus = !status || rowStat === status;
+      var show = matchTerm && matchStatus;
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    if (noResults) noResults.style.display = (visible === 0) ? '' : 'none';
+  }
+
+  if (searchInput)  searchInput.addEventListener('input', applyFilter);
+  if (statusSelect) statusSelect.addEventListener('change', applyFilter);
+  if (clearBtn) clearBtn.addEventListener('click', function () {
+    if (searchInput)  searchInput.value = '';
+    if (statusSelect) statusSelect.value = '';
+    applyFilter();
+  });
+
+  // ── Sorting ────────────────────────────────────────────────────────────────
+  var currentSort = 'status';
+  var currentDir  = 'asc';
+
+  var statusOrder = { 'In-Stock': 0, 'Deployed': 1, 'Checked-Out': 2, 'In-Repair': 3, 'Retired': 4 };
+
+  function sortTable(col) {
+    if (currentSort === col) {
+      currentDir = currentDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      currentSort = col;
+      currentDir  = 'asc';
+    }
+    updateSortIcons();
+
+    var rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+    rows.sort(function (a, b) {
+      var av = a.dataset[col] || '';
+      var bv = b.dataset[col] || '';
+      var cmp;
+      if (col === 'status') {
+        cmp = (statusOrder[a.dataset.status] ?? 99) - (statusOrder[b.dataset.status] ?? 99);
+        if (cmp === 0) cmp = (a.dataset.serial || '').localeCompare(b.dataset.serial || '');
+      } else {
+        cmp = av.localeCompare(bv);
+      }
+      return currentDir === 'asc' ? cmp : -cmp;
+    });
+    rows.forEach(function (r) { tbody.appendChild(r); });
+  }
+
+  function updateSortIcons() {
+    ['location', 'serial', 'asset', 'status'].forEach(function (col) {
+      var icon = document.getElementById('icon-' + col);
+      if (!icon) return;
+      if (col !== currentSort) {
+        icon.className = 'bi bi-arrow-down-up text-muted ms-1 small opacity-50';
+      } else {
+        icon.className = currentDir === 'asc'
+          ? 'bi bi-sort-up ms-1 small'
+          : 'bi bi-sort-down ms-1 small';
+      }
+    });
+  }
+
+  document.querySelectorAll('.sortable').forEach(function (th) {
+    th.addEventListener('click', function () { sortTable(this.dataset.col); });
+  });
+
+  // Initial sort: status asc
+  sortTable('status');
+})();
+</script>

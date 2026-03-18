@@ -136,7 +136,7 @@ async function getByID(itemID) {
 async function create(data, auditContext = {}) {
   const {
     trackingType, serialNumber, assetTag, commonName, partNumber, modelNumber, manufacturer,
-    categoryID, statusID, stockLocationID, quantityTotal, relatedSystemID,
+    categoryID, statusID, stockLocationID, assignedToUserID, quantityTotal, relatedSystemID,
     description, purchaseDate, warrantyExpires, notes,
   } = data;
 
@@ -153,6 +153,7 @@ async function create(data, auditContext = {}) {
     .input('CategoryID',       sql.Int,             categoryID         || null)
     .input('StatusID',         sql.Int,             statusID           || null)
     .input('StockLocationID',  sql.Int,             isBulk ? null : (stockLocationID || null))
+    .input('AssignedToUserID', sql.Int,             isBulk ? null : (assignedToUserID || null))
     .input('QuantityTotal',    sql.Int,             isBulk ? (parseInt(quantityTotal, 10) || 1) : 1)
     .input('RelatedSystemID',  sql.Int,             relatedSystemID    || null)
     .input('Description',      sql.NVarChar(sql.MAX), description      || null)
@@ -163,11 +164,11 @@ async function create(data, auditContext = {}) {
     .query(`
       INSERT INTO Inventory
         (TrackingType, SerialNumber, AssetTag, CommonName, PartNumber, ModelNumber, Manufacturer,
-         CategoryID, StatusID, StockLocationID, QuantityTotal, RelatedSystemID,
+         CategoryID, StatusID, StockLocationID, AssignedToUserID, QuantityTotal, RelatedSystemID,
          Description, PurchaseDate, WarrantyExpires, Notes, CreatedByUserID)
       VALUES
         (@TrackingType, @SerialNumber, @AssetTag, @CommonName, @PartNumber, @ModelNumber, @Manufacturer,
-         @CategoryID, @StatusID, @StockLocationID, @QuantityTotal, @RelatedSystemID,
+         @CategoryID, @StatusID, @StockLocationID, @AssignedToUserID, @QuantityTotal, @RelatedSystemID,
          @Description, @PurchaseDate, @WarrantyExpires, @Notes, @CreatedByUserID);
       SELECT SCOPE_IDENTITY() AS NewID
     `);
@@ -184,7 +185,7 @@ async function create(data, auditContext = {}) {
 async function update(itemID, data, auditContext = {}) {
   const {
     serialNumber, assetTag, commonName, partNumber, modelNumber, manufacturer, categoryID, statusID,
-    stockLocationID, quantityTotal, relatedSystemID, description, purchaseDate, warrantyExpires, notes,
+    stockLocationID, assignedToUserID, quantityTotal, relatedSystemID, description, purchaseDate, warrantyExpires, notes,
   } = data;
 
   const pool = await getPool();
@@ -202,6 +203,7 @@ async function update(itemID, data, auditContext = {}) {
     .input('CategoryID',       sql.Int,             categoryID         || null)
     .input('StatusID',         sql.Int,             statusID           || null)
     .input('StockLocationID',  sql.Int,             isBulk ? null : (stockLocationID || null))
+    .input('AssignedToUserID', sql.Int,             isBulk ? null : (assignedToUserID || null))
     .input('QuantityTotal',    sql.Int,             isBulk ? (parseInt(quantityTotal, 10) || old.QuantityTotal) : 1)
     .input('RelatedSystemID',  sql.Int,             relatedSystemID    || null)
     .input('Description',      sql.NVarChar(sql.MAX), description      || null)
@@ -219,6 +221,7 @@ async function update(itemID, data, auditContext = {}) {
         CategoryID      = @CategoryID,
         StatusID        = @StatusID,
         StockLocationID = @StockLocationID,
+        AssignedToUserID = @AssignedToUserID,
         QuantityTotal   = @QuantityTotal,
         RelatedSystemID = @RelatedSystemID,
         Description     = @Description,
@@ -518,10 +521,43 @@ async function searchForPicker(q, { inStockOnly = false } = {}) {
   return result.recordset;
 }
 
+// All active serialized items sharing a CommonName, with location info.
+async function getByCommonName(commonName) {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('CommonName', sql.NVarChar(150), commonName)
+    .query(`
+      SELECT
+        i.ItemID, i.SerialNumber, i.AssetTag, i.ModelNumber, i.Manufacturer,
+        i.PartNumber, i.Notes, i.PurchaseDate, i.WarrantyExpires,
+        c.CategoryName, s.StatusName,
+        l.LocationName AS StockLocationName,
+        u.DisplayName  AS AssignedToUserName,
+        (SELECT TOP 1 si2.SiteID
+           FROM SiteInventory si2
+           WHERE si2.ItemID = i.ItemID AND si2.RemovedAt IS NULL) AS CurrentSiteID,
+        (SELECT TOP 1 st.SiteName
+           FROM SiteInventory si2
+           JOIN Sites st ON st.SiteID = si2.SiteID
+           WHERE si2.ItemID = i.ItemID AND si2.RemovedAt IS NULL) AS CurrentSiteName
+      FROM Inventory i
+      LEFT JOIN InventoryCategories c ON c.CategoryID      = i.CategoryID
+      LEFT JOIN InventoryStatuses   s ON s.StatusID        = i.StatusID
+      LEFT JOIN StockLocations      l ON l.LocationID      = i.StockLocationID
+      LEFT JOIN Users               u ON u.UserID          = i.AssignedToUserID
+      WHERE i.CommonName = @CommonName
+        AND i.TrackingType = 'serialized'
+        AND i.IsActive = 1
+      ORDER BY s.StatusName, i.SerialNumber
+    `);
+  return result.recordset;
+}
+
 module.exports = {
   getAll, getByID, create, update, softDelete,
   updateStatus,
   getInStock, getRelatedParts, getSystemsList,
   getStock, upsertStock, removeStock, adjustStock,
   findByImportKey, searchForPicker,
+  getByCommonName,
 };
