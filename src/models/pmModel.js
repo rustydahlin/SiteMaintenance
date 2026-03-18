@@ -169,6 +169,7 @@ async function getUpcomingDue(daysAhead = 7) {
         pm.LastPerformedAt, pm.AssignedUserID, pm.AssignedVendorID, pm.Notes,
         s.SiteName, s.City, s.State,
         u.DisplayName AS AssignedUserName,
+        u.Email       AS AssignedUserEmail,
         v.VendorName  AS AssignedVendorName,
         ${NEXT_DUE_EXPR}      AS NextDueDate,
         ${DAYS_UNTIL_DUE_EXPR} AS DaysUntilDue

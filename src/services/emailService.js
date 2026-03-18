@@ -1,6 +1,6 @@
 'use strict';
 
-const nodemailer   = require('nodemailer');
+const nodemailer    = require('nodemailer');
 const settingsModel = require('../models/settingsModel');
 const { writeAudit } = require('../models/auditModel');
 const logger         = require('../utils/logger');
@@ -41,17 +41,10 @@ async function getFromAddress() {
   return `"${name}" <${address}>`;
 }
 
-async function getAdminEmails(pool) {
-  // Import here to avoid circular deps
-  const { getPool, sql } = require('../config/database');
-  const db = pool || await getPool();
-  const result = await db.request().query(`
-    SELECT u.Email FROM Users u
-    JOIN UserRoles ur ON ur.UserID = u.UserID
-    JOIN Roles r ON r.RoleID = ur.RoleID
-    WHERE r.RoleName = 'Admin' AND u.IsActive = 1 AND u.Email IS NOT NULL
-  `);
-  return result.recordset.map(r => r.Email);
+// Users who opted in to a given notification type
+async function getOptedInEmails(notificationType) {
+  const userModel = require('../models/userModel');
+  return userModel.getOptedInEmails(notificationType);
 }
 
 /**
@@ -80,12 +73,21 @@ async function sendMail({ to, subject, html, text }) {
 // ── Notification helpers ──────────────────────────────────────────────────────
 
 async function sendPMReminder(site, schedule, daysUntilDue) {
-  const vendorModel  = require('../models/vendorModel');
-  const adminEmails  = await getAdminEmails();
-  const vendorEmails = schedule.AssignedVendorID
-    ? await vendorModel.getVendorEmailRecipients(schedule.AssignedVendorID)
-    : [];
-  const allTo = [...new Set([...adminEmails, ...vendorEmails])].filter(Boolean);
+  const vendorModel = require('../models/vendorModel');
+
+  // Primary recipients: assigned user email (if set) or vendor contact emails
+  const assignedEmails = [];
+  if (schedule.AssignedUserEmail) {
+    assignedEmails.push(schedule.AssignedUserEmail);
+  } else if (schedule.AssignedVendorID) {
+    const vendorEmails = await vendorModel.getVendorEmailRecipients(schedule.AssignedVendorID);
+    assignedEmails.push(...vendorEmails);
+  }
+
+  // Opted-in subscribers
+  const optedIn = await getOptedInEmails('pm.reminder');
+
+  const allTo = [...new Set([...assignedEmails, ...optedIn])].filter(Boolean);
   if (!allTo.length) return;
 
   const assignedLabel = schedule.AssignedUserName || schedule.AssignedVendorName || null;
@@ -102,8 +104,8 @@ async function sendPMReminder(site, schedule, daysUntilDue) {
 }
 
 async function sendRepairFollowUp(repair) {
-  const admins = await getAdminEmails();
-  if (!admins.length) return;
+  const to = await getOptedInEmails('repair.followup');
+  if (!to.length) return;
 
   const subject = `Repair Follow-Up Due: ${repair.SerialNumber}`;
   const html    = `
@@ -115,12 +117,12 @@ async function sendRepairFollowUp(repair) {
     <p><strong>Follow-Up Date:</strong> ${new Date(repair.FollowUpDate).toLocaleDateString()}</p>
     <p><a href="${process.env.APP_BASE_URL || ''}/repairs/${repair.RepairID}">View Repair</a></p>
   `;
-  await sendMail({ to: admins, subject, html });
+  await sendMail({ to, subject, html });
 }
 
 async function sendRepairOverdue(repair) {
-  const admins = await getAdminEmails();
-  if (!admins.length) return;
+  const to = await getOptedInEmails('repair.overdue');
+  if (!to.length) return;
 
   const daysSinceSent = Math.floor((Date.now() - new Date(repair.SentDate).getTime()) / 86400000);
   const subject = `Repair OVERDUE: ${repair.SerialNumber} (${daysSinceSent} days)`;
@@ -132,12 +134,12 @@ async function sendRepairOverdue(repair) {
     ${repair.ManufacturerContact ? `<p><strong>Contact:</strong> ${repair.ManufacturerContact}</p>` : ''}
     <p><a href="${process.env.APP_BASE_URL || ''}/repairs/${repair.RepairID}">View Repair</a></p>
   `;
-  await sendMail({ to: admins, subject, html });
+  await sendMail({ to, subject, html });
 }
 
 async function sendWarrantyExpiring(type, item, daysLeft) {
-  const admins = await getAdminEmails();
-  if (!admins.length) return;
+  const to = await getOptedInEmails('warranty.expiring');
+  if (!to.length) return;
 
   const label   = type === 'site' ? `Site: ${item.SiteName}` : `Item: ${item.SerialNumber} — ${item.ModelNumber || ''}`;
   const subject = `Warranty Expiring: ${label}`;
@@ -148,12 +150,12 @@ async function sendWarrantyExpiring(type, item, daysLeft) {
     <p><strong>Expires:</strong> ${new Date(item.WarrantyExpires).toLocaleDateString()} (${daysLeft} day(s) remaining)</p>
     <p><a href="${process.env.APP_BASE_URL || ''}${url}">View Details</a></p>
   `;
-  await sendMail({ to: admins, subject, html });
+  await sendMail({ to, subject, html });
 }
 
 async function sendCheckoutReminder(item, user) {
-  const admins = await getAdminEmails();
-  if (!admins.length) return;
+  const to = await getOptedInEmails('checkout.reminder');
+  if (!to.length) return;
 
   const subject = `Long-Term Checkout: ${item.SerialNumber}`;
   const html    = `
@@ -163,12 +165,12 @@ async function sendCheckoutReminder(item, user) {
     <p><strong>Checked Out Since:</strong> ${new Date(item.CheckedOutAt).toLocaleDateString()}</p>
     <p><a href="${process.env.APP_BASE_URL || ''}/inventory/${item.ItemID}">View Item</a></p>
   `;
-  await sendMail({ to: admins, subject, html });
+  await sendMail({ to, subject, html });
 }
 
 async function sendSiteStatusChange(site, oldStatus, newStatus) {
-  const admins = await getAdminEmails();
-  if (!admins.length) return;
+  const to = await getOptedInEmails('site.statusChange');
+  if (!to.length) return;
 
   const subject = `Site Status Changed: ${site.SiteName} → ${newStatus}`;
   const html    = `
@@ -177,7 +179,7 @@ async function sendSiteStatusChange(site, oldStatus, newStatus) {
     <p><strong>Status:</strong> ${oldStatus} → <strong>${newStatus}</strong></p>
     <p><a href="${process.env.APP_BASE_URL || ''}/sites/${site.SiteID}">View Site</a></p>
   `;
-  await sendMail({ to: admins, subject, html });
+  await sendMail({ to, subject, html });
 }
 
 async function sendWelcomeEmail(user, temporaryPassword) {
@@ -194,7 +196,13 @@ async function sendWelcomeEmail(user, temporaryPassword) {
 }
 
 async function sendSystemKeyExpiring(key, daysLeft) {
-  if (!key.IssuedToEmail) return;  // no email on file — skip
+  // Primary: the key holder
+  const directEmails = key.IssuedToEmail ? [key.IssuedToEmail] : [];
+  // Opted-in subscribers
+  const optedIn = await getOptedInEmails('systemKey.expiring');
+  const allTo = [...new Set([...directEmails, ...optedIn])].filter(Boolean);
+  if (!allTo.length) return;
+
   const expired = daysLeft !== undefined && daysLeft <= 0;
   const subject = expired
     ? `System Key EXPIRED: ${key.SerialNumber || key.KeyCode || key.KeyID}`
@@ -209,12 +217,13 @@ async function sendSystemKeyExpiring(key, daysLeft) {
     ${key.ManufacturerName ? `<p><strong>Manufacturer:</strong> ${key.ManufacturerName}</p>` : ''}
     <p><a href="${process.env.APP_BASE_URL || ''}/system-keys/${key.KeyID}">View Key</a></p>
   `;
-  await sendMail({ to: key.IssuedToEmail, subject, html });
+  await sendMail({ to: allTo, subject, html });
 }
 
 async function notifyNewLogEntry({ site, log }) {
-  const admins = await getAdminEmails();
-  if (!admins.length) return;
+  const to = await getOptedInEmails('log.new');
+  if (!to.length) return;
+
   const subject = `New Log Entry: ${site.SiteName} — ${log.Subject || 'No Subject'}`;
   const html = `
     <p>A new log entry has been created.</p>
@@ -224,7 +233,7 @@ async function notifyNewLogEntry({ site, log }) {
     <p><strong>Date:</strong> ${new Date(log.EntryDate).toLocaleDateString()}</p>
     <p><a href="${process.env.APP_BASE_URL || ''}/sites/${site.SiteID}/logs/${log.LogEntryID}">View Log Entry</a></p>
   `;
-  await sendMail({ to: admins.join(','), subject, html });
+  await sendMail({ to, subject, html });
 }
 
 module.exports = {
@@ -238,5 +247,5 @@ module.exports = {
   sendWelcomeEmail,
   notifyNewLogEntry,
   sendSystemKeyExpiring,
-  getAdminEmails,
+  getOptedInEmails,
 };

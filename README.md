@@ -243,6 +243,7 @@ When new database migrations are released:
 | `007_site_fields.sql` | Adds `SiteNumber` and `ContractNumber` to Sites |
 | `008_vendors.sql` | Creates `Vendors` and `VendorContacts` tables; adds `AssignedVendorID` to `PMSchedules` |
 | `009_system_keys.sql` | Creates `KeyManufacturers` lookup and `SystemKeys` table; adds `SystemKeys` role |
+| `010_user_notifications.sql` | Creates `UserNotifications` table for per-user email notification opt-in preferences |
 
 > **Note:** `database/schema.sql` always reflects the current full schema. Fresh installs only need to run `schema.sql` + `seed.sql` — migrations are only needed when upgrading an existing database.
 

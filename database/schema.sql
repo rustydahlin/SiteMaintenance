@@ -443,6 +443,20 @@ CREATE INDEX IX_SK_IssuedToContact ON SystemKeys(IssuedToContactID) WHERE Issued
 CREATE INDEX IX_SK_Expiry          ON SystemKeys(ExpirationDate)    WHERE IsActive = 1;
 
 -- ============================================================
+-- USER NOTIFICATION PREFERENCES
+-- ============================================================
+CREATE TABLE UserNotifications (
+    NotificationID   INT IDENTITY(1,1) PRIMARY KEY,
+    UserID           INT          NOT NULL,
+    NotificationType NVARCHAR(50) NOT NULL,
+    IsEnabled        BIT          NOT NULL DEFAULT 0,
+    UpdatedAt        DATETIME2(0) NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT FK_UN_User FOREIGN KEY (UserID) REFERENCES Users(UserID),
+    CONSTRAINT UQ_UN_UserType UNIQUE (UserID, NotificationType)
+);
+CREATE INDEX IX_UN_UserID ON UserNotifications(UserID);
+
+-- ============================================================
 -- AUDIT LOG
 -- ============================================================
 CREATE TABLE AuditLog (

@@ -186,8 +186,59 @@ async function toggleActive(userID, auditContext = {}) {
   return findByID(userID);
 }
 
+// ── Notification preferences ──────────────────────────────────────────────────
+
+// Returns { 'pm.reminder': true, 'repair.overdue': false, ... } for a user
+async function getNotificationPrefs(userID) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('UserID', sql.Int, userID)
+    .query(`SELECT NotificationType, IsEnabled FROM UserNotifications WHERE UserID = @UserID`);
+  const map = {};
+  for (const row of r.recordset) map[row.NotificationType] = !!row.IsEnabled;
+  return map;
+}
+
+// Upserts the full set of notification prefs for a user
+// prefs: { 'pm.reminder': true, 'repair.overdue': false, ... }
+async function setNotificationPrefs(userID, prefs) {
+  const pool = await getPool();
+  for (const [type, enabled] of Object.entries(prefs)) {
+    await pool.request()
+      .input('UserID',  sql.Int,         userID)
+      .input('Type',    sql.NVarChar(50), type)
+      .input('Enabled', sql.Bit,         enabled ? 1 : 0)
+      .query(`
+        MERGE UserNotifications AS target
+        USING (SELECT @UserID AS UserID, @Type AS NotificationType) AS src
+          ON target.UserID = src.UserID AND target.NotificationType = src.NotificationType
+        WHEN MATCHED    THEN UPDATE SET IsEnabled = @Enabled, UpdatedAt = GETUTCDATE()
+        WHEN NOT MATCHED THEN INSERT (UserID, NotificationType, IsEnabled)
+                              VALUES (@UserID, @Type, @Enabled);
+      `);
+  }
+}
+
+// Returns email addresses of all active users who have opted in to a notification type
+async function getOptedInEmails(notificationType) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('Type', sql.NVarChar(50), notificationType)
+    .query(`
+      SELECT u.Email
+      FROM UserNotifications un
+      JOIN Users u ON u.UserID = un.UserID
+      WHERE un.NotificationType = @Type
+        AND un.IsEnabled = 1
+        AND u.IsActive = 1
+        AND u.Email IS NOT NULL
+    `);
+  return r.recordset.map(row => row.Email);
+}
+
 module.exports = {
   findByID, findByUsername, findByEmail, findByExternalID,
   getAll, create, update, updatePassword, updateLastLogin,
   setRoles, verifyPassword, toggleActive,
+  getNotificationPrefs, setNotificationPrefs, getOptedInEmails,
 };

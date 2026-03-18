@@ -35,4 +35,9 @@ function canAccessSystemKeys(req, res, next) {
   return hasRole('Admin', 'SystemKeys')(req, res, next);
 }
 
-module.exports = { isAuthenticated, isAdmin, hasRole, canWrite, canAccessSystemKeys };
+// canManageNotifications — Admin or Notifications role
+function canManageNotifications(req, res, next) {
+  return hasRole('Admin', 'Notifications')(req, res, next);
+}
+
+module.exports = { isAuthenticated, isAdmin, hasRole, canWrite, canAccessSystemKeys, canManageNotifications };

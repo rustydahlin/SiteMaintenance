@@ -1,7 +1,7 @@
 'use strict';
 
 const express   = require('express');
-const { isAuthenticated } = require('../middleware/auth');
+const { isAuthenticated, canManageNotifications } = require('../middleware/auth');
 const userModel = require('../models/userModel');
 const { body, validationResult } = require('express-validator');
 const router = express.Router();
@@ -10,8 +10,28 @@ router.use(isAuthenticated);
 
 router.get('/', async (req, res, next) => {
   try {
-    const profile = await userModel.findByID(req.user.UserID);
-    res.render('users/profile', { title: 'My Profile', profile });
+    const roles = req.user?.roles || [];
+    const canNotify = roles.includes('Admin') || roles.includes('Notifications');
+    const [profile, notifPrefs] = await Promise.all([
+      userModel.findByID(req.user.UserID),
+      canNotify ? userModel.getNotificationPrefs(req.user.UserID) : Promise.resolve({}),
+    ]);
+    res.render('users/profile', { title: 'My Profile', profile, notifPrefs, canNotify });
+  } catch (err) { next(err); }
+});
+
+router.post('/notifications', canManageNotifications, async (req, res, next) => {
+  try {
+    const TYPES = [
+      'pm.reminder', 'repair.followup', 'repair.overdue',
+      'warranty.expiring', 'site.statusChange', 'log.new',
+      'systemKey.expiring',
+    ];
+    const prefs = {};
+    for (const t of TYPES) prefs[t] = req.body[t] === '1';
+    await userModel.setNotificationPrefs(req.user.UserID, prefs);
+    req.flash('success', 'Notification preferences saved.');
+    res.redirect('/profile');
   } catch (err) { next(err); }
 });
 

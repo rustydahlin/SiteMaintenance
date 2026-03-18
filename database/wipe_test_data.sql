@@ -5,7 +5,8 @@
 --          Configuration, lookup tables, users, and settings are preserved.
 --
 -- KEEPS:   Users, UserRoles, Roles, AppSettings, SiteTypes, SiteStatuses,
---          LogTypes, InventoryCategories, InventoryStatuses, StockLocations
+--          LogTypes, InventoryCategories, InventoryStatuses, StockLocations,
+--          UserNotifications (per-user preferences)
 --
 -- WIPES:   Sites, Inventory, SiteInventory, InventoryStock,
 --          UserInventoryPossession, LogEntries, Documents, DocumentData,

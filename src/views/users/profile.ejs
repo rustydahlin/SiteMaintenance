@@ -32,6 +32,58 @@
     </div>
   </div>
 
+  <!-- Notification Preferences -->
+  <% if (canNotify) { %>
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold"><i class="bi bi-bell me-2"></i>Email Notification Preferences</div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Select which email notifications you want to receive.
+          You must have an email address set on your account for these to be delivered.
+          <strong>Note:</strong> if you are directly assigned to a PM schedule or system key, you will always receive
+          that reminder regardless of these settings — these checkboxes control whether you receive
+          notifications for items <em>not</em> assigned to you.
+        </p>
+        <form action="/profile/notifications" method="POST">
+          <%
+            const prefs = notifPrefs || {};
+            const notifTypes = [
+              { key: 'pm.reminder',       label: 'PM Reminders',              desc: 'PMs that are due or overdue across all sites (assigned PMs notify you regardless)' },
+              { key: 'repair.followup',   label: 'Repair Follow-Up Due',      desc: 'Any repair where the follow-up date has passed' },
+              { key: 'repair.overdue',    label: 'Repair Overdue',            desc: 'Any repair not returned by its expected date' },
+              { key: 'warranty.expiring', label: 'Warranty Expiring',         desc: 'Sites or inventory items with warranties expiring soon' },
+              { key: 'site.statusChange', label: 'Site Status Changes',       desc: 'When any site\'s status is updated' },
+              { key: 'log.new',           label: 'New Log Entries',           desc: 'When a new log entry is created on any site' },
+{ key: 'systemKey.expiring',label: 'System Key Expiring',       desc: 'System keys expiring soon (key holders are always notified regardless)' },
+            ];
+          %>
+          <div class="row g-2">
+            <% for (const n of notifTypes) { %>
+            <div class="col-md-6">
+              <div class="form-check d-flex align-items-start gap-2">
+                <input class="form-check-input mt-1" type="checkbox" name="<%= n.key %>" value="1"
+                       id="notif_<%= n.key.replace('.','_') %>"
+                       <%= prefs[n.key] ? 'checked' : '' %>>
+                <label class="form-check-label" for="notif_<%= n.key.replace('.','_') %>">
+                  <span class="fw-semibold"><%= n.label %></span>
+                  <br><span class="text-muted small"><%= n.desc %></span>
+                </label>
+              </div>
+            </div>
+            <% } %>
+          </div>
+          <div class="mt-3">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-check-lg me-1"></i>Save Preferences
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
   <% if (profile.AuthProvider === 'local') { %>
   <div class="col-md-6">
     <div class="card shadow-sm">
