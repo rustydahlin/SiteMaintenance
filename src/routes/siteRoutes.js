@@ -106,7 +106,7 @@ router.get('/export', async (req, res, next) => {
 router.get('/import/template', isAdmin, (_req, res) => {
   const wb = XLSX.utils.book_new();
   const headers = [
-    'SiteName', 'SiteNumber', 'ContractNumber', 'SiteType', 'Status',
+    'SiteName', 'SiteNumber', 'ContractNumber', 'SiteType',
     'Address', 'City', 'State', 'ZipCode',
     'Latitude', 'Longitude', 'WarrantyExpires', 'Description',
   ];
@@ -142,12 +142,8 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
       return res.redirect('/sites/import');
     }
 
-    const [siteTypes, siteStatuses] = await Promise.all([
-      lookupModel.getSiteTypes(),
-      lookupModel.getSiteStatuses(),
-    ]);
-    const typeMap   = Object.fromEntries(siteTypes.map(t => [t.TypeName.toLowerCase(),   t.SiteTypeID]));
-    const statusMap = Object.fromEntries(siteStatuses.map(s => [s.StatusName.toLowerCase(), s.SiteStatusID]));
+    const siteTypes = await lookupModel.getSiteTypes();
+    const typeMap   = Object.fromEntries(siteTypes.map(t => [t.TypeName.toLowerCase(), t.SiteTypeID]));
 
     const plan    = [];
     const summary = { total: rows.length, created: 0, updated: 0, skipped: 0, errors: 0 };
@@ -167,18 +163,11 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
       }
 
       const siteTypeName = (row['SiteType'] || '').toString().trim();
-      const statusName   = (row['Status']   || '').toString().trim();
-      const siteTypeID   = siteTypeName ? (typeMap[siteTypeName.toLowerCase()]   || null) : null;
-      const siteStatusID = statusName   ? (statusMap[statusName.toLowerCase()] || null) : null;
+      const siteTypeID   = siteTypeName ? (typeMap[siteTypeName.toLowerCase()] || null) : null;
 
       if (siteTypeName && !siteTypeID) {
         summary.errors++;
-        plan.push({ action: 'error', rowNum, display: { siteName, siteNumber, siteType: siteTypeName, status: statusName }, message: `Site Type "${siteTypeName}" not found` });
-        continue;
-      }
-      if (statusName && !siteStatusID) {
-        summary.errors++;
-        plan.push({ action: 'error', rowNum, display: { siteName, siteNumber, siteType: siteTypeName, status: statusName }, message: `Status "${statusName}" not found` });
+        plan.push({ action: 'error', rowNum, display: { siteName, siteNumber, siteType: siteTypeName }, message: `Site Type "${siteTypeName}" not found` });
         continue;
       }
 
@@ -190,7 +179,6 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
         siteNumber,
         contractNumber:  norm(row['ContractNumber']),
         siteTypeID,
-        siteStatusID,
         address:         norm(row['Address']),
         city:            norm(row['City']),
         state:           norm(row['State']),
@@ -209,7 +197,6 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
           ['Site #',       norm(existing.SiteNumber),       norm(siteData.siteNumber)],
           ['Contract #',   norm(existing.ContractNumber),   norm(siteData.contractNumber)],
           ['Type',         norm(existing.SiteTypeName),     norm(siteTypeName) || null],
-          ['Status',       norm(existing.SiteStatusName),   norm(statusName)   || null],
           ['Address',      norm(existing.Address),          norm(siteData.address)],
           ['City',         norm(existing.City),             norm(siteData.city)],
           ['State',        norm(existing.State),            norm(siteData.state)],
@@ -222,10 +209,10 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
          .map(([field, from, to]) => ({ field, from, to }));
 
         summary.updated++;
-        plan.push({ action: 'update', rowNum, display: { siteName, siteNumber, siteType: siteTypeName, status: statusName }, existingID, data: siteData, diff });
+        plan.push({ action: 'update', rowNum, display: { siteName, siteNumber, siteType: siteTypeName }, existingID, data: siteData, diff });
       } else {
         summary.created++;
-        plan.push({ action: 'create', rowNum, display: { siteName, siteNumber, siteType: siteTypeName, status: statusName }, data: siteData });
+        plan.push({ action: 'create', rowNum, display: { siteName, siteNumber, siteType: siteTypeName }, data: siteData });
       }
     }
 

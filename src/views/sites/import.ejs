@@ -46,7 +46,6 @@
             <tr><td><code>SiteNumber</code></td><td><span class="badge bg-secondary">No</span></td><td>Up to 100 characters</td></tr>
             <tr><td><code>ContractNumber</code></td><td><span class="badge bg-secondary">No</span></td><td>Up to 100 characters</td></tr>
             <tr><td><code>SiteType</code></td><td><span class="badge bg-secondary">No</span></td><td>Must match an existing Site Type name</td></tr>
-            <tr><td><code>Status</code></td><td><span class="badge bg-secondary">No</span></td><td>Must match an existing Status name</td></tr>
             <tr><td><code>Address</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
             <tr><td><code>City</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
             <tr><td><code>State</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
@@ -103,7 +102,6 @@
           <th>Site Name</th>
           <th>Site #</th>
           <th>Type</th>
-          <th>Status</th>
           <th>Result</th>
         </tr>
       </thead>
@@ -120,7 +118,6 @@
           </td>
           <td class="small text-muted"><%= row.siteNumber || '—' %></td>
           <td class="small text-muted"><%= row.siteType || '—' %></td>
-          <td class="small text-muted"><%= row.status || '—' %></td>
           <td>
             <% if (row.result === 'created') { %>
               <span class="badge bg-success">Created</span>

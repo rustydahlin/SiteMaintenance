@@ -49,7 +49,6 @@
             <th>Site Name</th>
             <th>Site #</th>
             <th>Type</th>
-            <th>Status</th>
             <th style="width:6rem">Action</th>
             <th>Changes</th>
           </tr>
@@ -61,7 +60,6 @@
             <td class="small fw-semibold"><%= entry.display.siteName || '—' %></td>
             <td class="small text-muted"><%= entry.display.siteNumber || '—' %></td>
             <td class="small text-muted"><%= entry.display.siteType || '—' %></td>
-            <td class="small text-muted"><%= entry.display.status || '—' %></td>
             <td>
               <% if (entry.action === 'create') { %>
                 <span class="badge bg-success">New</span>
