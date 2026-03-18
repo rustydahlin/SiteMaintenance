@@ -92,6 +92,27 @@ CREATE TABLE LogTypes (
     IsActive    BIT           NOT NULL DEFAULT 1
 );
 
+CREATE TABLE InventoryCommonNames (
+    CommonNameID INT           IDENTITY(1,1) PRIMARY KEY,
+    Name         NVARCHAR(150) NOT NULL,
+    IsActive     BIT           NOT NULL DEFAULT 1,
+    CreatedAt    DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE()
+);
+
+CREATE TABLE InventoryModelNumbers (
+    ModelNumberID INT           IDENTITY(1,1) PRIMARY KEY,
+    Name          NVARCHAR(150) NOT NULL,
+    IsActive      BIT           NOT NULL DEFAULT 1,
+    CreatedAt     DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE()
+);
+
+CREATE TABLE InventoryManufacturers (
+    ManufacturerID INT           IDENTITY(1,1) PRIMARY KEY,
+    Name           NVARCHAR(150) NOT NULL,
+    IsActive       BIT           NOT NULL DEFAULT 1,
+    CreatedAt      DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE()
+);
+
 CREATE TABLE InventoryCategories (
     CategoryID   INT           IDENTITY(1,1) PRIMARY KEY,
     CategoryName NVARCHAR(100) NOT NULL UNIQUE,

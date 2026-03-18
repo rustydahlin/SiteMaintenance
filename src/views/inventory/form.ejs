@@ -48,12 +48,16 @@
           <label for="commonName" class="form-label">
             Common Name <span class="text-danger">*</span>
           </label>
-          <input type="text" id="commonName" name="commonName"
-                 class="form-control"
-                 value="<%= item && item.CommonName ? item.CommonName : '' %>"
-                 maxlength="150"
-                 placeholder="e.g. Spare VMS Server NIC"
-                 required />
+          <select id="commonName" name="commonName" class="form-select" required>
+            <option value="">— Select Common Name —</option>
+            <% (typeof commonNames !== 'undefined' ? commonNames : []).forEach(n => { %>
+              <option value="<%= n.Name %>"
+                <%= (item && item.CommonName === n.Name) ? 'selected' : '' %>>
+                <%= n.Name %>
+              </option>
+            <% }) %>
+          </select>
+          <div class="form-text">Manage options in <a href="/admin/inventory/common-names" target="_blank">Admin → Inventory</a>.</div>
         </div>
 
         <!-- Serial Number (serialized only) -->
@@ -97,19 +101,29 @@
         <!-- Model Number -->
         <div class="col-md-4">
           <label for="modelNumber" class="form-label">Model Number</label>
-          <input type="text" id="modelNumber" name="modelNumber"
-                 class="form-control"
-                 value="<%= item && item.ModelNumber ? item.ModelNumber : '' %>"
-                 maxlength="100" />
+          <select id="modelNumber" name="modelNumber" class="form-select">
+            <option value="">— Select Model Number —</option>
+            <% (typeof modelNumbers !== 'undefined' ? modelNumbers : []).forEach(n => { %>
+              <option value="<%= n.Name %>"
+                <%= (item && item.ModelNumber === n.Name) ? 'selected' : '' %>>
+                <%= n.Name %>
+              </option>
+            <% }) %>
+          </select>
         </div>
 
         <!-- Manufacturer -->
         <div class="col-md-4">
           <label for="manufacturer" class="form-label">Manufacturer</label>
-          <input type="text" id="manufacturer" name="manufacturer"
-                 class="form-control"
-                 value="<%= item && item.Manufacturer ? item.Manufacturer : '' %>"
-                 maxlength="150" />
+          <select id="manufacturer" name="manufacturer" class="form-select">
+            <option value="">— Select Manufacturer —</option>
+            <% (typeof manufacturers !== 'undefined' ? manufacturers : []).forEach(n => { %>
+              <option value="<%= n.Name %>"
+                <%= (item && item.Manufacturer === n.Name) ? 'selected' : '' %>>
+                <%= n.Name %>
+              </option>
+            <% }) %>
+          </select>
         </div>
 
         <!-- Related System -->

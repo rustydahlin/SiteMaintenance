@@ -168,6 +168,93 @@ async function toggleStockLocation(id) {
     .query('UPDATE StockLocations SET IsActive = 1 - IsActive WHERE LocationID = @ID');
 }
 
+// ── Inventory Common Names ────────────────────────────────────────────────────
+async function getInventoryCommonNames(activeOnly = true) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('ActiveOnly', sql.Bit, activeOnly ? 1 : 0)
+    .query(`SELECT * FROM InventoryCommonNames WHERE (@ActiveOnly = 0 OR IsActive = 1) ORDER BY Name`);
+  return r.recordset;
+}
+
+async function upsertInventoryCommonName(id, name) {
+  const pool = await getPool();
+  if (id) {
+    await pool.request()
+      .input('ID', sql.Int, id)
+      .input('Name', sql.NVarChar(150), name)
+      .query('UPDATE InventoryCommonNames SET Name = @Name WHERE CommonNameID = @ID');
+  } else {
+    await pool.request()
+      .input('Name', sql.NVarChar(150), name)
+      .query('INSERT INTO InventoryCommonNames (Name) VALUES (@Name)');
+  }
+}
+
+async function toggleInventoryCommonName(id) {
+  const pool = await getPool();
+  await pool.request().input('ID', sql.Int, id)
+    .query('UPDATE InventoryCommonNames SET IsActive = 1 - IsActive WHERE CommonNameID = @ID');
+}
+
+// ── Inventory Model Numbers ───────────────────────────────────────────────────
+async function getInventoryModelNumbers(activeOnly = true) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('ActiveOnly', sql.Bit, activeOnly ? 1 : 0)
+    .query(`SELECT * FROM InventoryModelNumbers WHERE (@ActiveOnly = 0 OR IsActive = 1) ORDER BY Name`);
+  return r.recordset;
+}
+
+async function upsertInventoryModelNumber(id, name) {
+  const pool = await getPool();
+  if (id) {
+    await pool.request()
+      .input('ID', sql.Int, id)
+      .input('Name', sql.NVarChar(150), name)
+      .query('UPDATE InventoryModelNumbers SET Name = @Name WHERE ModelNumberID = @ID');
+  } else {
+    await pool.request()
+      .input('Name', sql.NVarChar(150), name)
+      .query('INSERT INTO InventoryModelNumbers (Name) VALUES (@Name)');
+  }
+}
+
+async function toggleInventoryModelNumber(id) {
+  const pool = await getPool();
+  await pool.request().input('ID', sql.Int, id)
+    .query('UPDATE InventoryModelNumbers SET IsActive = 1 - IsActive WHERE ModelNumberID = @ID');
+}
+
+// ── Inventory Manufacturers ───────────────────────────────────────────────────
+async function getInventoryManufacturers(activeOnly = true) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('ActiveOnly', sql.Bit, activeOnly ? 1 : 0)
+    .query(`SELECT * FROM InventoryManufacturers WHERE (@ActiveOnly = 0 OR IsActive = 1) ORDER BY Name`);
+  return r.recordset;
+}
+
+async function upsertInventoryManufacturer(id, name) {
+  const pool = await getPool();
+  if (id) {
+    await pool.request()
+      .input('ID', sql.Int, id)
+      .input('Name', sql.NVarChar(150), name)
+      .query('UPDATE InventoryManufacturers SET Name = @Name WHERE ManufacturerID = @ID');
+  } else {
+    await pool.request()
+      .input('Name', sql.NVarChar(150), name)
+      .query('INSERT INTO InventoryManufacturers (Name) VALUES (@Name)');
+  }
+}
+
+async function toggleInventoryManufacturer(id) {
+  const pool = await getPool();
+  await pool.request().input('ID', sql.Int, id)
+    .query('UPDATE InventoryManufacturers SET IsActive = 1 - IsActive WHERE ManufacturerID = @ID');
+}
+
 // ── Key Manufacturers ─────────────────────────────────────────────────────────
 async function getKeyManufacturers(activeOnly = true) {
   const pool = await getPool();
@@ -208,4 +295,7 @@ module.exports = {
   getInventoryStatuses, getInventoryStatusByName,
   getStockLocations, upsertStockLocation, toggleStockLocation,
   getKeyManufacturers, upsertKeyManufacturer, toggleKeyManufacturer,
+  getInventoryCommonNames, upsertInventoryCommonName, toggleInventoryCommonName,
+  getInventoryModelNumbers, upsertInventoryModelNumber, toggleInventoryModelNumber,
+  getInventoryManufacturers, upsertInventoryManufacturer, toggleInventoryManufacturer,
 };

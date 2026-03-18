@@ -135,6 +135,38 @@ router.post('/key-manufacturers', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Inventory Lookups hub ─────────────────────────────────────────────────────
+router.get('/inventory', (_req, res) => {
+  res.render('admin/inventoryLookups', { title: 'Inventory Lookups' });
+});
+
+// helper: single-field upsert pattern for the three simple pick-list tables
+function simplePicklistRoute(routePath, label, getFn, upsertFn, toggleFn, viewName) {
+  router.get(routePath, async (_req, res, next) => {
+    try {
+      const items = await getFn(false);
+      res.render(`admin/${viewName}`, { title: label, items });
+    } catch (err) { next(err); }
+  });
+  router.post(routePath, async (req, res, next) => {
+    try {
+      const { id, name, action } = req.body;
+      if (action === 'toggle') {
+        await toggleFn(parseInt(id));
+      } else {
+        if (!name?.trim()) { req.flash('error', `${label} name is required.`); return res.redirect(`/admin${routePath}`); }
+        await upsertFn(id ? parseInt(id) : null, name.trim());
+      }
+      req.flash('success', `${label} saved.`);
+      res.redirect(`/admin${routePath}`);
+    } catch (err) { next(err); }
+  });
+}
+
+simplePicklistRoute('/inventory/common-names',   'Common Names',   lookupModel.getInventoryCommonNames,   lookupModel.upsertInventoryCommonName,   lookupModel.toggleInventoryCommonName,   'inventoryCommonNames');
+simplePicklistRoute('/inventory/model-numbers',  'Model Numbers',  lookupModel.getInventoryModelNumbers,  lookupModel.upsertInventoryModelNumber,  lookupModel.toggleInventoryModelNumber,  'inventoryModelNumbers');
+simplePicklistRoute('/inventory/manufacturers',  'Manufacturers',  lookupModel.getInventoryManufacturers, lookupModel.upsertInventoryManufacturer, lookupModel.toggleInventoryManufacturer, 'inventoryManufacturers');
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 router.get('/users', async (req, res, next) => {
   try {

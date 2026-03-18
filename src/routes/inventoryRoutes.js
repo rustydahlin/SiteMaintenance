@@ -297,11 +297,14 @@ router.post('/import/confirm', isAdmin, async (req, res, next) => {
 // ── GET /new — create form ────────────────────────────────────────────────────
 router.get('/new', isAdmin, async (req, res, next) => {
   try {
-    const [categories, statuses, locations, systems] = await Promise.all([
+    const [categories, statuses, locations, systems, commonNames, modelNumbers, manufacturers] = await Promise.all([
       lookupModel.getInventoryCategories(),
       lookupModel.getInventoryStatuses(),
       lookupModel.getStockLocations(),
       inventoryModel.getSystemsList(),
+      lookupModel.getInventoryCommonNames(),
+      lookupModel.getInventoryModelNumbers(),
+      lookupModel.getInventoryManufacturers(),
     ]);
     res.render('inventory/form', {
       title:          'Add Inventory Item',
@@ -311,6 +314,9 @@ router.get('/new', isAdmin, async (req, res, next) => {
       statuses,
       locations,
       systems,
+      commonNames,
+      modelNumbers,
+      manufacturers,
       presetSystemID: req.query.relatedSystemID ? parseInt(req.query.relatedSystemID, 10) : null,
     });
   } catch (err) {
@@ -418,12 +424,15 @@ router.get('/:id', async (req, res, next) => {
 router.get('/:id/edit', isAdmin, async (req, res, next) => {
   try {
     const itemID = parseInt(req.params.id, 10);
-    const [item, categories, statuses, locations, systems] = await Promise.all([
+    const [item, categories, statuses, locations, systems, commonNames, modelNumbers, manufacturers] = await Promise.all([
       inventoryModel.getByID(itemID),
       lookupModel.getInventoryCategories(),
       lookupModel.getInventoryStatuses(),
       lookupModel.getStockLocations(),
       inventoryModel.getSystemsList(itemID),
+      lookupModel.getInventoryCommonNames(),
+      lookupModel.getInventoryModelNumbers(),
+      lookupModel.getInventoryManufacturers(),
     ]);
 
     if (!item) {
@@ -439,6 +448,9 @@ router.get('/:id/edit', isAdmin, async (req, res, next) => {
       statuses,
       locations,
       systems,
+      commonNames,
+      modelNumbers,
+      manufacturers,
     });
   } catch (err) {
     next(err);

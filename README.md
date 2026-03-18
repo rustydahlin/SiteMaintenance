@@ -246,6 +246,7 @@ When new database migrations are released:
 | `010_user_notifications.sql` | Creates `UserNotifications` table for per-user email notification opt-in preferences |
 | `011_repair_assigned_user.sql` | Adds `AssignedUserID` to `RepairTracking`; back-fills from `SentByUserID` |
 | `012_repair_sentdate_nullable.sql` | Makes `SentDate` nullable on `RepairTracking` so RMAs can be created before shipment |
+| `013_inventory_picklists.sql` | Adds `InventoryCommonNames`, `InventoryModelNumbers`, `InventoryManufacturers` pick-list tables; seeds from existing data |
 
 > **Note:** `database/schema.sql` always reflects the current full schema. Fresh installs only need to run `schema.sql` + `seed.sql` — migrations are only needed when upgrading an existing database.
 

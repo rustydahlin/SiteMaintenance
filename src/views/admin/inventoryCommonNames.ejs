@@ -1,0 +1,71 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-card-text me-2"></i>Common Names</h1>
+  <a href="/admin/inventory" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+<div class="row g-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm">
+      <div class="card-header" id="formTitle">Add Common Name</div>
+      <div class="card-body">
+        <form action="/admin/inventory/common-names" method="POST" id="itemForm">
+          <input type="hidden" name="id" id="itemID" value="" />
+          <div class="mb-3">
+            <label class="form-label">Name <span class="text-danger">*</span></label>
+            <input type="text" name="name" id="itemName" class="form-control" required maxlength="150" />
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm" id="submitBtn">Add</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="cancelBtn">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Name</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <% items.forEach(c => { %>
+            <tr class="<%= c.IsActive ? '' : 'text-muted' %>">
+              <td><%= c.Name %></td>
+              <td><span class="badge <%= c.IsActive ? 'bg-success' : 'bg-secondary' %>"><%= c.IsActive ? 'Active' : 'Inactive' %></span></td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-primary py-0 me-1 js-edit"
+                  data-id="<%= c.CommonNameID %>" data-name="<%= c.Name %>">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form action="/admin/inventory/common-names" method="POST" class="d-inline">
+                  <input type="hidden" name="id" value="<%= c.CommonNameID %>" />
+                  <input type="hidden" name="action" value="toggle" />
+                  <button type="submit" class="btn btn-sm btn-outline-secondary py-0"><%= c.IsActive ? 'Disable' : 'Enable' %></button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.querySelectorAll('.js-edit').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.getElementById('itemID').value   = this.dataset.id;
+    document.getElementById('itemName').value = this.dataset.name;
+    document.getElementById('formTitle').textContent = 'Edit Common Name';
+    document.getElementById('submitBtn').textContent = 'Save Changes';
+    document.getElementById('cancelBtn').classList.remove('d-none');
+    document.getElementById('itemName').focus();
+  });
+});
+document.getElementById('cancelBtn').addEventListener('click', function() {
+  document.getElementById('itemForm').reset();
+  document.getElementById('itemID').value = '';
+  document.getElementById('formTitle').textContent = 'Add Common Name';
+  document.getElementById('submitBtn').textContent = 'Add';
+  this.classList.add('d-none');
+});
+</script>
