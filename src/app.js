@@ -104,6 +104,7 @@ async function createApp() {
   app.use('/vendors',      require('./routes/vendorRoutes'));
   app.use('/system-keys',  require('./routes/systemKeyRoutes'));
   app.use('/maintenance',  require('./routes/maintenanceRoutes'));
+  app.use('/logs',         require('./routes/logsRoutes'));
   app.use('/admin',        require('./routes/adminRoutes'));
   app.use('/profile',    require('./routes/profileRoutes'));
 

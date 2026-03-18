@@ -45,6 +45,12 @@
         </a>
       </li>
       <% } %>
+      <li class="nav-item">
+        <a class="nav-link <%= currentPath.startsWith('/logs') ? 'active' : '' %>" href="/logs" title="Logs">
+          <i class="bi bi-journal-text"></i>
+          <span class="nav-label">Logs</span>
+        </a>
+      </li>
 
       <li class="nav-item mt-2">
         <span class="sidebar-section-label">Vendors</span>
