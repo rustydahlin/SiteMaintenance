@@ -838,9 +838,24 @@
             Removing <strong id="removeBulkName"></strong> from this site.<br>
             <span class="text-muted">Currently installed: <strong id="removeBulkMax"></strong> unit(s)</span>
           </p>
-          <label class="form-label small">Quantity to remove</label>
-          <input type="number" name="quantity" id="removeBulkQty"
-                 class="form-control" min="1" value="1" required />
+          <div class="mb-3">
+            <label class="form-label small">Quantity to remove</label>
+            <input type="number" name="quantity" id="removeBulkQty"
+                   class="form-control" min="1" value="1" required />
+          </div>
+          <div>
+            <label class="form-label small">After removal</label>
+            <div class="d-flex flex-column gap-1">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="disposition" id="dispReturn" value="return" checked>
+                <label class="form-check-label small" for="dispReturn">Return to inventory (unallocated)</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="disposition" id="dispDelete" value="delete">
+                <label class="form-check-label small" for="dispDelete">Delete from inventory</label>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>

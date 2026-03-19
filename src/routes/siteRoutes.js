@@ -683,7 +683,12 @@ router.post('/:id/inventory/:itemID/remove-bulk', isAdmin, async (req, res, next
       return res.redirect(`/sites/${siteID}#equipment`);
     }
     await siteInventoryModel.removeBulkQuantity(siteID, itemID, quantity, { removedByUserID: req.user?.UserID }, req.auditContext);
-    req.flash('success', `${quantity} unit(s) removed from site.`);
+    if (req.body.disposition === 'delete') {
+      await inventoryModel.adjustQuantityTotal(itemID, -quantity);
+      req.flash('success', `${quantity} unit(s) removed from site and deleted from inventory.`);
+    } else {
+      req.flash('success', `${quantity} unit(s) removed from site and returned to inventory.`);
+    }
     res.redirect(`/sites/${siteID}#equipment`);
   } catch (err) {
     if (err.userMessage) {
