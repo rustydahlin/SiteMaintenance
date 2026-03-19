@@ -3,242 +3,389 @@
   <a href="/admin" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
 </div>
 
+<style>
+.settings-chevron { transition: transform 0.2s; }
+.card-header[data-bs-toggle="collapse"] { cursor: pointer; user-select: none; }
+.card-header[data-bs-toggle="collapse"].collapsed .settings-chevron { transform: rotate(-90deg); }
+</style>
+
 <form action="/admin/settings" method="POST">
+
   <!-- General -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold"><i class="bi bi-sliders me-2"></i>General</div>
-    <div class="card-body row g-3">
-      <div class="col-md-4">
-        <label class="form-label">Application Name</label>
-        <input type="text" name="app.name" class="form-control"
-               value="<%= settings['app.name'] || 'SiteMaintenance' %>"
-               placeholder="SiteMaintenance" maxlength="80" />
-        <div class="form-text">Displayed in the top-left navigation bar.</div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Enable System Keys Section</label>
-        <select name="systemKeys.enabled" class="form-select">
-          <option value="0" <%= settings['systemKeys.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
-          <option value="1" <%= settings['systemKeys.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
-        </select>
-        <div class="form-text">Show / hide the System Keys section in the navigation.</div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Enable Vendors Section</label>
-        <select name="vendors.enabled" class="form-select">
-          <option value="0" <%= settings['vendors.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
-          <option value="1" <%= settings['vendors.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
-        </select>
-        <div class="form-text">Show / hide the Vendors section in the navigation.</div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Enable Maintenance Section</label>
-        <select name="maintenance.enabled" class="form-select">
-          <option value="0" <%= settings['maintenance.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
-          <option value="1" <%= settings['maintenance.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
-        </select>
-        <div class="form-text">Show / hide the Maintenance section in the navigation.</div>
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#s-general">
+      <i class="bi bi-sliders me-2"></i>General
+      <i class="bi bi-chevron-down ms-auto settings-chevron"></i>
+    </div>
+    <div class="collapse" id="s-general">
+      <div class="card-body row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Application Name</label>
+          <input type="text" name="app.name" class="form-control"
+                 value="<%= settings['app.name'] || 'SiteMaintenance' %>"
+                 placeholder="SiteMaintenance" maxlength="80" />
+          <div class="form-text">Displayed in the top-left navigation bar.</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Enable System Keys Section</label>
+          <select name="systemKeys.enabled" class="form-select">
+            <option value="0" <%= settings['systemKeys.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+            <option value="1" <%= settings['systemKeys.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+          </select>
+          <div class="form-text">Show / hide the System Keys section in the navigation.</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Enable Vendors Section</label>
+          <select name="vendors.enabled" class="form-select">
+            <option value="0" <%= settings['vendors.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+            <option value="1" <%= settings['vendors.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+          </select>
+          <div class="form-text">Show / hide the Vendors section in the navigation.</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Enable Maintenance Section</label>
+          <select name="maintenance.enabled" class="form-select">
+            <option value="0" <%= settings['maintenance.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+            <option value="1" <%= settings['maintenance.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+          </select>
+          <div class="form-text">Show / hide the Maintenance section in the navigation.</div>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Sidebar -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold"><i class="bi bi-layout-sidebar me-2"></i>Sidebar</div>
-    <div class="card-body row g-3">
-      <div class="col-md-5">
-        <label class="form-label">Logo / Image URL</label>
-        <input type="text" name="sidebar.logoUrl" class="form-control"
-               value="<%= settings['sidebar.logoUrl'] || '/images/publicsafetyteam.png' %>"
-               placeholder="/images/yourlogo.png" maxlength="500" />
-        <div class="form-text">Path or URL to the image shown at the bottom of the sidebar. Leave blank to hide.</div>
-      </div>
-      <div class="col-md-7">
-        <label class="form-label">Footer Text <span class="text-muted fw-normal">(HTML allowed)</span></label>
-        <textarea name="sidebar.footerHtml" class="form-control" rows="2"
-                  placeholder="e.g. Call Darron. (701) 328-6974"><%= settings['sidebar.footerHtml'] !== undefined ? settings['sidebar.footerHtml'] : 'Call Darron. (701) 328-6974' %></textarea>
-        <div class="form-text">Text displayed below the logo. Supports HTML (links, line breaks, etc.). Leave blank to hide.</div>
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#s-sidebar">
+      <i class="bi bi-layout-sidebar me-2"></i>Sidebar
+      <i class="bi bi-chevron-down ms-auto settings-chevron"></i>
+    </div>
+    <div class="collapse" id="s-sidebar">
+      <div class="card-body row g-3">
+        <div class="col-md-5">
+          <label class="form-label">Logo / Image URL</label>
+          <input type="text" name="sidebar.logoUrl" class="form-control"
+                 value="<%= settings['sidebar.logoUrl'] || '/images/publicsafetyteam.png' %>"
+                 placeholder="/images/yourlogo.png" maxlength="500" />
+          <div class="form-text">Path or URL to the image shown at the bottom of the sidebar. Leave blank to hide.</div>
+        </div>
+        <div class="col-md-7">
+          <label class="form-label">Footer Text <span class="text-muted fw-normal">(HTML allowed)</span></label>
+          <textarea name="sidebar.footerHtml" class="form-control" rows="2"
+                    placeholder="e.g. Call Darron. (701) 328-6974"><%= settings['sidebar.footerHtml'] !== undefined ? settings['sidebar.footerHtml'] : 'Call Darron. (701) 328-6974' %></textarea>
+          <div class="form-text">Text displayed below the logo. Supports HTML (links, line breaks, etc.). Leave blank to hide.</div>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Login Page -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold"><i class="bi bi-door-open me-2"></i>Login Page</div>
-    <div class="card-body row g-3">
-      <div class="col-md-4">
-        <label class="form-label">SSO Button Label</label>
-        <input type="text" name="login.oidcButtonLabel" class="form-control"
-               value="<%= settings['login.oidcButtonLabel'] || '' %>"
-               placeholder="Sign in with Microsoft / Entra ID" maxlength="80" />
-        <div class="form-text">Label for the OIDC / SSO login button. Leave blank for default.</div>
-      </div>
-      <div class="col-md-8">
-        <label class="form-label">Login Page Note</label>
-        <input type="text" name="login.note" class="form-control"
-               value="<%= settings['login.note'] || '' %>"
-               placeholder="e.g. Use your network username and password" maxlength="200" />
-        <div class="form-text">Optional message displayed on the login page below the password field.</div>
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#s-login">
+      <i class="bi bi-door-open me-2"></i>Login Page
+      <i class="bi bi-chevron-down ms-auto settings-chevron"></i>
+    </div>
+    <div class="collapse" id="s-login">
+      <div class="card-body row g-3">
+        <div class="col-md-4">
+          <label class="form-label">SSO Button Label</label>
+          <input type="text" name="login.oidcButtonLabel" class="form-control"
+                 value="<%= settings['login.oidcButtonLabel'] || '' %>"
+                 placeholder="Sign in with Microsoft / Entra ID" maxlength="80" />
+          <div class="form-text">Label for the OIDC / SSO login button. Leave blank for default.</div>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Login Page Note</label>
+          <input type="text" name="login.note" class="form-control"
+                 value="<%= settings['login.note'] || '' %>"
+                 placeholder="e.g. Use your network username and password" maxlength="200" />
+          <div class="form-text">Optional message displayed on the login page below the password field.</div>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- OIDC / Entra ID -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold"><i class="bi bi-microsoft me-2"></i>OIDC / Entra ID Authentication</div>
-    <div class="card-body row g-3">
-      <div class="col-md-3">
-        <label class="form-label">Enable OIDC Login</label>
-        <select name="oidc.enabled" class="form-select">
-          <option value="0" <%= settings['oidc.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
-          <option value="1" <%= settings['oidc.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
-        </select>
-      </div>
-      <div class="col-md-9">
-        <label class="form-label">Redirect URI</label>
-        <input type="text" name="oidc.redirectUri" class="form-control" value="<%= settings['oidc.redirectUri'] || '' %>" placeholder="https://yourapp.example.com/auth/oidc/callback" />
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Tenant ID</label>
-        <input type="text" name="oidc.tenantId" class="form-control" value="<%= settings['oidc.tenantId'] || '' %>" />
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Client ID</label>
-        <input type="text" name="oidc.clientId" class="form-control" value="<%= settings['oidc.clientId'] || '' %>" />
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Client Secret</label>
-        <input type="password" name="oidc.clientSecret" class="form-control" placeholder="<%= settings['oidc.clientSecret'] ? '••••••' : 'Not set' %>" autocomplete="new-password" />
-        <div class="form-text">Leave blank to keep existing secret.</div>
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#s-oidc">
+      <i class="bi bi-microsoft me-2"></i>OIDC / Entra ID Authentication
+      <i class="bi bi-chevron-down ms-auto settings-chevron"></i>
+    </div>
+    <div class="collapse" id="s-oidc">
+      <div class="card-body row g-3">
+        <div class="col-md-3">
+          <label class="form-label">Enable OIDC Login</label>
+          <select name="oidc.enabled" class="form-select">
+            <option value="0" <%= settings['oidc.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+            <option value="1" <%= settings['oidc.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+          </select>
+        </div>
+        <div class="col-md-9">
+          <label class="form-label">Redirect URI</label>
+          <input type="text" name="oidc.redirectUri" class="form-control" value="<%= settings['oidc.redirectUri'] || '' %>" placeholder="https://yourapp.example.com/auth/oidc/callback" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Tenant ID</label>
+          <input type="text" name="oidc.tenantId" class="form-control" value="<%= settings['oidc.tenantId'] || '' %>" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Client ID</label>
+          <input type="text" name="oidc.clientId" class="form-control" value="<%= settings['oidc.clientId'] || '' %>" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Client Secret</label>
+          <input type="password" name="oidc.clientSecret" class="form-control" placeholder="<%= settings['oidc.clientSecret'] ? '••••••' : 'Not set' %>" autocomplete="new-password" />
+          <div class="form-text">Leave blank to keep existing secret.</div>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- LDAP / Active Directory -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold"><i class="bi bi-diagram-3 me-2"></i>Active Directory / LDAP</div>
-    <div class="card-body row g-3">
-      <div class="col-md-3">
-        <label class="form-label">Enable AD Login</label>
-        <select name="ldap.enabled" class="form-select">
-          <option value="0" <%= settings['ldap.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
-          <option value="1" <%= settings['ldap.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
-        </select>
-      </div>
-      <div class="col-md-9">
-        <label class="form-label">LDAP Server URL</label>
-        <input type="text" name="ldap.url" class="form-control"
-               value="<%= settings['ldap.url'] || '' %>" placeholder="dc.example.com or ldaps://dc.example.com:636" />
-        <div class="form-text"><code>ldap://</code> is added automatically if omitted.</div>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Bind Username</label>
-        <input type="text" name="ldap.bindDn" class="form-control"
-               value="<%= settings['ldap.bindDn'] || '' %>" placeholder="binduser@example.com" />
-        <div class="form-text">Account used to search the directory.</div>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Bind Password</label>
-        <input type="password" name="ldap.bindCredentials" class="form-control"
-               placeholder="<%= settings['ldap.bindCredentials'] ? '••••••' : 'Not set' %>"
-               autocomplete="new-password" />
-        <div class="form-text">Leave blank to keep existing password.</div>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Base DN for User Search</label>
-        <input type="text" name="ldap.searchBase" class="form-control"
-               value="<%= settings['ldap.searchBase'] || '' %>" placeholder="DC=example,DC=com" />
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Search Filter</label>
-        <input type="text" name="ldap.searchFilter" class="form-control"
-               value="<%= settings['ldap.searchFilter'] || '(sAMAccountName={{username}})' %>"
-               placeholder="(sAMAccountName={{username}})" />
-        <div class="form-text"><code>{{username}}</code> is replaced with the entered username.</div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Use STARTTLS</label>
-        <select name="ldap.starttls" class="form-select">
-          <option value="0" <%= settings['ldap.starttls'] === '1' ? '' : 'selected' %>>No</option>
-          <option value="1" <%= settings['ldap.starttls'] === '1' ? 'selected' : '' %>>Yes</option>
-        </select>
-        <div class="form-text">Port 389 + TLS upgrade. Use <code>ldaps://</code> for port 636.</div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Reject Unauthorized TLS</label>
-        <select name="ldap.rejectUnauthorized" class="form-select">
-          <option value="1" <%= settings['ldap.rejectUnauthorized'] === '0' ? '' : 'selected' %>>Yes (recommended)</option>
-          <option value="0" <%= settings['ldap.rejectUnauthorized'] === '0' ? 'selected' : '' %>>No (allow self-signed)</option>
-        </select>
-      </div>
-      <div class="col-12">
-        <label class="form-label">Test Connection</label>
-        <div class="d-flex gap-2 align-items-center">
-          <input type="text" id="ldapTestUser" class="form-control" placeholder="AD username" style="max-width:220px" />
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="testLdapBtn">
-            <i class="bi bi-plug me-1"></i>Test
-          </button>
-          <span id="ldapTestResult" class="small"></span>
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#s-ldap">
+      <i class="bi bi-diagram-3 me-2"></i>Active Directory / LDAP
+      <i class="bi bi-chevron-down ms-auto settings-chevron"></i>
+    </div>
+    <div class="collapse" id="s-ldap">
+      <div class="card-body row g-3">
+        <div class="col-md-3">
+          <label class="form-label">Enable AD Login</label>
+          <select name="ldap.enabled" class="form-select">
+            <option value="0" <%= settings['ldap.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+            <option value="1" <%= settings['ldap.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+          </select>
         </div>
-        <div class="form-text">Save settings first, then enter a username to verify the connection.</div>
+        <div class="col-md-9">
+          <label class="form-label">LDAP Server URL</label>
+          <input type="text" name="ldap.url" class="form-control"
+                 value="<%= settings['ldap.url'] || '' %>" placeholder="dc.example.com or ldaps://dc.example.com:636" />
+          <div class="form-text"><code>ldap://</code> is added automatically if omitted.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Bind Username</label>
+          <input type="text" name="ldap.bindDn" class="form-control"
+                 value="<%= settings['ldap.bindDn'] || '' %>" placeholder="binduser@example.com" />
+          <div class="form-text">Account used to search the directory.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Bind Password</label>
+          <input type="password" name="ldap.bindCredentials" class="form-control"
+                 placeholder="<%= settings['ldap.bindCredentials'] ? '••••••' : 'Not set' %>"
+                 autocomplete="new-password" />
+          <div class="form-text">Leave blank to keep existing password.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Base DN for User Search</label>
+          <input type="text" name="ldap.searchBase" class="form-control"
+                 value="<%= settings['ldap.searchBase'] || '' %>" placeholder="DC=example,DC=com" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Search Filter</label>
+          <input type="text" name="ldap.searchFilter" class="form-control"
+                 value="<%= settings['ldap.searchFilter'] || '(sAMAccountName={{username}})' %>"
+                 placeholder="(sAMAccountName={{username}})" />
+          <div class="form-text"><code>{{username}}</code> is replaced with the entered username.</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Use STARTTLS</label>
+          <select name="ldap.starttls" class="form-select">
+            <option value="0" <%= settings['ldap.starttls'] === '1' ? '' : 'selected' %>>No</option>
+            <option value="1" <%= settings['ldap.starttls'] === '1' ? 'selected' : '' %>>Yes</option>
+          </select>
+          <div class="form-text">Port 389 + TLS upgrade. Use <code>ldaps://</code> for port 636.</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Reject Unauthorized TLS</label>
+          <select name="ldap.rejectUnauthorized" class="form-select">
+            <option value="1" <%= settings['ldap.rejectUnauthorized'] === '0' ? '' : 'selected' %>>Yes (recommended)</option>
+            <option value="0" <%= settings['ldap.rejectUnauthorized'] === '0' ? 'selected' : '' %>>No (allow self-signed)</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Test Connection</label>
+          <div class="d-flex gap-2 align-items-center">
+            <input type="text" id="ldapTestUser" class="form-control" placeholder="AD username" style="max-width:220px" />
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="testLdapBtn">
+              <i class="bi bi-plug me-1"></i>Test
+            </button>
+            <span id="ldapTestResult" class="small"></span>
+          </div>
+          <div class="form-text">Save settings first, then enter a username to verify the connection.</div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Email Settings link -->
-  <div class="card shadow-sm mb-4 border-0 bg-body-secondary">
-    <div class="card-body d-flex align-items-center gap-3 py-3">
-      <i class="bi bi-envelope fs-3 text-primary"></i>
-      <div class="flex-grow-1">
-        <div class="fw-semibold">Email &amp; Notification Settings</div>
-        <div class="text-muted small">Configure SMTP, reminder thresholds, and notification email templates.</div>
+  <!-- Email / SMTP -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#s-email">
+      <i class="bi bi-envelope me-2"></i>Email / SMTP
+      <i class="bi bi-chevron-down ms-auto settings-chevron"></i>
+    </div>
+    <div class="collapse" id="s-email">
+      <div class="card-body row g-3">
+        <div class="col-md-3">
+          <label class="form-label">Enable Email</label>
+          <select name="email.enabled" class="form-select">
+            <option value="0" <%= settings['email.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+            <option value="1" <%= settings['email.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">SMTP Host</label>
+          <input type="text" name="email.host" class="form-control" value="<%= settings['email.host'] || '' %>" placeholder="smtp.office365.com" />
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Port</label>
+          <input type="number" name="email.port" class="form-control" value="<%= settings['email.port'] || '587' %>" />
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Use TLS</label>
+          <select name="email.secure" class="form-select">
+            <option value="none" <%= settings['email.secure'] === 'none' ? 'selected' : '' %>>None (port 25)</option>
+            <option value="0" <%= (!settings['email.secure'] || settings['email.secure'] === '0') ? 'selected' : '' %>>STARTTLS (port 587)</option>
+            <option value="1" <%= settings['email.secure'] === '1' ? 'selected' : '' %>>TLS/SSL (port 465)</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">SMTP Username</label>
+          <input type="text" name="email.user" class="form-control" value="<%= settings['email.user'] || '' %>" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">SMTP Password</label>
+          <input type="password" name="email.password" class="form-control"
+                 placeholder="<%= settings['email.password'] ? '••••••' : 'Not set' %>"
+                 autocomplete="new-password" />
+          <div class="form-text">Leave blank to keep the existing password.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">From Address</label>
+          <input type="email" name="email.fromAddress" class="form-control" value="<%= settings['email.fromAddress'] || '' %>" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">From Name</label>
+          <input type="text" name="email.fromName" class="form-control" value="<%= settings['email.fromName'] || 'SiteMaintenance' %>" />
+        </div>
+        <div class="col-12 d-flex align-items-center gap-3 flex-wrap">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="testEmailBtn">
+            <i class="bi bi-send me-1"></i>Send Test Email
+          </button>
+          <span id="emailTestResult" class="small"></span>
+          <a href="/admin/email-templates" class="btn btn-outline-secondary btn-sm ms-auto">
+            <i class="bi bi-file-earmark-text me-1"></i>Edit Email Templates
+          </a>
+        </div>
       </div>
-      <a href="/admin/email-settings" class="btn btn-outline-primary btn-sm">
-        <i class="bi bi-envelope-gear me-1"></i>Email Settings
-      </a>
-      <a href="/admin/email-templates" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-file-earmark-text me-1"></i>Email Templates
-      </a>
+    </div>
+  </div>
+
+  <!-- Reminder Thresholds -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#s-reminders">
+      <i class="bi bi-bell me-2"></i>Reminder Thresholds
+      <i class="bi bi-chevron-down ms-auto settings-chevron"></i>
+    </div>
+    <div class="collapse" id="s-reminders">
+      <div class="card-body row g-3">
+        <div class="col-md-4">
+          <label class="form-label">PM Reminder (days before due)</label>
+          <input type="number" name="email.pmReminderDays" class="form-control"
+                 value="<%= settings['email.pmReminderDays'] || '14' %>" min="1" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Warranty Reminder (days before expiry)</label>
+          <input type="number" name="email.warrantyReminderDays" class="form-control"
+                 value="<%= settings['email.warrantyReminderDays'] || '30' %>" min="1" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Repair Overdue (repeat every N days)</label>
+          <input type="number" name="email.repairReminderIntervalDays" class="form-control"
+                 value="<%= settings['email.repairReminderIntervalDays'] || '3' %>" min="1" />
+          <div class="form-text">After Expected Return Date passes, remind every this many days.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Unsent RMA (repeat every N days)</label>
+          <input type="number" name="email.unsentRmaReminderDays" class="form-control"
+                 value="<%= settings['email.unsentRmaReminderDays'] || '3' %>" min="1" />
+          <div class="form-text">Remind assigned user while an RMA has no Sent Date.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">System Key Expiry (days before expiry)</label>
+          <input type="number" name="email.systemKeyReminderDays" class="form-control"
+                 value="<%= settings['email.systemKeyReminderDays'] || '30' %>" min="1" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Maintenance Reminder (repeat every N days)</label>
+          <input type="number" name="email.maintenanceReminderDays" class="form-control"
+                 value="<%= settings['email.maintenanceReminderDays'] || '3' %>" min="1" />
+          <div class="form-text">Email assigned user this often while item is open and not yet due.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Maintenance Overdue (repeat every N days)</label>
+          <input type="number" name="email.maintenanceOverdueDays" class="form-control"
+                 value="<%= settings['email.maintenanceOverdueDays'] || '1' %>" min="0" />
+          <div class="form-text">Email after due date passes. Set to <code>0</code> to disable.</div>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- Logs & Audit -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold"><i class="bi bi-journal-text me-2"></i>Logs &amp; Audit</div>
-    <div class="card-body row g-3">
-      <div class="col-md-3">
-        <label class="form-label">App Log Retention (days)</label>
-        <input type="number" name="logs.appRetentionDays" class="form-control"
-               value="<%= settings['logs.appRetentionDays'] || '30' %>" min="1" />
-        <div class="form-text">How many days to keep <code>app-*.log</code> files.</div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Error Log Retention (days)</label>
-        <input type="number" name="logs.errorRetentionDays" class="form-control"
-               value="<%= settings['logs.errorRetentionDays'] || '90' %>" min="1" />
-        <div class="form-text">How many days to keep <code>error-*.log</code> files.</div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Audit Log Retention (days)</label>
-        <input type="number" name="audit.retentionDays" class="form-control"
-               value="<%= settings['audit.retentionDays'] || '365' %>" min="0" />
-        <div class="form-text">Days to keep audit records. <code>0</code> = keep forever.</div>
-      </div>
-      <div class="col-12">
-        <a href="/admin/logs" class="btn btn-outline-secondary btn-sm">
-          <i class="bi bi-folder2-open me-1"></i>Browse &amp; Download Log Files
-        </a>
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#s-logs">
+      <i class="bi bi-journal-text me-2"></i>Logs &amp; Audit
+      <i class="bi bi-chevron-down ms-auto settings-chevron"></i>
+    </div>
+    <div class="collapse" id="s-logs">
+      <div class="card-body row g-3">
+        <div class="col-md-3">
+          <label class="form-label">App Log Retention (days)</label>
+          <input type="number" name="logs.appRetentionDays" class="form-control"
+                 value="<%= settings['logs.appRetentionDays'] || '30' %>" min="1" />
+          <div class="form-text">How many days to keep <code>app-*.log</code> files.</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Error Log Retention (days)</label>
+          <input type="number" name="logs.errorRetentionDays" class="form-control"
+                 value="<%= settings['logs.errorRetentionDays'] || '90' %>" min="1" />
+          <div class="form-text">How many days to keep <code>error-*.log</code> files.</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Audit Log Retention (days)</label>
+          <input type="number" name="audit.retentionDays" class="form-control"
+                 value="<%= settings['audit.retentionDays'] || '365' %>" min="0" />
+          <div class="form-text">Days to keep audit records. <code>0</code> = keep forever.</div>
+        </div>
+        <div class="col-12">
+          <a href="/admin/logs" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-folder2-open me-1"></i>Browse &amp; Download Log Files
+          </a>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="d-flex gap-2">
+  <div class="d-flex gap-2 mt-4">
     <button type="submit" class="btn btn-primary"><i class="bi bi-save me-2"></i>Save All Settings</button>
     <a href="/admin" class="btn btn-outline-secondary">Cancel</a>
   </div>
 </form>
 
 <script>
+// Collapse state persistence
+const collapseIds = ['s-general','s-sidebar','s-login','s-oidc','s-ldap','s-email','s-reminders','s-logs'];
+collapseIds.forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (localStorage.getItem('settings-' + id) === 'true') {
+    bootstrap.Collapse.getOrCreateInstance(el, { toggle: false }).show();
+  }
+  el.addEventListener('show.bs.collapse', () => localStorage.setItem('settings-' + id, 'true'));
+  el.addEventListener('hide.bs.collapse', () => localStorage.setItem('settings-' + id, 'false'));
+});
+
+// LDAP test
 document.getElementById('testLdapBtn').addEventListener('click', async () => {
   const btn      = document.getElementById('testLdapBtn');
   const result   = document.getElementById('ldapTestResult');
@@ -257,7 +404,27 @@ document.getElementById('testLdapBtn').addEventListener('click', async () => {
     result.className   = 'small ' + (data.success ? 'text-success' : 'text-danger');
   } catch (e) {
     result.textContent = 'Request failed.';
-    result.className   = 'small text-danger';
+    result.className = 'small text-danger';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Email test
+document.getElementById('testEmailBtn').addEventListener('click', async () => {
+  const btn    = document.getElementById('testEmailBtn');
+  const result = document.getElementById('emailTestResult');
+  btn.disabled = true;
+  result.textContent = 'Sending...';
+  result.className = 'ms-3 small text-muted';
+  try {
+    const res  = await fetch('/admin/settings/email/test', { method: 'POST' });
+    const data = await res.json();
+    result.textContent = data.message;
+    result.className = 'ms-3 small ' + (data.success ? 'text-success' : 'text-danger');
+  } catch (e) {
+    result.textContent = 'Request failed.';
+    result.className = 'ms-3 small text-danger';
   } finally {
     btn.disabled = false;
   }
