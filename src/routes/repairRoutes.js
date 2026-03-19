@@ -156,10 +156,13 @@ router.post('/', isAdmin, async (req, res, next) => {
       }
     }
 
-    // If a bulk stock entry was selected, decrement the entry and the total
-    const bulkStockID = req.body.bulkStockID ? parseInt(req.body.bulkStockID, 10) : null;
-    if (bulkStockID) {
-      await inventoryModel.adjustStockByStockID(bulkStockID, -1);
+    // For bulk items: decrement QuantityTotal; also decrement the specific stock entry if one was chosen
+    const bulkStockID  = req.body.bulkStockID ? parseInt(req.body.bulkStockID, 10) : null;
+    const pickedItem   = await inventoryModel.getByID(parseInt(itemID, 10));
+    if (pickedItem && pickedItem.TrackingType === 'bulk') {
+      if (bulkStockID) {
+        await inventoryModel.adjustStockByStockID(bulkStockID, -1);
+      }
       await inventoryModel.adjustQuantityTotal(parseInt(itemID, 10), -1);
     }
 

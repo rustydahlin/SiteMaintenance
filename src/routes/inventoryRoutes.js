@@ -46,25 +46,28 @@ router.get('/', async (req, res, next) => {
       } else if (item.CommonName) {
         if (!seenGroups.has(item.CommonName)) {
           seenGroups.add(item.CommonName);
-          const groupItems    = rows.filter(r => r.TrackingType !== 'bulk' && r.CommonName === item.CommonName);
-          const inStockItems  = groupItems.filter(r => r.StatusName === 'In-Stock');
-          const deployedItems = groupItems.filter(r => r.StatusName === 'Deployed');
+          const groupItems     = rows.filter(r => r.TrackingType !== 'bulk' && r.CommonName === item.CommonName);
+          const inStockItems   = groupItems.filter(r => r.StatusName === 'In-Stock');
+          const deployedItems  = groupItems.filter(r => r.StatusName === 'Deployed');
+          const inRepairItems  = groupItems.filter(r => r.StatusName === 'In-Repair');
+          const knownCount     = inStockItems.length + deployedItems.length + inRepairItems.length;
           // Primary in-stock location: most common among in-stock units
           const locCounts = {};
           inStockItems.forEach(r => { if (r.StockLocationName) locCounts[r.StockLocationName] = (locCounts[r.StockLocationName] || 0) + 1; });
           const primaryLocation = Object.keys(locCounts).sort((a, b) => locCounts[b] - locCounts[a])[0] || null;
           displayRows.push({
-            _displayType:  'group',
-            commonName:    item.CommonName,
-            CategoryName:  item.CategoryName,
-            ModelNumber:   item.ModelNumber,
-            Manufacturer:  item.Manufacturer,
-            totalCount:    groupItems.length,
-            inStockCount:  inStockItems.length,
-            deployedCount: deployedItems.length,
-            otherCount:    groupItems.length - inStockItems.length - deployedItems.length,
+            _displayType:   'group',
+            commonName:     item.CommonName,
+            CategoryName:   item.CategoryName,
+            ModelNumber:    item.ModelNumber,
+            Manufacturer:   item.Manufacturer,
+            totalCount:     groupItems.length,
+            inStockCount:   inStockItems.length,
+            deployedCount:  deployedItems.length,
+            inRepairCount:  inRepairItems.length,
+            otherCount:     groupItems.length - knownCount,
             primaryLocation,
-            locationCount: Object.keys(locCounts).length,
+            locationCount:  Object.keys(locCounts).length,
           });
         }
       } else {

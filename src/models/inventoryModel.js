@@ -83,6 +83,9 @@ async function getAll({ categoryID, statusID, search, locationID, assignedUserID
        JOIN StockLocations sl2 ON sl2.LocationID = isk.LocationID
        WHERE isk.ItemID = i.ItemID AND isk.Quantity > 0
        ORDER BY isk.Quantity DESC) AS BulkPrimaryLocation,
+      -- Open repair count for bulk items
+      (SELECT COUNT(*) FROM RepairTracking rt
+       WHERE rt.ItemID = i.ItemID AND rt.ReceivedDate IS NULL) AS InRepairCount,
       rs.CommonName  AS RelatedSystemCommonName,
       COALESCE(rs.CommonName, rs.ModelNumber, rs.SerialNumber) AS RelatedSystemName
     FROM Inventory i
