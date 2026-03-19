@@ -41,6 +41,24 @@ async function getBySite(siteID) {
   return result.recordset;
 }
 
+async function getByVendor(vendorID) {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('VendorID', sql.Int, vendorID)
+    .query(`
+      SELECT
+        d.DocumentID, d.OriginalFilename, d.MimeType, d.FileSizeBytes,
+        d.Description, d.UploadedByUserID, d.UploadedAt,
+        d.LogEntryID, d.SiteID, d.ItemID, d.VendorID,
+        u.DisplayName AS UploadedByName
+      FROM Documents d
+      LEFT JOIN Users u ON u.UserID = d.UploadedByUserID
+      WHERE d.VendorID = @VendorID
+      ORDER BY d.UploadedAt DESC
+    `);
+  return result.recordset;
+}
+
 async function getByItem(itemID) {
   const pool = await getPool();
   const result = await pool.request()
@@ -98,7 +116,7 @@ async function getFileData(documentID) {
 
 async function create({
   originalFilename, mimeType, fileSizeBytes, uploadedByUserID,
-  description, logEntryID, siteID, itemID, fileBuffer,
+  description, logEntryID, siteID, itemID, vendorID, fileBuffer,
 }, auditContext = {}) {
   const pool = await getPool();
   const tx   = new sql.Transaction(pool);
@@ -114,13 +132,14 @@ async function create({
       .input('LogEntryID',        sql.Int,            logEntryID        || null)
       .input('SiteID',            sql.Int,            siteID            || null)
       .input('ItemID',            sql.Int,            itemID            || null)
+      .input('VendorID',          sql.Int,            vendorID          || null)
       .query(`
         INSERT INTO Documents
           (OriginalFilename, MimeType, FileSizeBytes, UploadedByUserID, Description,
-           LogEntryID, SiteID, ItemID)
+           LogEntryID, SiteID, ItemID, VendorID)
         VALUES
           (@OriginalFilename, @MimeType, @FileSizeBytes, @UploadedByUserID, @Description,
-           @LogEntryID, @SiteID, @ItemID);
+           @LogEntryID, @SiteID, @ItemID, @VendorID);
         SELECT SCOPE_IDENTITY() AS NewID
       `);
 
@@ -166,7 +185,7 @@ async function hardDelete(documentID, auditContext = {}) {
 }
 
 module.exports = {
-  getByLogEntry, getBySite, getByItem,
+  getByLogEntry, getBySite, getByItem, getByVendor,
   getMetadata, getFileData,
   create, delete: hardDelete,
 };

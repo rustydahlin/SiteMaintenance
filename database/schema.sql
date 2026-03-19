@@ -413,19 +413,23 @@ CREATE TABLE Documents (
     LogEntryID       INT           NULL,
     SiteID           INT           NULL,
     ItemID           INT           NULL,
+    VendorID         INT           NULL,
     CONSTRAINT FK_Doc_LogEntry   FOREIGN KEY (LogEntryID)       REFERENCES LogEntries(LogEntryID),
     CONSTRAINT FK_Doc_Site       FOREIGN KEY (SiteID)           REFERENCES Sites(SiteID),
     CONSTRAINT FK_Doc_Item       FOREIGN KEY (ItemID)           REFERENCES Inventory(ItemID),
+    CONSTRAINT FK_Doc_Vendor     FOREIGN KEY (VendorID)         REFERENCES Vendors(VendorID),
     CONSTRAINT FK_Doc_UploadedBy FOREIGN KEY (UploadedByUserID) REFERENCES Users(UserID),
     CONSTRAINT CHK_Doc_OneOwner  CHECK (
         (CASE WHEN LogEntryID IS NOT NULL THEN 1 ELSE 0 END +
          CASE WHEN SiteID     IS NOT NULL THEN 1 ELSE 0 END +
-         CASE WHEN ItemID     IS NOT NULL THEN 1 ELSE 0 END) = 1
+         CASE WHEN ItemID     IS NOT NULL THEN 1 ELSE 0 END +
+         CASE WHEN VendorID   IS NOT NULL THEN 1 ELSE 0 END) = 1
     )
 );
 CREATE INDEX IX_Doc_LogEntryID ON Documents(LogEntryID) WHERE LogEntryID IS NOT NULL;
 CREATE INDEX IX_Doc_SiteID     ON Documents(SiteID)     WHERE SiteID IS NOT NULL;
 CREATE INDEX IX_Doc_ItemID     ON Documents(ItemID)     WHERE ItemID IS NOT NULL;
+CREATE INDEX IX_Doc_VendorID   ON Documents(VendorID)   WHERE VendorID IS NOT NULL;
 
 -- Separate table for binary data to keep Documents metadata rows fast
 CREATE TABLE DocumentData (

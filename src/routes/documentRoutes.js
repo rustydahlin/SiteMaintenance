@@ -31,10 +31,11 @@ router.post('/upload', canWrite, upload.single('file'), async (req, res, next) =
     const { entityType, entityId, description } = req.body;
     const id = parseInt(entityId);
 
-    let logEntryID = null, siteID = null, itemID = null;
-    if      (entityType === 'log')  logEntryID = id;
-    else if (entityType === 'site') siteID     = id;
-    else if (entityType === 'item') itemID     = id;
+    let logEntryID = null, siteID = null, itemID = null, vendorID = null;
+    if      (entityType === 'log')    logEntryID = id;
+    else if (entityType === 'site')   siteID     = id;
+    else if (entityType === 'item')   itemID     = id;
+    else if (entityType === 'vendor') vendorID   = id;
     else {
       req.flash('error', 'Invalid entity type.');
       return res.redirect('back');
@@ -46,7 +47,7 @@ router.post('/upload', canWrite, upload.single('file'), async (req, res, next) =
       fileSizeBytes:    req.file.size,
       uploadedByUserID: req.user.UserID,
       description:      description || null,
-      logEntryID, siteID, itemID,
+      logEntryID, siteID, itemID, vendorID,
       fileBuffer:       req.file.buffer,
     }, req.auditContext);
 

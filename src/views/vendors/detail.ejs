@@ -167,6 +167,18 @@
   <% } %>
 </div>
 
+<!-- Documents -->
+<div class="mt-4">
+  <%- include('../partials/fileList', {
+    documents:  documents,
+    uploadUrl:  '/documents/upload',
+    canUpload:  isAdminUser,
+    entityType: 'vendor',
+    entityId:   vendor.VendorID,
+    returnTo:   `/vendors/${vendor.VendorID}`
+  }) %>
+</div>
+
 <!-- Add Contact Modal -->
 <% if (isAdminUser) { %>
 <div class="modal fade" id="addContactModal" tabindex="-1">

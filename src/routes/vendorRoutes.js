@@ -253,12 +253,17 @@ router.post('/', isAdmin, async (req, res, next) => {
 // ── GET /:id — detail ─────────────────────────────────────────────────────────
 router.get('/:id', async (req, res, next) => {
   try {
-    const vendor = await vendorModel.getByID(parseInt(req.params.id, 10));
+    const vendorID = parseInt(req.params.id, 10);
+    const documentModel = require('../models/documentModel');
+    const [vendor, documents] = await Promise.all([
+      vendorModel.getByID(vendorID),
+      documentModel.getByVendor(vendorID),
+    ]);
     if (!vendor) {
       req.flash('error', 'Vendor not found.');
       return res.redirect('/vendors');
     }
-    res.render('vendors/detail', { title: vendor.VendorName, vendor });
+    res.render('vendors/detail', { title: vendor.VendorName, vendor, documents });
   } catch (err) { next(err); }
 });
 
