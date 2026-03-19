@@ -79,15 +79,20 @@
             <label class="form-label small fw-semibold mb-1">Swap in replacement (optional)</label>
             <input type="hidden" id="replacementItemID" name="replacementItemID" value="" />
             <div class="input-group input-group-sm">
-              <input type="text" id="replacementSearch" class="form-control"
-                     placeholder="Search In-Stock items…" autocomplete="off" />
-              <button type="button" class="btn btn-outline-secondary btn-sm" id="clearReplacement"
+              <input type="text" id="replacementChosen" class="form-control bg-body-secondary" readonly
+                     placeholder="Click to browse In-Stock items…"
+                     style="cursor:pointer"
+                     data-bs-toggle="modal" data-bs-target="#replacementPickerModal" />
+              <button type="button" class="btn btn-outline-secondary btn-sm"
+                      data-bs-toggle="modal" data-bs-target="#replacementPickerModal"
+                      title="Browse In-Stock items">
+                <i class="bi bi-search"></i>
+              </button>
+              <button type="button" class="btn btn-outline-danger btn-sm" id="clearReplacement"
                       style="display:none" title="Clear replacement">
                 <i class="bi bi-x-lg"></i>
               </button>
             </div>
-            <div id="replacementResults" class="list-group mt-1" style="display:none; max-height:180px; overflow-y:auto;"></div>
-            <div id="replacementChosen" class="form-control form-control-sm bg-body-secondary mt-1" style="display:none;"></div>
           </div>
         </div>
 
@@ -274,6 +279,79 @@
   </div>
 </div>
 
+<!-- ── Replacement Picker Modal ───────────────────────────────────────────── -->
+<div class="modal fade" id="replacementPickerModal" tabindex="-1" aria-labelledby="replPickerLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title" id="replPickerLabel">
+          <i class="bi bi-box-seam me-2"></i>Select Replacement — In-Stock Items
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="p-3 border-bottom">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" id="replPickerSearch" class="form-control"
+                   placeholder="Search by serial number, common name, model, manufacturer…"
+                   autocomplete="off" />
+            <button type="button" class="btn btn-outline-secondary" id="replClearSearch"
+                    style="display:none" title="Clear search">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+        <div id="replLoading" class="text-center text-muted py-5" style="display:none">
+          <div class="spinner-border spinner-border-sm me-2"></div>Loading…
+        </div>
+        <div id="replEmpty" class="text-center text-muted py-5" style="display:none">
+          <i class="bi bi-inbox fs-3 d-block mb-2"></i>No in-stock items found.
+        </div>
+        <div class="table-responsive" id="replTableWrap">
+          <table class="table table-hover table-sm align-middle mb-0" style="cursor:pointer">
+            <thead class="table-dark sticky-top">
+              <tr>
+                <th>Serial #</th>
+                <th>Common Name</th>
+                <th>Model #</th>
+                <th>Manufacturer</th>
+                <th>Stock Location</th>
+              </tr>
+            </thead>
+            <tbody id="replTableBody"></tbody>
+          </table>
+        </div>
+        <div id="replCount" class="px-3 py-2 border-top small text-muted" style="display:none"></div>
+
+        <!-- Bulk items matching Common Name -->
+        <div id="replBulkSection" style="display:none">
+          <div class="px-3 pt-3 pb-1 border-top">
+            <span class="fw-semibold small">
+              <i class="bi bi-stack me-1 text-secondary"></i>Bulk Items — Matching Common Name
+            </span>
+            <span class="text-muted small ms-2">Tracked by quantity, not serial number.</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle mb-0" style="cursor:pointer">
+              <thead class="table-secondary">
+                <tr>
+                  <th>Common Name</th>
+                  <th>Model #</th>
+                  <th>Manufacturer</th>
+                  <th>Stock Location</th>
+                  <th class="text-center">Available</th>
+                </tr>
+              </thead>
+              <tbody id="replBulkBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   const hiddenInput   = document.getElementById('itemID');
@@ -283,12 +361,6 @@
   const deployWarning = document.getElementById('deployedWarning');
   const deployedName  = document.getElementById('deployedSiteName');
 
-  // Replacement picker elements
-  const replSearch    = document.getElementById('replacementSearch');
-  const replHidden    = document.getElementById('replacementItemID');
-  const replResults   = document.getElementById('replacementResults');
-  const replChosen    = document.getElementById('replacementChosen');
-  const replClearBtn  = document.getElementById('clearReplacement');
 
   // Modal picker elements
   const pickerSearch      = document.getElementById('pickerSearch');
@@ -304,7 +376,7 @@
   const pickerBulkBody    = document.getElementById('pickerBulkBody');
   const pickerModal       = document.getElementById('itemPickerModal');
 
-  let searchDebounce, replDebounce;
+  let searchDebounce;
 
   function statusBadge(name) {
     const cls = name === 'In-Stock' ? 'bg-success'
@@ -477,12 +549,15 @@
     pickerSearch.focus();
   });
 
+  let selectedCommonName = '';
+
   function selectItem(item) {
     hiddenInput.value      = item.ItemID;
     siHidden.value         = item.CurrentSiteInventoryID || '';
     bulkStockHidden.value  = '';
     displayInput.value     = itemLabel(item);
     clearBtn.style.display = 'inline-flex';
+    selectedCommonName     = item.CommonName || '';
 
     if (item.CurrentSiteID) {
       deployedName.textContent    = item.CurrentSiteName;
@@ -504,64 +579,150 @@
     clearReplacement();
   });
 
-  // ── Replacement inline picker (for deployed items) ──────────────────────────
-  function buildReplResults(items) {
-    if (!items.length) {
-      replResults.innerHTML     = '<div class="list-group-item text-muted small">No in-stock items found.</div>';
-      replResults.style.display = 'block';
-      return;
+  // ── Replacement modal picker ─────────────────────────────────────────────────
+  const replHidden   = document.getElementById('replacementItemID');
+  const replChosen   = document.getElementById('replacementChosen');
+  const replClearBtn   = document.getElementById('clearReplacement');
+  const replModal      = document.getElementById('replacementPickerModal');
+  const replSearch     = document.getElementById('replPickerSearch');
+  const replClearS     = document.getElementById('replClearSearch');
+  const replLoading    = document.getElementById('replLoading');
+  const replEmpty      = document.getElementById('replEmpty');
+  const replTableWrap  = document.getElementById('replTableWrap');
+  const replTableBody  = document.getElementById('replTableBody');
+  const replCount      = document.getElementById('replCount');
+  const replBulkSection= document.getElementById('replBulkSection');
+  const replBulkBody   = document.getElementById('replBulkBody');
+
+  let replDebounce;
+
+  async function loadReplItems(q) {
+    replLoading.style.display     = 'block';
+    replTableWrap.style.display   = 'none';
+    replEmpty.style.display       = 'none';
+    replCount.style.display       = 'none';
+    replBulkSection.style.display = 'none';
+    try {
+      const [items, bulkItems] = await Promise.all([
+        fetch(`/repairs/inventory-search?q=${encodeURIComponent(q || '')}&inStock=1`).then(r => r.json()),
+        q ? fetch(`/repairs/bulk-inventory-search?q=${encodeURIComponent(q)}`).then(r => r.json()) : Promise.resolve([]),
+      ]);
+      replLoading.style.display = 'none';
+
+      if (!items.length && !bulkItems.length) {
+        replEmpty.style.display = 'block';
+      } else if (!items.length) {
+        // bulk items exist — don't show the empty state
+      } else {
+        replCount.textContent       = `${items.length} item${items.length !== 1 ? 's' : ''} found`;
+        replCount.style.display     = 'block';
+        replTableWrap.style.display = '';
+        replTableBody.innerHTML     = items.map(item => `
+          <tr class="repl-row" style="cursor:pointer"
+              data-item='${JSON.stringify(item).replace(/'/g,'&#39;').replace(/"/g,'&quot;')}'>
+            <td class="fw-semibold">${escHtml(item.SerialNumber || '—')}</td>
+            <td>${escHtml(item.CommonName || '—')}</td>
+            <td class="text-muted small">${escHtml(item.ModelNumber || '—')}</td>
+            <td class="text-muted small">${escHtml(item.Manufacturer || '—')}</td>
+            <td class="small">${item.StockLocationName ? `<i class="bi bi-box-seam text-success me-1"></i>${escHtml(item.StockLocationName)}` : '<span class="text-muted">—</span>'}</td>
+          </tr>`).join('');
+        replTableBody.querySelectorAll('.repl-row').forEach(row => {
+          row.addEventListener('click', function () {
+            selectReplacement(JSON.parse(this.dataset.item.replace(/&quot;/g, '"')));
+            bootstrap.Modal.getInstance(replModal).hide();
+          });
+        });
+      }
+
+      // Bulk section
+      if (bulkItems.length) {
+        replBulkSection.style.display = '';
+        let html = '';
+        for (const item of bulkItems) {
+          const distribs     = item.distributions || [];
+          const allocatedQty = distribs.reduce((s, d) => s + d.Quantity, 0);
+          const unallocated  = Math.max(0, item.QuantityAvailable - allocatedQty);
+          html += `<tr class="table-secondary">
+            <td colspan="4" class="fw-semibold ps-3 py-1">
+              <i class="bi bi-stack me-1"></i>${escHtml(item.CommonName || '—')}
+              <span class="text-muted fw-normal small ms-2">${escHtml(item.ModelNumber || '')}${item.ModelNumber && item.Manufacturer ? ' / ' : ''}${escHtml(item.Manufacturer || '')}</span>
+            </td>
+            <td class="text-center py-1 text-muted small">${item.QuantityAvailable} / ${item.QuantityTotal} avail.</td>
+          </tr>`;
+          for (const d of distribs) {
+            const icon    = d.StockType === 'location' ? 'bi-box-seam text-success' : 'bi-person text-info';
+            const subItem = JSON.stringify({ ...item, _stockID: d.StockID, _stockLabel: d.Label }).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+            html += `<tr class="repl-bulk-row" style="cursor:pointer" data-item='${subItem}'>
+              <td class="ps-4 small"><i class="bi ${icon} me-1"></i>${escHtml(d.Label)}</td>
+              <td class="text-muted small" colspan="3"></td>
+              <td class="text-center"><span class="badge bg-success">${d.Quantity}</span></td>
+            </tr>`;
+          }
+          if (unallocated > 0) {
+            const subItem = JSON.stringify({ ...item, _stockID: null, _stockLabel: 'Unallocated' }).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+            html += `<tr class="repl-bulk-row" style="cursor:pointer" data-item='${subItem}'>
+              <td class="ps-4 small text-muted fst-italic"><i class="bi bi-inbox me-1"></i>Unallocated</td>
+              <td class="text-muted small" colspan="3"></td>
+              <td class="text-center"><span class="badge bg-secondary">${unallocated}</span></td>
+            </tr>`;
+          }
+        }
+        replBulkBody.innerHTML = html;
+        replBulkBody.querySelectorAll('.repl-bulk-row').forEach(row => {
+          row.addEventListener('click', function () {
+            selectBulkReplacement(JSON.parse(this.dataset.item.replace(/&quot;/g, '"')));
+            bootstrap.Modal.getInstance(replModal).hide();
+          });
+        });
+      }
+    } catch (_) {
+      replLoading.style.display = 'none';
+      replEmpty.style.display   = 'block';
     }
-    replResults.innerHTML = items.map(item => `
-      <button type="button" class="list-group-item list-group-item-action small py-1 px-2"
-              data-item='${JSON.stringify(item).replace(/'/g, '&#39;')}'>
-        <span class="fw-semibold">${itemLabel(item)}</span>
-        <span class="badge bg-success ms-1">In-Stock</span>
-      </button>
-    `).join('');
-    replResults.style.display = 'block';
-    replResults.querySelectorAll('button').forEach(btn => {
-      btn.addEventListener('click', function () {
-        selectReplacement(JSON.parse(this.dataset.item));
-      });
-    });
   }
+
+  replModal.addEventListener('show.bs.modal', () => {
+    replSearch.value = selectedCommonName;
+    replClearS.style.display = selectedCommonName ? 'inline-flex' : 'none';
+    loadReplItems(selectedCommonName);
+    setTimeout(() => replSearch.focus(), 300);
+  });
+
+  replSearch.addEventListener('input', function () {
+    const q = this.value.trim();
+    replClearS.style.display = q ? 'inline-flex' : 'none';
+    clearTimeout(replDebounce);
+    replDebounce = setTimeout(() => loadReplItems(q), 250);
+  });
+
+  replClearS.addEventListener('click', () => {
+    replSearch.value = '';
+    replClearS.style.display = 'none';
+    loadReplItems('');
+    replSearch.focus();
+  });
 
   function selectReplacement(item) {
     replHidden.value           = item.ItemID;
-    replSearch.style.display   = 'none';
+    replChosen.value           = itemLabel(item);
     replClearBtn.style.display = 'inline-flex';
-    replResults.style.display  = 'none';
-    replResults.innerHTML      = '';
-    replChosen.style.display   = 'block';
-    replChosen.innerHTML = `<i class="bi bi-box-seam me-1 text-muted"></i><strong>${itemLabel(item)}</strong>`;
+  }
+
+  function selectBulkReplacement(item) {
+    replHidden.value           = item.ItemID;
+    const nameParts = [item.CommonName, item.ModelNumber].filter(Boolean).join(' — ');
+    const from      = item._stockLabel ? ` · from: ${item._stockLabel}` : '';
+    replChosen.value           = `${nameParts}${from}`;
+    replClearBtn.style.display = 'inline-flex';
   }
 
   function clearReplacement() {
     replHidden.value           = '';
-    replSearch.value           = '';
-    replSearch.style.display   = '';
+    replChosen.value           = '';
     replClearBtn.style.display = 'none';
-    replChosen.style.display   = 'none';
-    replResults.style.display  = 'none';
-    replResults.innerHTML      = '';
   }
 
   replClearBtn.addEventListener('click', clearReplacement);
-
-  replSearch.addEventListener('input', function () {
-    clearTimeout(replDebounce);
-    const q = this.value.trim();
-    if (!q) { replResults.style.display = 'none'; replResults.innerHTML = ''; return; }
-    replDebounce = setTimeout(async () => {
-      const resp = await fetch(`/repairs/inventory-search?q=${encodeURIComponent(q)}&inStock=1`);
-      buildReplResults(await resp.json());
-    }, 250);
-  });
-
-  document.addEventListener('click', function (e) {
-    if (!replResults.contains(e.target) && e.target !== replSearch)
-      replResults.style.display = 'none';
-  });
 })();
 </script>
 <% } %>
