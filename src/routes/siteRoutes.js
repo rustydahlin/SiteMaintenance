@@ -558,14 +558,20 @@ router.post('/:id/inventory/:siID/replace', isAdmin, async (req, res, next) => {
       return res.redirect(`/sites/${siteID}#equipment`);
     }
 
-    // Remove the old item from the site
-    await siteInventoryModel.removeItem(siID, { removedByUserID: req.user?.UserID }, req.auditContext);
+    // Remove the old item (skip its own log — the install will write a single "Replaced" entry)
+    await siteInventoryModel.removeItem(siID, { removedByUserID: req.user?.UserID, skipLog: true }, req.auditContext);
 
-    // Install the replacement
+    // Install the replacement with a combined "Replaced" log entry
     await siteInventoryModel.installItem(
       siteID,
       parseInt(replacementItemID, 10),
-      { installedAt: new Date(), installedByUserID: req.user?.UserID, installNotes: installNotes || null },
+      {
+        installedAt:      new Date(),
+        installedByUserID: req.user?.UserID,
+        installNotes:     installNotes || null,
+        isReplacement:    true,
+        replacedItemID:   oldSI.ItemID,
+      },
       req.auditContext,
     );
 
@@ -611,19 +617,21 @@ router.post('/:id/inventory/:itemID/replace-bulk', isAdmin, async (req, res, nex
       pulledFromUserID = parseInt(pulledFrom.split(':')[1], 10) || null;
     }
 
-    // Remove the faulty units from the site; remove them from the total too
-    // (if an RMA is created and received, markReceived will add them back)
+    // Remove the faulty units (skip their own logs — one combined "Replaced" entry follows)
+    // Also remove them from the total (markReceived will add them back if RMA received)
     await siteInventoryModel.removeBulkQuantity(siteID, itemID, replaceQty,
-      { removedByUserID: req.user?.UserID }, req.auditContext);
+      { removedByUserID: req.user?.UserID, skipLog: true }, req.auditContext);
     await inventoryModel.adjustQuantityTotal(itemID, -replaceQty);
 
-    // Install replacement units (same item, from chosen stock source)
+    // Install replacement units with a combined "Replaced" log entry
     await siteInventoryModel.installItem(siteID, itemID, {
       installedAt:          new Date(),
       installedByUserID:    req.user?.UserID,
       installNotes:         installNotes || null,
       pulledFromLocationID,
       pulledFromUserID,
+      isReplacement:        true,
+      replacedQty:          replaceQty,
       quantity:             installQty,
     }, req.auditContext);
 
@@ -682,7 +690,8 @@ router.post('/:id/inventory/:itemID/remove-bulk', isAdmin, async (req, res, next
       req.flash('error', 'Please enter a valid quantity to remove.');
       return res.redirect(`/sites/${siteID}#equipment`);
     }
-    await siteInventoryModel.removeBulkQuantity(siteID, itemID, quantity, { removedByUserID: req.user?.UserID }, req.auditContext);
+    const disposition = req.body.disposition === 'delete' ? 'delete' : 'return';
+    await siteInventoryModel.removeBulkQuantity(siteID, itemID, quantity, { removedByUserID: req.user?.UserID, disposition }, req.auditContext);
     if (req.body.disposition === 'delete') {
       await inventoryModel.adjustQuantityTotal(itemID, -quantity);
       req.flash('success', `${quantity} unit(s) removed from site and deleted from inventory.`);
