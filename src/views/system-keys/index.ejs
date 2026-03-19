@@ -52,14 +52,6 @@
         </select>
       </div>
 
-      <div class="col-sm-2 col-lg-1">
-        <div class="form-check mt-4">
-          <input class="form-check-input" type="checkbox" name="includeInactive" id="includeInactive" value="1"
-                 <%= filters.includeInactive === '1' ? 'checked' : '' %>>
-          <label class="form-check-label small" for="includeInactive">Inactive</label>
-        </div>
-      </div>
-
       <div class="col-auto">
         <button type="submit" class="btn btn-sm btn-outline-primary">
           <i class="bi bi-search me-1"></i>Filter
@@ -90,7 +82,6 @@
     const newDir = (sort === col && dir === 'asc') ? 'desc' : 'asc';
     const parts = [];
     if (filters.search)         parts.push(`search=${encodeURIComponent(filters.search)}`);
-    if (filters.includeInactive === '1') parts.push('includeInactive=1');
     if (filters.keyType)        parts.push(`keyType=${encodeURIComponent(filters.keyType)}`);
     if (filters.expiryStatus)   parts.push(`expiryStatus=${encodeURIComponent(filters.expiryStatus)}`);
     if (filters.manufacturerID) parts.push(`manufacturerID=${encodeURIComponent(filters.manufacturerID)}`);
@@ -124,7 +115,7 @@
     </thead>
     <tbody>
     <% for (const k of keys) { %>
-      <tr class="<%= k.IsActive ? '' : 'text-muted' %>">
+      <tr>
         <td><a href="/system-keys/<%= k.KeyID %>"><%= k.IssuedToName || '—' %></a></td>
         <td><%= k.Organization || '—' %></td>
         <td><%= k.DateIssued ? new Date(k.DateIssued).toLocaleDateString() : '—' %></td>
@@ -146,14 +137,12 @@
         </td>
         <td><%= k.LastUpdatedByName || '—' %></td>
         <td class="text-end text-nowrap">
-          <% if (k.IsActive) { %>
           <button type="button" class="btn btn-outline-success btn-sm me-1 js-renew-btn"
             data-key-id="<%= k.KeyID %>"
             data-expiry="<%= k.ExpirationDate ? new Date(k.ExpirationDate).toISOString().slice(0,10) : '' %>"
             title="Renew Key">
             <i class="bi bi-arrow-clockwise"></i>
           </button>
-          <% } %>
           <a href="/system-keys/<%= k.KeyID %>/edit" class="btn btn-outline-secondary btn-sm">Edit</a>
         </td>
       </tr>

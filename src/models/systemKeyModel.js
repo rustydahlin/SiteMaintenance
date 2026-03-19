@@ -52,13 +52,12 @@ async function getAll({ search = '', includeInactive = false, sort = 'issuedTo',
 
   const pool = await getPool();
   const r = await pool.request()
-    .input('IncludeInactive',  sql.Bit,         includeInactive ? 1 : 0)
     .input('Search',           sql.NVarChar(200), search ? `%${search}%` : null)
     .input('KeyType',          sql.NVarChar(20),  keyType || null)
     .input('ManufacturerID',   sql.Int,           manufacturerID || null)
     .query(`
       ${BASE_SELECT}
-      WHERE (@IncludeInactive = 1 OR sk.IsActive = 1)
+      WHERE sk.IsActive = 1
         AND (@Search IS NULL OR
              sk.SerialNumber LIKE @Search OR
              sk.KeyCode LIKE @Search OR
@@ -176,20 +175,13 @@ async function renew(keyID, { lastRenewalDate, expirationDate, notes }, auditCon
     newValues: { lastRenewalDate, expirationDate } });
 }
 
-// ── Soft delete ────────────────────────────────────────────────────────────────
-async function softDelete(keyID, auditContext = {}) {
+// ── Hard delete ────────────────────────────────────────────────────────────────
+async function deleteKey(keyID, auditContext = {}) {
   const pool = await getPool();
-  await pool.request()
-    .input('KeyID',               sql.Int, keyID)
-    .input('LastUpdatedByUserID', sql.Int, auditContext.userID || null)
-    .query(`
-      UPDATE SystemKeys SET
-        IsActive            = 0,
-        LastUpdatedByUserID = @LastUpdatedByUserID,
-        UpdatedAt           = GETUTCDATE()
-      WHERE KeyID = @KeyID
-    `);
   await writeAudit({ ...auditContext, tableName: 'SystemKeys', recordID: keyID, action: 'DELETE' });
+  await pool.request()
+    .input('KeyID', sql.Int, keyID)
+    .query('DELETE FROM SystemKeys WHERE KeyID = @KeyID');
 }
 
 // ── Expiring soon (for cron + dashboard) ──────────────────────────────────────
@@ -234,7 +226,7 @@ module.exports = {
   create,
   update,
   renew,
-  softDelete,
+  deleteKey,
   getExpiringSoon,
   getExpired,
 };

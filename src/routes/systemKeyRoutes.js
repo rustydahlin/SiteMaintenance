@@ -43,16 +43,16 @@ function parseDate(v) {
 // ── GET / — list ───────────────────────────────────────────────────────────────
 router.get('/', async (req, res, next) => {
   try {
-    const { search = '', includeInactive = '', sort = 'issuedTo', dir = 'asc',
+    const { search = '', sort = 'issuedTo', dir = 'asc',
             keyType = '', expiryStatus = '', manufacturerID = '' } = req.query;
     const [keys, manufacturers] = await Promise.all([
       systemKeyModel.getAll({
-        search, includeInactive: includeInactive === '1', sort, dir,
+        search, sort, dir,
         keyType, expiryStatus, manufacturerID: manufacturerID ? parseInt(manufacturerID) : null,
       }),
       lookupModel.getKeyManufacturers(),
     ]);
-    const filters = { search, includeInactive, sort, dir, keyType, expiryStatus, manufacturerID };
+    const filters = { search, sort, dir, keyType, expiryStatus, manufacturerID };
     res.render('system-keys/index', {
       title: 'System Keys', keys, manufacturers, filters, sort, dir,
     });
@@ -62,7 +62,7 @@ router.get('/', async (req, res, next) => {
 // ── GET /export — download CSV ─────────────────────────────────────────────────
 router.get('/export', canImportExport, async (req, res, next) => {
   try {
-    const keys = await systemKeyModel.getAll({ includeInactive: true });
+    const keys = await systemKeyModel.getAll({});
     const rows = keys.map(k => ({
       SerialNumber:    k.SerialNumber      || '',
       IssuedTo:        k.IssuedToName      || '',
@@ -75,7 +75,6 @@ router.get('/export', canImportExport, async (req, res, next) => {
       KeyCode:         k.KeyCode           || '',
       KeyType:         k.KeyType           || '',
       Notes:           k.Notes             || '',
-      IsActive:        k.IsActive ? 'Yes' : 'No',
     }));
 
     const wb = XLSX.utils.book_new();
@@ -266,13 +265,13 @@ router.post('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ── POST /:id/delete — soft delete ────────────────────────────────────────────
+// ── POST /:id/delete — hard delete ────────────────────────────────────────────
 router.post('/:id/delete', async (req, res, next) => {
   try {
     const keyID = parseInt(req.params.id);
     const auditContext = { userID: req.user.UserID, username: req.user.Username };
-    await systemKeyModel.softDelete(keyID, auditContext);
-    req.flash('success', 'System key deactivated.');
+    await systemKeyModel.deleteKey(keyID, auditContext);
+    req.flash('success', 'System key deleted.');
     res.redirect('/system-keys');
   } catch (err) { next(err); }
 });
