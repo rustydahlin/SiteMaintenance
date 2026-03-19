@@ -48,4 +48,38 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── POST /logs — create log entry from global modal ──────────────────────────
+router.post('/', async (req, res, next) => {
+  try {
+    const { siteID, logTypeID, entryDate, subject, performedBy, description } = req.body;
+
+    if (!siteID) {
+      req.flash('error', 'Site is required.');
+      return res.redirect('/logs');
+    }
+    if (!logTypeID) {
+      req.flash('error', 'Log Type is required.');
+      return res.redirect('/logs');
+    }
+    if (!entryDate) {
+      req.flash('error', 'Entry Date is required.');
+      return res.redirect('/logs');
+    }
+
+    const log = await logModel.create({
+      siteID:          parseInt(siteID, 10),
+      logTypeID:       parseInt(logTypeID, 10),
+      entryDate,
+      subject:         subject      || null,
+      performedBy:     performedBy  || null,
+      description:     description  || null,
+      notes:           null,
+      createdByUserID: req.auditContext?.userID || null,
+    }, req.auditContext);
+
+    req.flash('success', 'Log entry created.');
+    res.redirect(`/sites/${siteID}/logs/${log.LogEntryID}`);
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
