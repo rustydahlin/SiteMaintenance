@@ -102,8 +102,12 @@
         </span>
       </div>
       <div class="sidebar-logo nav-label">
-        <img src="/images/publicsafetyteam.png" alt="Logo" style="width:60px;height:auto;margin-bottom:4px;" />
-        <p class="text-muted" style="font-size:11px;margin:0;">Call Darron. (701) 328-6974</p>
+        <% if (sidebarLogoUrl) { %>
+        <img src="<%= sidebarLogoUrl %>" alt="Logo" style="width:60px;height:auto;margin-bottom:4px;" />
+        <% } %>
+        <% if (sidebarFooterHtml) { %>
+        <p class="text-muted" style="font-size:11px;margin:0;"><%- sidebarFooterHtml %></p>
+        <% } %>
       </div>
     </div>
 

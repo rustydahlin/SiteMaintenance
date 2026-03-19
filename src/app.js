@@ -79,21 +79,27 @@ async function createApp() {
     res.locals.flash       = req.flash();
     res.locals.currentPath = req.path;
     try {
-      const [appName, sysKeys, vendors, maintenance] = await Promise.all([
+      const [appName, sysKeys, vendors, maintenance, sidebarLogoUrl, sidebarFooterHtml] = await Promise.all([
         settingsModel.getSetting('app.name', null),
         settingsModel.getSetting('systemKeys.enabled', null),
         settingsModel.getSetting('vendors.enabled', null),
         settingsModel.getSetting('maintenance.enabled', null),
+        settingsModel.getSetting('sidebar.logoUrl', null),
+        settingsModel.getSetting('sidebar.footerHtml', null),
       ]);
       res.locals.appName             = appName || 'SiteMaintenance';
       res.locals.systemKeysEnabled   = sysKeys      === '1';
       res.locals.vendorsEnabled      = vendors      === '1';
       res.locals.maintenanceEnabled  = maintenance  === '1';
+      res.locals.sidebarLogoUrl      = sidebarLogoUrl  || '/images/publicsafetyteam.png';
+      res.locals.sidebarFooterHtml   = sidebarFooterHtml !== null ? sidebarFooterHtml : 'Call Darron. (701) 328-6974';
     } catch (_) {
       res.locals.appName             = 'SiteMaintenance';
       res.locals.systemKeysEnabled   = false;
       res.locals.vendorsEnabled      = false;
       res.locals.maintenanceEnabled  = false;
+      res.locals.sidebarLogoUrl      = '/images/publicsafetyteam.png';
+      res.locals.sidebarFooterHtml   = 'Call Darron. (701) 328-6974';
     }
     next();
   });

@@ -42,6 +42,26 @@
     </div>
   </div>
 
+  <!-- Sidebar -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-layout-sidebar me-2"></i>Sidebar</div>
+    <div class="card-body row g-3">
+      <div class="col-md-5">
+        <label class="form-label">Logo / Image URL</label>
+        <input type="text" name="sidebar.logoUrl" class="form-control"
+               value="<%= settings['sidebar.logoUrl'] || '/images/publicsafetyteam.png' %>"
+               placeholder="/images/yourlogo.png" maxlength="500" />
+        <div class="form-text">Path or URL to the image shown at the bottom of the sidebar. Leave blank to hide.</div>
+      </div>
+      <div class="col-md-7">
+        <label class="form-label">Footer Text <span class="text-muted fw-normal">(HTML allowed)</span></label>
+        <textarea name="sidebar.footerHtml" class="form-control" rows="2"
+                  placeholder="e.g. Call Darron. (701) 328-6974"><%= settings['sidebar.footerHtml'] !== undefined ? settings['sidebar.footerHtml'] : 'Call Darron. (701) 328-6974' %></textarea>
+        <div class="form-text">Text displayed below the logo. Supports HTML (links, line breaks, etc.). Leave blank to hide.</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Login Page -->
   <div class="card shadow-sm mb-4">
     <div class="card-header fw-semibold"><i class="bi bi-door-open me-2"></i>Login Page</div>
