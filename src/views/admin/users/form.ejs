@@ -53,19 +53,35 @@
           <div class="form-text">Leave blank to keep existing password. Only applies to local accounts.</div>
         </div>
         <% } %>
+
+        <!-- ── Roles ─────────────────────────────────────────────────────────── -->
         <div class="col-12">
-          <label class="form-label">Roles</label>
-          <div class="d-flex flex-wrap gap-3">
-            <% roles.forEach(r => { %>
-              <div class="form-check">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <label class="form-label mb-0">Roles</label>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
+                    data-bs-toggle="modal" data-bs-target="#rolesMatrixModal">
+              <i class="bi bi-table me-1"></i>Permissions Reference
+            </button>
+          </div>
+          <div class="row g-2">
+            <% roles.forEach(r => {
+                 const checked = editUser && editUser.roles && editUser.roles.includes(r.RoleName);
+            %>
+            <div class="col-sm-6 col-lg-4">
+              <label class="role-card d-flex align-items-start gap-2 p-2 rounded border cursor-pointer
+                            <%= checked ? 'border-primary bg-primary bg-opacity-10' : '' %>"
+                     for="role_<%= r.RoleID %>" id="roleLabel_<%= r.RoleID %>">
                 <input type="checkbox" name="roles" value="<%= r.RoleName %>"
-                       id="role_<%= r.RoleID %>" class="form-check-input"
-                       <%= editUser && editUser.roles && editUser.roles.includes(r.RoleName) ? 'checked' : '' %> />
-                <label class="form-check-label" for="role_<%= r.RoleID %>">
-                  <%= r.RoleName %>
-                  <% if (r.Description) { %><span class="text-muted small">— <%= r.Description %></span><% } %>
-                </label>
-              </div>
+                       id="role_<%= r.RoleID %>" class="form-check-input mt-1 flex-shrink-0"
+                       <%= checked ? 'checked' : '' %> />
+                <div>
+                  <div class="fw-semibold small"><%= r.RoleName %></div>
+                  <% if (r.Description) { %>
+                  <div class="text-muted" style="font-size:0.78rem"><%= r.Description %></div>
+                  <% } %>
+                </div>
+              </label>
+            </div>
             <% }) %>
           </div>
         </div>
@@ -79,9 +95,226 @@
   </div>
 </div>
 
-<% if (!editUser) { %>
+<!-- ── Permissions Matrix Modal ──────────────────────────────────────────────── -->
+<div class="modal fade" id="rolesMatrixModal" tabindex="-1" aria-labelledby="rolesMatrixLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rolesMatrixLabel"><i class="bi bi-table me-2"></i>Permissions Reference</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered align-middle mb-0" style="font-size:0.82rem">
+            <thead class="table-dark">
+              <tr>
+                <th style="min-width:180px">Capability</th>
+                <th class="text-center">Admin</th>
+                <th class="text-center">Technician</th>
+                <th class="text-center">Contractor</th>
+                <th class="text-center">Viewer</th>
+                <th class="text-center">Maintenance</th>
+                <th class="text-center">Maint&#8209;Close</th>
+                <th class="text-center">SystemKeys</th>
+                <th class="text-center">Import&#8209;Export</th>
+                <th class="text-center">Notifications</th>
+              </tr>
+            </thead>
+            <tbody>
+              <%
+                function y() { return '<span class="text-success fw-bold">&#10003;</span>'; }
+                function n() { return '<span class="text-danger opacity-50">&#8212;</span>'; }
+                function p(t) { return '<span class="text-warning small">' + t + '</span>'; }
+              %>
+              <tr class="table-secondary"><td colspan="10" class="fw-semibold px-3 py-1">Sites &amp; Inventory</td></tr>
+              <tr>
+                <td class="ps-3">View sites &amp; inventory</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- p('Assigned') %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+              </tr>
+              <tr>
+                <td class="ps-3">Create / edit log entries</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- p('Assigned') %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+              </tr>
+              <tr>
+                <td class="ps-3">Install / remove inventory at sites</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+              </tr>
+              <tr>
+                <td class="ps-3">Upload file attachments</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+              </tr>
+              <tr>
+                <td class="ps-3">Manage sites &amp; inventory (create/edit/delete)</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+              </tr>
+
+              <tr class="table-secondary"><td colspan="10" class="fw-semibold px-3 py-1">Maintenance</td></tr>
+              <tr>
+                <td class="ps-3">View maintenance items</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- p('Own only') %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+              </tr>
+              <tr>
+                <td class="ps-3">Create / edit maintenance items</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+              </tr>
+              <tr>
+                <td class="ps-3">Close maintenance items</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- p('Own only') %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+              </tr>
+
+              <tr class="table-secondary"><td colspan="10" class="fw-semibold px-3 py-1">System Keys</td></tr>
+              <tr>
+                <td class="ps-3">View &amp; manage system keys</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+              </tr>
+
+              <tr class="table-secondary"><td colspan="10" class="fw-semibold px-3 py-1">Data Management</td></tr>
+              <tr>
+                <td class="ps-3">Import &amp; export data</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+              </tr>
+
+              <tr class="table-secondary"><td colspan="10" class="fw-semibold px-3 py-1">Administration</td></tr>
+              <tr>
+                <td class="ps-3">Manage users, roles &amp; settings</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+              </tr>
+              <tr>
+                <td class="ps-3">View audit log</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+              </tr>
+              <tr>
+                <td class="ps-3">Email notification preferences</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- y() %></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-3 py-2 small text-muted border-top">
+          <span class="text-success fw-bold me-1">&#10003;</span> Allowed &nbsp;&nbsp;
+          <span class="text-danger opacity-50 me-1">&#8212;</span> Not allowed &nbsp;&nbsp;
+          <span class="text-warning me-1">Assigned / Own only</span> Restricted scope
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.role-card { cursor: pointer; transition: border-color 0.15s, background-color 0.15s; }
+.role-card:hover { border-color: var(--bs-primary) !important; }
+</style>
+
 <script>
 (function () {
+  <% if (!editUser) { %>
   const providerSelect = document.getElementById('authProviderSelect');
   const passwordField  = document.getElementById('passwordField');
   const passwordInput  = document.getElementById('passwordInput');
@@ -91,9 +324,20 @@
     passwordField.style.display = isLocal ? '' : 'none';
     passwordInput.required = isLocal;
   }
-
   providerSelect.addEventListener('change', togglePassword);
   togglePassword();
+  <% } %>
+
+  // Role card highlight toggle
+  document.querySelectorAll('.role-card input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', function () {
+      const label = document.getElementById('roleLabel_' + this.id.replace('role_', ''));
+      if (this.checked) {
+        label.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+      } else {
+        label.classList.remove('border-primary', 'bg-primary', 'bg-opacity-10');
+      }
+    });
+  });
 })();
 </script>
-<% } %>
