@@ -50,8 +50,13 @@ function canManageMaintenance(req, res, next) {
   return hasRole('Admin', 'Maintenance')(req, res, next);
 }
 
+// canImportExport — Admin or ImportExport role
+function canImportExport(req, res, next) {
+  return hasRole('Admin', 'ImportExport')(req, res, next);
+}
+
 module.exports = {
   isAuthenticated, isAdmin, hasRole,
   canWrite, canAccessSystemKeys, canManageNotifications,
-  canAccessMaintenance, canManageMaintenance,
+  canAccessMaintenance, canManageMaintenance, canImportExport,
 };

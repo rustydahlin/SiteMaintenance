@@ -14,14 +14,14 @@ const pmModel            = require('../models/pmModel');
 const repairModel        = require('../models/repairModel');
 const userModel          = require('../models/userModel');
 const vendorModel        = require('../models/vendorModel');
-const { isAuthenticated, isAdmin, canWrite } = require('../middleware/auth');
+const { isAuthenticated, isAdmin, canWrite, canImportExport } = require('../middleware/auth');
 
 const importUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (/\.(xlsx|xls)$/i.test(file.originalname)) cb(null, true);
-    else cb(new Error('Only .xlsx and .xls files are accepted'));
+    if (/\.csv$/i.test(file.originalname)) cb(null, true);
+    else cb(new Error('Only .csv files are accepted'));
   },
 });
 
@@ -67,8 +67,8 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// ── GET /export — download all matching sites as Excel ───────────────────────
-router.get('/export', async (req, res, next) => {
+// ── GET /export — download all matching sites as CSV ─────────────────────────
+router.get('/export', canImportExport, async (req, res, next) => {
   try {
     const { typeID, statusID, search, pmDue, sort = 'siteName', dir = 'asc' } = req.query;
     const { rows } = await siteModel.getAll({ typeID, statusID, search, pmDue, page: 1, pageSize: 100000, sort, dir });
@@ -91,49 +91,46 @@ router.get('/export', async (req, res, next) => {
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheetData), 'Sites');
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'csv' });
 
     const date = new Date().toISOString().split('T')[0];
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="sites-export-${date}.xlsx"`);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="sites-export-${date}.csv"`);
     res.send(buf);
   } catch (err) {
     next(err);
   }
 });
 
-// ── GET /import/template — download blank Excel template ─────────────────────
-router.get('/import/template', isAdmin, (_req, res) => {
-  const wb = XLSX.utils.book_new();
+// ── GET /import/template — download blank CSV template ───────────────────────
+router.get('/import/template', canImportExport, (_req, res) => {
   const headers = [
     'SiteName', 'SiteNumber', 'ContractNumber', 'SiteType',
     'Address', 'City', 'State', 'ZipCode',
     'Latitude', 'Longitude', 'WarrantyExpires', 'Description',
   ];
-  const ws = XLSX.utils.aoa_to_sheet([headers]);
-  // Set column widths
-  ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 4, 16) }));
-  XLSX.utils.book_append_sheet(wb, ws, 'Sites');
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  res.setHeader('Content-Disposition', 'attachment; filename="sites_import_template.xlsx"');
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers]), 'Sites');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'csv' });
+  res.setHeader('Content-Disposition', 'attachment; filename="sites_import_template.csv"');
+  res.setHeader('Content-Type', 'text/csv');
   res.send(buf);
 });
 
 // ── GET /import — upload form ─────────────────────────────────────────────────
-router.get('/import', isAdmin, (_req, res) => {
+router.get('/import', canImportExport, (_req, res) => {
   res.render('sites/import', { title: 'Import Sites', results: null });
 });
 
 // ── POST /import — dry-run: parse file and show preview ───────────────────────
-router.post('/import', isAdmin, importUpload.single('importFile'), async (req, res, next) => {
+router.post('/import', canImportExport, importUpload.single('importFile'), async (req, res, next) => {
   try {
     if (!req.file) {
       req.flash('error', 'Please select a file to upload.');
       return res.redirect('/sites/import');
     }
 
-    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
@@ -148,7 +145,13 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
     const plan    = [];
     const summary = { total: rows.length, created: 0, updated: 0, skipped: 0, errors: 0 };
     const norm    = v => (v == null || v === '') ? null : String(v).trim();
-    const fmtDate = v => { if (!v) return null; const d = v instanceof Date ? v : new Date(v); return isNaN(d) ? null : d.toISOString().split('T')[0]; };
+    const fmtDate = v => {
+      if (!v && v !== 0) return null;
+      const d = typeof v === 'number'
+        ? new Date(Math.round((v - 25569) * 86400 * 1000))  // Excel serial
+        : (v instanceof Date ? v : new Date(String(v).trim()));
+      return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+    };
 
     for (let i = 0; i < rows.length; i++) {
       const row        = rows[i];
@@ -223,7 +226,7 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
 });
 
 // ── POST /import/confirm — execute confirmed plan ─────────────────────────────
-router.post('/import/confirm', isAdmin, async (req, res, next) => {
+router.post('/import/confirm', canImportExport, async (req, res, next) => {
   try {
     const plan = JSON.parse(req.body.importPlan || '[]');
     const results = { total: plan.length, created: 0, updated: 0, skipped: 0, errors: 0, rows: [] };

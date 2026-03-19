@@ -13,9 +13,8 @@
 <div class="card">
   <div class="card-body">
     <p class="text-muted mb-3">
-      Upload an Excel file (.xlsx or .xls) with a <strong>SystemKeys</strong> sheet.
-      Required column: <strong>SerialNumber</strong>. Existing keys matched by serial number will be updated;
-      new serial numbers will be created.
+      Upload a CSV file with a <strong>SerialNumber</strong> column (required).
+      Existing keys matched by serial number will be updated; new serial numbers will be created.
     </p>
     <p class="text-muted mb-3">
       <strong>IssuedToType</strong> must be <code>user</code> or <code>contact</code>.
@@ -24,8 +23,9 @@
 
     <form method="POST" action="/system-keys/import" enctype="multipart/form-data">
       <div class="mb-3">
-        <label class="form-label fw-semibold">Excel File</label>
-        <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+        <label class="form-label fw-semibold">CSV File</label>
+        <input type="file" name="file" class="form-control" accept=".csv" required>
+        <div class="form-text">Accepted format: .csv — max 5 MB</div>
       </div>
       <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>Preview Import</button>
     </form>

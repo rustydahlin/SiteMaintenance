@@ -5,7 +5,7 @@ const multer       = require('multer');
 const XLSX         = require('xlsx');
 const router       = express.Router();
 const vendorModel  = require('../models/vendorModel');
-const { isAuthenticated, isAdmin } = require('../middleware/auth');
+const { isAuthenticated, isAdmin, canImportExport } = require('../middleware/auth');
 
 const importUpload = multer({
   storage: multer.memoryStorage(),
@@ -33,7 +33,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // ── GET /export — download Excel ──────────────────────────────────────────────
-router.get('/export', isAdmin, async (req, res, next) => {
+router.get('/export', canImportExport, async (req, res, next) => {
   try {
     const vendors = await vendorModel.getAll({ includeInactive: true });
 
@@ -79,7 +79,7 @@ router.get('/export', isAdmin, async (req, res, next) => {
 });
 
 // ── GET /import/template ──────────────────────────────────────────────────────
-router.get('/import/template', isAdmin, (_req, res) => {
+router.get('/import/template', canImportExport, (_req, res) => {
   const wb = XLSX.utils.book_new();
 
   const vendorHeaders   = ['VendorName', 'Phone', 'Email', 'Address', 'City', 'State', 'Zip', 'Website', 'DoesPMWork', 'Notes'];
@@ -101,12 +101,12 @@ router.get('/import/template', isAdmin, (_req, res) => {
 });
 
 // ── GET /import ───────────────────────────────────────────────────────────────
-router.get('/import', isAdmin, (_req, res) => {
+router.get('/import', canImportExport, (_req, res) => {
   res.render('vendors/import', { title: 'Import Vendors', results: null });
 });
 
 // ── POST /import — dry-run preview ────────────────────────────────────────────
-router.post('/import', isAdmin, importUpload.single('importFile'), async (req, res, next) => {
+router.post('/import', canImportExport, importUpload.single('importFile'), async (req, res, next) => {
   try {
     if (!req.file) {
       req.flash('error', 'Please select a file to upload.');
@@ -184,7 +184,7 @@ router.post('/import', isAdmin, importUpload.single('importFile'), async (req, r
 });
 
 // ── POST /import/confirm ──────────────────────────────────────────────────────
-router.post('/import/confirm', isAdmin, async (req, res, next) => {
+router.post('/import/confirm', canImportExport, async (req, res, next) => {
   try {
     const plan = JSON.parse(req.body.importPlan || '[]');
     const results = { total: plan.length, created: 0, updated: 0, skipped: 0, errors: 0, rows: [] };

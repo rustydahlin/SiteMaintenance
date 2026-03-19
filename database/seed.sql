@@ -13,7 +13,10 @@ INSERT INTO Roles (RoleName, Description) VALUES
     ('Contractor',         'Create log entries for assigned sites, upload files, view assigned sites'),
     ('Viewer',             'Read-only: view sites, inventory, logs, and documents'),
     ('Maintenance',        'Create, edit, close, and delete maintenance items'),
-    ('Maintenance-Close',  'Close maintenance items assigned to them; view only their own items');
+    ('Maintenance-Close',  'Close maintenance items assigned to them; view only their own items'),
+    ('SystemKeys',         'Can create and manage system keys'),
+    ('Notifications',      'Can manage personal email notification preferences'),
+    ('ImportExport',       'Can import and export data for Sites, Inventory, System Keys, and Vendors');
 
 -- ============================================================
 -- SITE STATUSES

@@ -250,6 +250,7 @@ When new database migrations are released:
 | `014_maintenance.sql` | Adds `MaintenanceTypes` and `MaintenanceItems` tables; replaces site statuses (Active/Offline/Decommissioned → Current/Past-Due); adds Maintenance and Maintenance-Close roles |
 | `015_email_templates.sql` | Inserts default email template bodies into `AppSettings` for all 12 notification types |
 | `016_user_organization.sql` | Adds `Organization` column to `Users` table for displaying user's organization on System Keys list |
+| `017_import_export_role.sql` | Adds `ImportExport` role — grants non-admin users the ability to import and export data |
 
 > **Note:** `database/schema.sql` always reflects the current full schema. Fresh installs only need to run `schema.sql` + `seed.sql` — migrations are only needed when upgrading an existing database.
 

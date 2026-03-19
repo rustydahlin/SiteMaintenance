@@ -8,14 +8,14 @@ const systemKeyModel   = require('../models/systemKeyModel');
 const lookupModel      = require('../models/lookupModel');
 const userModel        = require('../models/userModel');
 const vendorModel      = require('../models/vendorModel');
-const { canAccessSystemKeys } = require('../middleware/auth');
+const { canAccessSystemKeys, canImportExport } = require('../middleware/auth');
 
 const importUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (/\.(xlsx|xls)$/i.test(file.originalname)) cb(null, true);
-    else cb(new Error('Only .xlsx and .xls files are accepted'));
+    if (/\.csv$/i.test(file.originalname)) cb(null, true);
+    else cb(new Error('Only .csv files are accepted'));
   },
 });
 
@@ -25,6 +25,20 @@ router.use((_req, res, next) => {
 });
 
 router.use(canAccessSystemKeys);
+
+// Normalizes any date value to 'YYYY-MM-DD' string or null.
+// Handles: ISO strings, locale strings (e.g. "3/14/2026"), Excel serial numbers.
+function parseDate(v) {
+  if (!v && v !== 0) return null;
+  let d;
+  if (typeof v === 'number') {
+    // Excel date serial: days since 1900-01-01 (with Excel leap-year bug offset)
+    d = new Date(Math.round((v - 25569) * 86400 * 1000));
+  } else {
+    d = new Date(String(v).trim());
+  }
+  return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+}
 
 // ── GET / — list ───────────────────────────────────────────────────────────────
 router.get('/', async (req, res, next) => {
@@ -45,61 +59,60 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ── GET /export — download Excel ───────────────────────────────────────────────
-router.get('/export', async (req, res, next) => {
+// ── GET /export — download CSV ─────────────────────────────────────────────────
+router.get('/export', canImportExport, async (req, res, next) => {
   try {
     const keys = await systemKeyModel.getAll({ includeInactive: true });
     const rows = keys.map(k => ({
-      IssuedTo:        k.IssuedToName      || '',
-      Organization:    k.Organization      || '',
-      DateIssued:      k.DateIssued        ? new Date(k.DateIssued).toLocaleDateString()      : '',
-      Manufacturer:    k.ManufacturerName  || '',
-      ExpirationDate:  k.ExpirationDate    ? new Date(k.ExpirationDate).toLocaleDateString()  : '',
-      LastRenewalDate: k.LastRenewalDate   ? new Date(k.LastRenewalDate).toLocaleDateString() : '',
-      KeyCode:         k.KeyCode           || '',
       SerialNumber:    k.SerialNumber      || '',
+      IssuedTo:        k.IssuedToName      || '',
+      IssuedToType:    k.IssuedToContactID ? 'contact' : 'user',
+      Organization:    k.Organization      || '',
+      DateIssued:      k.DateIssued        ? new Date(k.DateIssued).toISOString().split('T')[0]        : '',
+      Manufacturer:    k.ManufacturerName  || '',
+      ExpirationDate:  k.ExpirationDate    ? new Date(k.ExpirationDate).toISOString().split('T')[0]    : '',
+      LastRenewalDate: k.LastRenewalDate   ? new Date(k.LastRenewalDate).toISOString().split('T')[0]   : '',
+      KeyCode:         k.KeyCode           || '',
       KeyType:         k.KeyType           || '',
       Notes:           k.Notes             || '',
       IsActive:        k.IsActive ? 'Yes' : 'No',
     }));
 
-    const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'SystemKeys');
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'SystemKeys');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'csv' });
 
-    res.setHeader('Content-Disposition', 'attachment; filename="system-keys.xlsx"');
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="system-keys.csv"');
+    res.setHeader('Content-Type', 'text/csv');
     res.send(buf);
   } catch (err) { next(err); }
 });
 
 // ── GET /import/template ───────────────────────────────────────────────────────
-router.get('/import/template', async (req, res, next) => {
+router.get('/import/template', canImportExport, async (req, res, next) => {
   try {
-    const ws = XLSX.utils.json_to_sheet([{
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{
       SerialNumber: '', IssuedTo: '', IssuedToType: 'user', DateIssued: '',
       Manufacturer: '', ExpirationDate: '', KeyCode: '', KeyType: 'Unlimited', Notes: '',
-    }]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'SystemKeys');
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    }]), 'SystemKeys');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'csv' });
 
-    res.setHeader('Content-Disposition', 'attachment; filename="system-keys-import-template.xlsx"');
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="system-keys-import-template.csv"');
+    res.setHeader('Content-Type', 'text/csv');
     res.send(buf);
   } catch (err) { next(err); }
 });
 
 // ── GET /import — upload form ──────────────────────────────────────────────────
-router.get('/import', async (req, res, next) => {
+router.get('/import', canImportExport, async (req, res, next) => {
   try {
     res.render('system-keys/import', { title: 'Import System Keys', result: null });
   } catch (err) { next(err); }
 });
 
 // ── POST /import — dry-run preview ────────────────────────────────────────────
-router.post('/import', importUpload.single('file'), async (req, res, next) => {
+router.post('/import', canImportExport, importUpload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) {
       req.flash('error', 'No file uploaded.');
@@ -145,8 +158,8 @@ router.post('/import', importUpload.single('file'), async (req, res, next) => {
         issuedToUserID,
         issuedToContactID,
         manufacturerID:    mfgName ? (mfgMap[mfgName] || null) : null,
-        dateIssued:        row.DateIssued     || null,
-        expirationDate:    row.ExpirationDate || null,
+        dateIssued:        parseDate(row.DateIssued),
+        expirationDate:    parseDate(row.ExpirationDate),
         keyCode:           String(row.KeyCode  || '').trim() || null,
         keyType:           String(row.KeyType  || 'Unlimited').trim(),
         notes:             String(row.Notes    || '').trim() || null,
@@ -169,7 +182,7 @@ router.post('/import', importUpload.single('file'), async (req, res, next) => {
 });
 
 // ── POST /import/confirm — execute import ─────────────────────────────────────
-router.post('/import/confirm', async (req, res, next) => {
+router.post('/import/confirm', canImportExport, async (req, res, next) => {
   try {
     const plan = req.session.systemKeyImportPlan || [];
     const auditContext = { userID: req.user.UserID, username: req.user.Username };
