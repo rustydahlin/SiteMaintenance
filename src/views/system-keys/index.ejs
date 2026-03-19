@@ -22,11 +22,24 @@
       </div>
 
       <div class="col-sm-3 col-lg-2">
-        <label class="form-label small mb-1">Key Type</label>
-        <select name="keyType" class="form-select form-select-sm">
-          <option value="">All Types</option>
-          <option value="Unlimited" <%= filters.keyType === 'Unlimited' ? 'selected' : '' %>>Unlimited</option>
-          <option value="Limited"   <%= filters.keyType === 'Limited'   ? 'selected' : '' %>>Limited</option>
+        <label class="form-label small mb-1">Organization</label>
+        <select name="organization" class="form-select form-select-sm">
+          <option value="">All Organizations</option>
+          <% organizations.forEach(org => { %>
+          <option value="<%= org %>" <%= filters.organization === org ? 'selected' : '' %>><%= org %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-sm-3 col-lg-2">
+        <label class="form-label small mb-1">Manufacturer</label>
+        <select name="manufacturerID" class="form-select form-select-sm">
+          <option value="">All Manufacturers</option>
+          <% manufacturers.forEach(m => { %>
+          <option value="<%= m.ManufacturerID %>" <%= filters.manufacturerID == m.ManufacturerID ? 'selected' : '' %>>
+            <%= m.ManufacturerName %>
+          </option>
+          <% }) %>
         </select>
       </div>
 
@@ -41,14 +54,11 @@
       </div>
 
       <div class="col-sm-3 col-lg-2">
-        <label class="form-label small mb-1">Manufacturer</label>
-        <select name="manufacturerID" class="form-select form-select-sm">
-          <option value="">All Manufacturers</option>
-          <% manufacturers.forEach(m => { %>
-          <option value="<%= m.ManufacturerID %>" <%= filters.manufacturerID == m.ManufacturerID ? 'selected' : '' %>>
-            <%= m.ManufacturerName %>
-          </option>
-          <% }) %>
+        <label class="form-label small mb-1">Key Type</label>
+        <select name="keyType" class="form-select form-select-sm">
+          <option value="">All Types</option>
+          <option value="Unlimited" <%= filters.keyType === 'Unlimited' ? 'selected' : '' %>>Unlimited</option>
+          <option value="Limited"   <%= filters.keyType === 'Limited'   ? 'selected' : '' %>>Limited</option>
         </select>
       </div>
 
@@ -82,9 +92,10 @@
     const newDir = (sort === col && dir === 'asc') ? 'desc' : 'asc';
     const parts = [];
     if (filters.search)         parts.push(`search=${encodeURIComponent(filters.search)}`);
-    if (filters.keyType)        parts.push(`keyType=${encodeURIComponent(filters.keyType)}`);
-    if (filters.expiryStatus)   parts.push(`expiryStatus=${encodeURIComponent(filters.expiryStatus)}`);
+    if (filters.organization)   parts.push(`organization=${encodeURIComponent(filters.organization)}`);
     if (filters.manufacturerID) parts.push(`manufacturerID=${encodeURIComponent(filters.manufacturerID)}`);
+    if (filters.expiryStatus)   parts.push(`expiryStatus=${encodeURIComponent(filters.expiryStatus)}`);
+    if (filters.keyType)        parts.push(`keyType=${encodeURIComponent(filters.keyType)}`);
     parts.push(`sort=${col}`, `dir=${newDir}`);
     return `/system-keys?${parts.join('&')}`;
   }

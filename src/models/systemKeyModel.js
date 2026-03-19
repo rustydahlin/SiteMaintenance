@@ -39,7 +39,7 @@ const SORT_MAP = {
 };
 
 async function getAll({ search = '', includeInactive = false, sort = 'issuedTo', dir = 'asc',
-                        keyType = '', expiryStatus = '', manufacturerID = null } = {}) {
+                        keyType = '', expiryStatus = '', manufacturerID = null, organization = '' } = {}) {
   const orderCol = SORT_MAP[sort] || 'IssuedToName';
   const orderDir = dir === 'desc' ? 'DESC' : 'ASC';
 
@@ -55,6 +55,7 @@ async function getAll({ search = '', includeInactive = false, sort = 'issuedTo',
     .input('Search',           sql.NVarChar(200), search ? `%${search}%` : null)
     .input('KeyType',          sql.NVarChar(20),  keyType || null)
     .input('ManufacturerID',   sql.Int,           manufacturerID || null)
+    .input('Organization',     sql.NVarChar(200), organization || null)
     .query(`
       ${BASE_SELECT}
       WHERE sk.IsActive = 1
@@ -65,12 +66,33 @@ async function getAll({ search = '', includeInactive = false, sort = 'issuedTo',
                LTRIM(RTRIM(vc.FirstName + ' ' + ISNULL(vc.LastName, '')))) LIKE @Search OR
              v.VendorName LIKE @Search OR
              km.ManufacturerName LIKE @Search)
-        AND (@KeyType       IS NULL OR sk.KeyType        = @KeyType)
-        AND (@ManufacturerID IS NULL OR sk.ManufacturerID = @ManufacturerID)
+        AND (@KeyType        IS NULL OR sk.KeyType         = @KeyType)
+        AND (@ManufacturerID IS NULL OR sk.ManufacturerID  = @ManufacturerID)
+        AND (@Organization   IS NULL OR
+             CASE WHEN sk.IssuedToUserID IS NOT NULL THEN COALESCE(u.Organization, 'System')
+                  ELSE v.VendorName END = @Organization)
         ${expiryClause}
       ORDER BY ${orderCol} ${orderDir}, sk.KeyID ASC
     `);
   return r.recordset;
+}
+
+async function getOrganizations() {
+  const pool = await getPool();
+  const r = await pool.request().query(`
+    SELECT DISTINCT
+      CASE WHEN sk.IssuedToUserID IS NOT NULL THEN COALESCE(u.Organization, 'System')
+           ELSE v.VendorName END AS Organization
+    FROM SystemKeys sk
+    LEFT JOIN Users          u  ON u.UserID     = sk.IssuedToUserID
+    LEFT JOIN VendorContacts vc ON vc.ContactID = sk.IssuedToContactID
+    LEFT JOIN Vendors        v  ON v.VendorID   = vc.VendorID
+    WHERE sk.IsActive = 1
+      AND CASE WHEN sk.IssuedToUserID IS NOT NULL THEN COALESCE(u.Organization, 'System')
+               ELSE v.VendorName END IS NOT NULL
+    ORDER BY Organization
+  `);
+  return r.recordset.map(row => row.Organization);
 }
 
 // ── Single record ──────────────────────────────────────────────────────────────
@@ -221,6 +243,7 @@ async function getExpired() {
 
 module.exports = {
   getAll,
+  getOrganizations,
   getByID,
   findBySerial,
   create,

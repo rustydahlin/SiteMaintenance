@@ -44,17 +44,19 @@ function parseDate(v) {
 router.get('/', async (req, res, next) => {
   try {
     const { search = '', sort = 'issuedTo', dir = 'asc',
-            keyType = '', expiryStatus = '', manufacturerID = '' } = req.query;
-    const [keys, manufacturers] = await Promise.all([
+            keyType = '', expiryStatus = '', manufacturerID = '', organization = '' } = req.query;
+    const [keys, manufacturers, organizations] = await Promise.all([
       systemKeyModel.getAll({
         search, sort, dir,
         keyType, expiryStatus, manufacturerID: manufacturerID ? parseInt(manufacturerID) : null,
+        organization,
       }),
       lookupModel.getKeyManufacturers(),
+      systemKeyModel.getOrganizations(),
     ]);
-    const filters = { search, sort, dir, keyType, expiryStatus, manufacturerID };
+    const filters = { search, sort, dir, keyType, expiryStatus, manufacturerID, organization };
     res.render('system-keys/index', {
-      title: 'System Keys', keys, manufacturers, filters, sort, dir,
+      title: 'System Keys', keys, manufacturers, organizations, filters, sort, dir,
     });
   } catch (err) { next(err); }
 });
