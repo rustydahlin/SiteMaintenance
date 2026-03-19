@@ -14,7 +14,7 @@ router.get('/', isAuthenticated, async (req, res, next) => {
     const systemKeysEnabled = (await settingsModel.getSetting('systemKeys.enabled', null)) === '1';
     const canSeeKeys = systemKeysEnabled && (userRoles.includes('Admin') || userRoles.includes('SystemKeys'));
 
-    const [countsResult, recentLogsResult, upcomingPMsResult, repairsFollowUpResult] = await Promise.all([
+    const [countsResult, recentLogsResult, upcomingPMsResult, repairsFollowUpResult, maintenanceDueResult] = await Promise.all([
       // Summary counts
       pool.request().query(`
         SELECT
@@ -36,7 +36,16 @@ router.get('/', isAuthenticated, async (req, res, next) => {
            WHERE pm.IsActive = 1
              AND (pm.LastPerformedAt IS NULL
                OR DATEADD(DAY, pm.FrequencyDays, pm.LastPerformedAt) <= DATEADD(DAY, 14, GETUTCDATE()))
-          ) AS PMsDue
+          ) AS PMsDue,
+          (SELECT COUNT(*) FROM PMSchedules pm
+           WHERE pm.IsActive = 1
+             AND (pm.LastPerformedAt IS NULL
+               OR DATEADD(DAY, pm.FrequencyDays, pm.LastPerformedAt) <= CAST(GETUTCDATE() AS DATE))
+          ) AS PMsOverdue,
+          (SELECT COUNT(*) FROM MaintenanceItems
+           WHERE ClosedAt IS NULL
+             AND (DueDate IS NULL OR DueDate <= GETUTCDATE())
+          ) AS MaintenanceOverdue
       `),
 
       // Recent log entries (last 8, non-auto-generated)
@@ -80,6 +89,23 @@ router.get('/', isAuthenticated, async (req, res, next) => {
           AND rt.FollowUpDate <= GETUTCDATE()
         ORDER BY rt.FollowUpDate ASC
       `),
+
+      // Maintenance items past due or due within 30 days
+      pool.request().query(`
+        SELECT TOP 8
+          m.MaintenanceID, m.WorkToComplete, m.ExternalReference, m.DueDate,
+          s.SiteID, s.SiteName,
+          t.TypeName AS MaintenanceType,
+          u.DisplayName AS AssignedToName,
+          DATEDIFF(day, CAST(GETUTCDATE() AS DATE), CAST(m.DueDate AS DATE)) AS DaysUntilDue
+        FROM MaintenanceItems m
+        JOIN Sites s ON s.SiteID = m.SiteID
+        LEFT JOIN MaintenanceTypes t ON t.MaintenanceTypeID = m.MaintenanceTypeID
+        LEFT JOIN Users u ON u.UserID = m.AssignedToUserID
+        WHERE m.ClosedAt IS NULL
+          AND (m.DueDate IS NULL OR m.DueDate <= DATEADD(day, 30, GETUTCDATE()))
+        ORDER BY m.DueDate ASC
+      `),
     ]);
 
     // System Keys: expired and expiring soon (only when enabled and user has access)
@@ -98,14 +124,17 @@ router.get('/', isAuthenticated, async (req, res, next) => {
     res.render('dashboard/index', {
       title: 'Dashboard',
       counts: {
-        sites:            c.Sites,
-        inventoryInStock: c.InventoryInStock,
-        openRepairs:      c.OpenRepairs,
-        pmsDue:           c.PMsDue,
+        sites:                c.Sites,
+        inventoryInStock:     c.InventoryInStock,
+        openRepairs:          c.OpenRepairs,
+        pmsDue:               c.PMsDue,
+        pmsOverdue:           c.PMsOverdue,
+        maintenanceOverdue:   c.MaintenanceOverdue,
       },
       recentLogs:      recentLogsResult.recordset,
       upcomingPMs:     upcomingPMsResult.recordset,
       repairsFollowUp: repairsFollowUpResult.recordset,
+      maintenanceDue:  maintenanceDueResult.recordset,
       canSeeKeys,
       expiringKeys,
       expiredKeys,

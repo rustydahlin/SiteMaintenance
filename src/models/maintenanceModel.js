@@ -96,6 +96,9 @@ async function getByID(maintenanceID) {
         m.DueDate, m.ExternalReference, m.WorkToComplete,
         m.ClosedAt, m.ClosedByUserID, m.ClosureNotes,
         m.IsActive, m.CreatedAt, m.CreatedByUserID,
+        CASE WHEN m.ClosedAt IS NULL AND m.DueDate IS NOT NULL
+             THEN DATEDIFF(day, CAST(m.DueDate AS DATE), CAST(GETUTCDATE() AS DATE))
+             ELSE 0 END AS DaysOverdue,
         s.SiteName,
         t.TypeName    AS MaintenanceTypeName,
         u.DisplayName AS AssignedToUserName,

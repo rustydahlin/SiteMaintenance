@@ -2,7 +2,7 @@
 
 <!-- Summary cards -->
 <div class="row g-3 mb-4">
-  <div class="col-sm-6 col-xl-3">
+  <div class="col">
     <div class="card h-100">
       <div class="card-body d-flex align-items-center">
         <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
@@ -16,7 +16,7 @@
       <a href="/sites" class="card-footer text-decoration-none small text-muted">View all &rarr;</a>
     </div>
   </div>
-  <div class="col-sm-6 col-xl-3">
+  <div class="col">
     <div class="card h-100">
       <div class="card-body d-flex align-items-center">
         <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
@@ -30,7 +30,7 @@
       <a href="/inventory?status=In-Stock" class="card-footer text-decoration-none small text-muted">View all &rarr;</a>
     </div>
   </div>
-  <div class="col-sm-6 col-xl-3">
+  <div class="col">
     <div class="card h-100">
       <div class="card-body d-flex align-items-center">
         <div class="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
@@ -44,8 +44,8 @@
       <a href="/repairs?status=open" class="card-footer text-decoration-none small text-muted">View all &rarr;</a>
     </div>
   </div>
-  <div class="col-sm-6 col-xl-3">
-    <div class="card h-100">
+  <div class="col">
+    <div class="card h-100 <%= counts.pmsOverdue > 0 ? 'border-danger' : counts.pmsDue > 0 ? 'border-warning' : '' %>">
       <div class="card-body d-flex align-items-center">
         <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
           <i class="bi bi-calendar-x fs-4 text-danger"></i>
@@ -58,11 +58,61 @@
       <a href="/sites?pmDue=1" class="card-footer text-decoration-none small text-muted">View all &rarr;</a>
     </div>
   </div>
+  <div class="col">
+    <div class="card h-100 <%= counts.maintenanceOverdue > 0 ? 'border-danger' : '' %>">
+      <div class="card-body d-flex align-items-center">
+        <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
+          <i class="bi bi-tools fs-4 text-danger"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold"><%= counts.maintenanceOverdue %></div>
+          <div class="text-muted small">Maintenance Overdue</div>
+        </div>
+      </div>
+      <a href="/maintenance?status=open" class="card-footer text-decoration-none small text-muted">View all &rarr;</a>
+    </div>
+  </div>
 </div>
 
 <div class="row g-3">
-  <!-- Recent log entries -->
+  <!-- Maintenance due / overdue + Recent log entries -->
   <div class="col-lg-8">
+    <% if (maintenanceDue.length > 0) { %>
+    <%
+      const hasOverdue  = maintenanceDue.some(m => m.DueDate && m.DaysUntilDue <= 0);
+      const hasUpcoming = maintenanceDue.some(m => m.DueDate && m.DaysUntilDue > 0);
+      const hdrClass    = hasOverdue ? 'text-danger' : hasUpcoming ? 'text-warning' : '';
+    %>
+    <div class="card shadow-sm mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="<%= hdrClass %>"><i class="bi bi-tools me-2"></i>Maintenance Due / Overdue</span>
+        <a href="/maintenance?status=open" class="small text-muted text-decoration-none">View all &rarr;</a>
+      </div>
+      <div class="list-group list-group-flush">
+        <% maintenanceDue.forEach(m => { %>
+        <a href="/maintenance/<%= m.MaintenanceID %>" class="list-group-item list-group-item-action py-2">
+          <div class="d-flex justify-content-between">
+            <span class="fw-semibold"><%= m.WorkToComplete || m.ExternalReference || '(no description)' %></span>
+            <% if (m.DueDate) { %>
+              <% const d = m.DaysUntilDue; %>
+              <span class="badge <%= d <= 0 ? 'bg-danger' : d <= 7 ? 'bg-warning text-dark' : 'bg-info text-dark' %> ms-2 text-nowrap">
+                <%= d < 0 ? Math.abs(d) + 'd overdue' : d === 0 ? 'Past Due' : d + 'd' %>
+              </span>
+            <% } else { %>
+              <span class="badge bg-secondary ms-2">No date</span>
+            <% } %>
+          </div>
+          <div class="text-muted small">
+            <i class="bi bi-building me-1"></i><%= m.SiteName %>
+            <% if (m.MaintenanceType) { %>&bull; <span class="badge bg-secondary"><%= m.MaintenanceType %></span><% } %>
+            <% if (m.AssignedToName) { %>&bull; <i class="bi bi-person me-1"></i><%= m.AssignedToName %><% } %>
+          </div>
+        </a>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
+
     <div class="card shadow-sm">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-journal-text me-2"></i>Recent Log Entries</span>
@@ -143,7 +193,6 @@
     </div>
     <% } %>
 
-    <!-- System Keys: expired / expiring -->
     <% if (canSeeKeys && (expiredKeys.length > 0 || expiringKeys.length > 0)) { %>
     <div class="card shadow-sm mt-3">
       <div class="card-header text-danger">
