@@ -29,6 +29,7 @@ CREATE TABLE Users (
     UserID          INT IDENTITY(1,1) PRIMARY KEY,
     Username        NVARCHAR(100) NOT NULL UNIQUE,
     DisplayName     NVARCHAR(150) NOT NULL,
+    Organization    NVARCHAR(150) NULL,
     Email           NVARCHAR(255) NULL,
     PasswordHash    NVARCHAR(255) NULL,
     AuthProvider    NVARCHAR(20)  NOT NULL DEFAULT 'local',  -- local, oidc, ldap

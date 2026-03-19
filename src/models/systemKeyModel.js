@@ -12,7 +12,7 @@ const BASE_SELECT = `
     sk.IssuedToUserID, sk.IssuedToContactID, sk.ManufacturerID, sk.LastUpdatedByUserID,
     COALESCE(u.DisplayName,
              LTRIM(RTRIM(vc.FirstName + ' ' + ISNULL(vc.LastName, ''))))  AS IssuedToName,
-    CASE WHEN sk.IssuedToUserID IS NOT NULL THEN 'System'
+    CASE WHEN sk.IssuedToUserID IS NOT NULL THEN COALESCE(u.Organization, 'System')
          ELSE v.VendorName END                                             AS Organization,
     COALESCE(u.Email, vc.Email)                                           AS IssuedToEmail,
     km.ManufacturerName,

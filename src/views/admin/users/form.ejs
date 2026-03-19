@@ -26,6 +26,12 @@
           <input type="email" name="email" class="form-control"
                  value="<%= editUser ? (editUser.Email || '') : '' %>" maxlength="255" />
         </div>
+        <div class="col-md-6">
+          <label class="form-label">Organization</label>
+          <input type="text" name="organization" class="form-control"
+                 value="<%= editUser ? (editUser.Organization || '') : '' %>" maxlength="150"
+                 placeholder="e.g. NDIT, Stutsman County" />
+        </div>
         <% if (!editUser) { %>
         <div class="col-md-6">
           <label class="form-label">Auth Provider</label>

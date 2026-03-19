@@ -204,8 +204,8 @@ router.post('/users', [
       req.flash('error', errors.array().map(e => e.msg));
       return res.redirect('/admin/users/new');
     }
-    const { username, displayName, email, password, authProvider, roles: roleNames } = req.body;
-    const user = await userModel.create({ username, displayName, email, password, authProvider: authProvider || 'local' }, req.auditContext);
+    const { username, displayName, email, organization, password, authProvider, roles: roleNames } = req.body;
+    const user = await userModel.create({ username, displayName, email, organization: organization || null, password, authProvider: authProvider || 'local' }, req.auditContext);
     const selectedRoles = Array.isArray(roleNames) ? roleNames : (roleNames ? [roleNames] : ['Viewer']);
     await userModel.setRoles(user.UserID, selectedRoles, req.auditContext);
     req.flash('success', `User "${displayName}" created.`);
@@ -233,8 +233,8 @@ router.get('/users/:id/edit', async (req, res, next) => {
 router.post('/users/:id', async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    const { displayName, email, roles: roleNames, newPassword } = req.body;
-    await userModel.update(id, { displayName, email, isActive: 1 }, req.auditContext);
+    const { displayName, email, organization, roles: roleNames, newPassword } = req.body;
+    await userModel.update(id, { displayName, email, organization: organization || null, isActive: 1 }, req.auditContext);
     const selectedRoles = Array.isArray(roleNames) ? roleNames : (roleNames ? [roleNames] : []);
     if (selectedRoles.length) await userModel.setRoles(id, selectedRoles, req.auditContext);
     if (newPassword?.trim()) await userModel.updatePassword(id, newPassword.trim(), req.auditContext);

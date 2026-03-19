@@ -5,7 +5,7 @@ const { getPool, sql } = require('../config/database');
 const { writeAudit }   = require('./auditModel');
 
 const USER_COLS = `
-  u.UserID, u.Username, u.DisplayName, u.Email,
+  u.UserID, u.Username, u.DisplayName, u.Email, u.Organization,
   u.PasswordHash, u.AuthProvider, u.ExternalID,
   u.IsActive, u.CreatedAt, u.LastLoginAt
 `;
@@ -77,7 +77,7 @@ async function getAll({ includeInactive = false, sort = 'displayName', dir = 'as
   return Promise.all(result.recordset.map(_attachRoles));
 }
 
-async function create({ username, displayName, email, password, authProvider = 'local', externalID = null, createdByUserID = null }, auditContext = {}) {
+async function create({ username, displayName, email, organization = null, password, authProvider = 'local', externalID = null, createdByUserID = null }, auditContext = {}) {
   const pool = await getPool();
   const passwordHash = password ? await bcrypt.hash(password, 12) : null;
 
@@ -85,38 +85,40 @@ async function create({ username, displayName, email, password, authProvider = '
     .input('Username',        sql.NVarChar(100), username)
     .input('DisplayName',     sql.NVarChar(150), displayName)
     .input('Email',           sql.NVarChar(255), email || null)
+    .input('Organization',    sql.NVarChar(150), organization || null)
     .input('PasswordHash',    sql.NVarChar(255), passwordHash)
     .input('AuthProvider',    sql.NVarChar(20),  authProvider)
     .input('ExternalID',      sql.NVarChar(255), externalID)
     .input('CreatedByUserID', sql.Int,           createdByUserID || null)
     .query(`
-      INSERT INTO Users (Username, DisplayName, Email, PasswordHash, AuthProvider, ExternalID, CreatedByUserID)
-      VALUES (@Username, @DisplayName, @Email, @PasswordHash, @AuthProvider, @ExternalID, @CreatedByUserID);
+      INSERT INTO Users (Username, DisplayName, Email, Organization, PasswordHash, AuthProvider, ExternalID, CreatedByUserID)
+      VALUES (@Username, @DisplayName, @Email, @Organization, @PasswordHash, @AuthProvider, @ExternalID, @CreatedByUserID);
       SELECT SCOPE_IDENTITY() AS NewID
     `);
 
   const newID = result.recordset[0].NewID;
   await writeAudit({ tableName: 'Users', recordID: newID, action: 'INSERT',
-    newValues: { username, displayName, email, authProvider },
+    newValues: { username, displayName, email, organization, authProvider },
     userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent });
   return findByID(newID);
 }
 
-async function update(userID, { displayName, email, isActive }, auditContext = {}) {
+async function update(userID, { displayName, email, organization = null, isActive }, auditContext = {}) {
   const pool  = await getPool();
   const old   = await findByID(userID);
   await pool.request()
-    .input('UserID',      sql.Int,           userID)
-    .input('DisplayName', sql.NVarChar(150), displayName)
-    .input('Email',       sql.NVarChar(255), email || null)
-    .input('IsActive',    sql.Bit,           isActive !== undefined ? isActive : 1)
+    .input('UserID',       sql.Int,           userID)
+    .input('DisplayName',  sql.NVarChar(150), displayName)
+    .input('Email',        sql.NVarChar(255), email || null)
+    .input('Organization', sql.NVarChar(150), organization || null)
+    .input('IsActive',     sql.Bit,           isActive !== undefined ? isActive : 1)
     .query(`
-      UPDATE Users SET DisplayName = @DisplayName, Email = @Email, IsActive = @IsActive
+      UPDATE Users SET DisplayName = @DisplayName, Email = @Email, Organization = @Organization, IsActive = @IsActive
       WHERE UserID = @UserID
     `);
   await writeAudit({ tableName: 'Users', recordID: userID, action: 'UPDATE',
-    oldValues: { displayName: old.DisplayName, email: old.Email, isActive: old.IsActive },
-    newValues: { displayName, email, isActive },
+    oldValues: { displayName: old.DisplayName, email: old.Email, organization: old.Organization, isActive: old.IsActive },
+    newValues: { displayName, email, organization, isActive },
     userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent });
   return findByID(userID);
 }
