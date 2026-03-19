@@ -35,6 +35,7 @@ CREATE TABLE Users (
     AuthProvider    NVARCHAR(20)  NOT NULL DEFAULT 'local',  -- local, oidc, ldap
     ExternalID      NVARCHAR(255) NULL,
     IsActive        BIT           NOT NULL DEFAULT 1,
+    DeletedAt       DATETIME2(0)  NULL,
     CreatedAt       DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE(),
     LastLoginAt     DATETIME2(0)  NULL,
     CreatedByUserID INT           NULL,

@@ -38,33 +38,54 @@
       </thead>
       <tbody>
         <% users.forEach(u => { %>
-        <tr class="<%= u.IsActive ? '' : 'text-muted' %>">
+        <tr class="<%= u.DeletedAt ? 'text-muted fst-italic opacity-50' : (u.IsActive ? '' : 'text-muted') %>">
           <td><%= u.DisplayName %></td>
           <td class="small"><%= u.Username %></td>
           <td class="small"><%= u.Email || '—' %></td>
           <td>
+            <% if (!u.DeletedAt) { %>
             <span class="badge <%=
               u.AuthProvider === 'oidc' ? 'bg-info text-dark' :
               u.AuthProvider === 'ldap' ? 'bg-warning text-dark' :
               'bg-secondary'
             %>"><%= u.AuthProvider %></span>
+            <% } else { %>—<% } %>
           </td>
           <td>
-            <% (u.roles || []).forEach(r => { %>
-              <span class="badge <%= r === 'Admin' ? 'bg-danger' : 'bg-primary' %> me-1"><%= r %></span>
-            <% }) %>
+            <% if (!u.DeletedAt) { %>
+              <% (u.roles || []).forEach(r => { %>
+                <span class="badge <%= r === 'Admin' ? 'bg-danger' : 'bg-primary' %> me-1"><%= r %></span>
+              <% }) %>
+            <% } %>
           </td>
-          <td><span class="badge <%= u.IsActive ? 'bg-success' : 'bg-secondary' %>"><%= u.IsActive ? 'Active' : 'Inactive' %></span></td>
+          <td>
+            <% if (u.DeletedAt) { %>
+              <span class="badge bg-dark">Deleted</span>
+            <% } else { %>
+              <span class="badge <%= u.IsActive ? 'bg-success' : 'bg-secondary' %>"><%= u.IsActive ? 'Active' : 'Inactive' %></span>
+            <% } %>
+          </td>
           <td class="small text-muted"><%= u.LastLoginAt ? new Date(u.LastLoginAt).toLocaleDateString() : 'Never' %></td>
           <td class="text-end">
-            <a href="/admin/users/<%= u.UserID %>/edit" class="btn btn-sm btn-outline-secondary py-0 me-1">Edit</a>
-            <% if (u.UserID !== user.UserID) { %>
-            <form action="/admin/users/<%= u.UserID %>/toggle" method="POST" class="d-inline"
-                  data-confirm="<%= u.IsActive ? 'Deactivate this user?' : 'Activate this user?' %>">
-              <button type="submit" class="btn btn-sm <%= u.IsActive ? 'btn-outline-danger' : 'btn-outline-success' %> py-0">
-                <%= u.IsActive ? 'Deactivate' : 'Activate' %>
-              </button>
-            </form>
+            <% if (u.DeletedAt) { %>
+              <form action="/admin/users/<%= u.UserID %>/restore" method="POST" class="d-inline"
+                    data-confirm="Restore <%= u.DisplayName %>? They will be active but have no password — set one after restoring.">
+                <button type="submit" class="btn btn-sm btn-outline-success py-0">Restore</button>
+              </form>
+            <% } else { %>
+              <a href="/admin/users/<%= u.UserID %>/edit" class="btn btn-sm btn-outline-secondary py-0 me-1">Edit</a>
+              <% if (u.UserID !== user.UserID) { %>
+                <form action="/admin/users/<%= u.UserID %>/toggle" method="POST" class="d-inline"
+                      data-confirm="<%= u.IsActive ? 'Deactivate this user?' : 'Activate this user?' %>">
+                  <button type="submit" class="btn btn-sm <%= u.IsActive ? 'btn-outline-warning' : 'btn-outline-success' %> py-0">
+                    <%= u.IsActive ? 'Deactivate' : 'Activate' %>
+                  </button>
+                </form>
+                <form action="/admin/users/<%= u.UserID %>/delete" method="POST" class="d-inline"
+                      data-confirm="Delete <%= u.DisplayName %>? If they have any history, their name will be preserved but they cannot log in. This cannot be undone.">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 ms-1">Delete</button>
+                </form>
+              <% } %>
             <% } %>
           </td>
         </tr>

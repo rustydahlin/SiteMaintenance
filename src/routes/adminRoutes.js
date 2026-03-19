@@ -174,7 +174,7 @@ simplePicklistRoute('/maintenance-types', 'Maintenance Types', lookupModel.getMa
 router.get('/users', async (req, res, next) => {
   try {
     const { sort = 'displayName', dir = 'asc' } = req.query;
-    const users = await userModel.getAll({ includeInactive: true, sort, dir });
+    const users = await userModel.getAll({ includeInactive: true, includeDeleted: true, sort, dir });
     res.render('admin/users/index', { title: 'Users', users, sort, dir });
   } catch (err) { next(err); }
 });
@@ -205,6 +205,15 @@ router.post('/users', [
       return res.redirect('/admin/users/new');
     }
     const { username, displayName, email, organization, password, authProvider, roles: roleNames } = req.body;
+
+    // Check if a deleted user with this username already exists — offer restore instead
+    const allUsers = await userModel.getAll({ includeDeleted: true });
+    const deletedMatch = allUsers.find(u => u.DeletedAt && u.Username.toLowerCase() === username.trim().toLowerCase());
+    if (deletedMatch) {
+      req.flash('error', `A deleted user with username "${username.trim()}" already exists (${deletedMatch.DisplayName}). Use the Restore button on the Users list to reactivate them.`);
+      return res.redirect('/admin/users/new');
+    }
+
     const user = await userModel.create({ username, displayName, email, organization: organization || null, password, authProvider: authProvider || 'local' }, req.auditContext);
     const selectedRoles = Array.isArray(roleNames) ? roleNames : (roleNames ? [roleNames] : ['Viewer']);
     await userModel.setRoles(user.UserID, selectedRoles, req.auditContext);
@@ -247,6 +256,26 @@ router.post('/users/:id/toggle', async (req, res, next) => {
   try {
     await userModel.toggleActive(parseInt(req.params.id), req.auditContext);
     req.flash('success', 'User status updated.');
+    res.redirect('/admin/users');
+  } catch (err) { next(err); }
+});
+
+router.post('/users/:id/delete', async (req, res, next) => {
+  try {
+    const result = await userModel.deleteUser(parseInt(req.params.id), req.auditContext);
+    if (result.method === 'hard') {
+      req.flash('success', 'User permanently deleted.');
+    } else {
+      req.flash('success', `User deleted. Their name is preserved in ${result.refsFound} historical record(s).`);
+    }
+    res.redirect('/admin/users');
+  } catch (err) { next(err); }
+});
+
+router.post('/users/:id/restore', async (req, res, next) => {
+  try {
+    const u = await userModel.restoreUser(parseInt(req.params.id), req.auditContext);
+    req.flash('success', `User "${u.DisplayName}" restored. Set a new password if needed.`);
     res.redirect('/admin/users');
   } catch (err) { next(err); }
 });

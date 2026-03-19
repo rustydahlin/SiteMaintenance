@@ -7,7 +7,7 @@ const { writeAudit }   = require('./auditModel');
 const USER_COLS = `
   u.UserID, u.Username, u.DisplayName, u.Email, u.Organization,
   u.PasswordHash, u.AuthProvider, u.ExternalID,
-  u.IsActive, u.CreatedAt, u.LastLoginAt
+  u.IsActive, u.DeletedAt, u.CreatedAt, u.LastLoginAt
 `;
 
 const ROLES_JSON = `
@@ -67,9 +67,16 @@ const USER_SORT_COLUMNS = {
   lastLogin:   'u.LastLoginAt',
 };
 
-async function getAll({ includeInactive = false, sort = 'displayName', dir = 'asc' } = {}) {
+async function getAll({ includeInactive = false, includeDeleted = false, sort = 'displayName', dir = 'asc' } = {}) {
   const pool = await getPool();
-  const where = includeInactive ? '' : 'WHERE u.IsActive = 1';
+  let where;
+  if (includeDeleted) {
+    where = '';  // all rows including deleted
+  } else if (includeInactive) {
+    where = 'WHERE u.DeletedAt IS NULL';  // active + inactive, but not deleted
+  } else {
+    where = 'WHERE u.IsActive = 1 AND u.DeletedAt IS NULL';
+  }
   const orderCol = USER_SORT_COLUMNS[sort] || 'u.DisplayName';
   const orderDir = dir === 'desc' ? 'DESC' : 'ASC';
   const result = await pool.request()
@@ -188,6 +195,73 @@ async function toggleActive(userID, auditContext = {}) {
   return findByID(userID);
 }
 
+async function deleteUser(userID, auditContext = {}) {
+  const pool = await getPool();
+
+  // Count all historical references to this user
+  const refResult = await pool.request()
+    .input('UserID', sql.Int, userID)
+    .query(`
+      SELECT (
+        (SELECT COUNT(*) FROM LogEntries         WHERE PerformedByUserID = @UserID OR CreatedByUserID = @UserID) +
+        (SELECT COUNT(*) FROM SiteInventory      WHERE InstalledByUserID = @UserID OR RemovedByUserID = @UserID OR PulledFromUserID = @UserID) +
+        (SELECT COUNT(*) FROM Inventory          WHERE AssignedToUserID  = @UserID OR CreatedByUserID = @UserID) +
+        (SELECT COUNT(*) FROM InventoryStock     WHERE UserID            = @UserID) +
+        (SELECT COUNT(*) FROM RepairTracking     WHERE SentByUserID      = @UserID OR ReceivedByUserID = @UserID OR AssignedUserID = @UserID) +
+        (SELECT COUNT(*) FROM PMSchedules        WHERE AssignedUserID    = @UserID) +
+        (SELECT COUNT(*) FROM MaintenanceItems   WHERE AssignedToUserID  = @UserID OR ClosedByUserID = @UserID OR CreatedByUserID = @UserID) +
+        (SELECT COUNT(*) FROM SystemKeys         WHERE IssuedToUserID    = @UserID OR LastUpdatedByUserID = @UserID) +
+        (SELECT COUNT(*) FROM Documents          WHERE UploadedByUserID  = @UserID) +
+        (SELECT COUNT(*) FROM Sites              WHERE CreatedByUserID   = @UserID) +
+        (SELECT COUNT(*) FROM UserInventoryPossession WHERE UserID       = @UserID)
+      ) AS TotalRefs
+    `);
+
+  const totalRefs = refResult.recordset[0].TotalRefs;
+
+  if (totalRefs === 0) {
+    // No history — hard delete is safe
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
+    try {
+      await new sql.Request(tx).input('UserID', sql.Int, userID).query('DELETE FROM UserNotifications   WHERE UserID = @UserID');
+      await new sql.Request(tx).input('UserID', sql.Int, userID).query('DELETE FROM UserRoles           WHERE UserID = @UserID');
+      await new sql.Request(tx).input('UserID', sql.Int, userID).query('DELETE FROM Users               WHERE UserID = @UserID');
+      await tx.commit();
+    } catch (err) { await tx.rollback(); throw err; }
+    await writeAudit({ tableName: 'Users', recordID: userID, action: 'DELETE',
+      userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent });
+    return { method: 'hard' };
+  }
+
+  // Has references — soft delete: preserve name/ID, block all login paths
+  await pool.request()
+    .input('UserID',    sql.Int,          userID)
+    .input('DeletedAt', sql.DateTime2,    new Date())
+    .query(`
+      UPDATE Users SET
+        IsActive     = 0,
+        DeletedAt    = @DeletedAt,
+        PasswordHash = NULL,
+        ExternalID   = NULL
+      WHERE UserID = @UserID
+    `);
+  await writeAudit({ tableName: 'Users', recordID: userID, action: 'DELETE',
+    newValues: { softDelete: true, refsFound: totalRefs },
+    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent });
+  return { method: 'soft', refsFound: totalRefs };
+}
+
+async function restoreUser(userID, auditContext = {}) {
+  const pool = await getPool();
+  await pool.request()
+    .input('UserID', sql.Int, userID)
+    .query('UPDATE Users SET IsActive = 1, DeletedAt = NULL WHERE UserID = @UserID');
+  await writeAudit({ tableName: 'Users', recordID: userID, action: 'RESTORE',
+    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent });
+  return findByID(userID);
+}
+
 // ── Notification preferences ──────────────────────────────────────────────────
 
 // Returns { 'pm.reminder': true, 'repair.overdue': false, ... } for a user
@@ -241,6 +315,6 @@ async function getOptedInEmails(notificationType) {
 module.exports = {
   findByID, findByUsername, findByEmail, findByExternalID,
   getAll, create, update, updatePassword, updateLastLogin,
-  setRoles, verifyPassword, toggleActive,
+  setRoles, verifyPassword, toggleActive, deleteUser, restoreUser,
   getNotificationPrefs, setNotificationPrefs, getOptedInEmails,
 };
