@@ -611,9 +611,11 @@ router.post('/:id/inventory/:itemID/replace-bulk', isAdmin, async (req, res, nex
       pulledFromUserID = parseInt(pulledFrom.split(':')[1], 10) || null;
     }
 
-    // Remove the faulty units from the site
+    // Remove the faulty units from the site; remove them from the total too
+    // (if an RMA is created and received, markReceived will add them back)
     await siteInventoryModel.removeBulkQuantity(siteID, itemID, replaceQty,
       { removedByUserID: req.user?.UserID }, req.auditContext);
+    await inventoryModel.adjustQuantityTotal(itemID, -replaceQty);
 
     // Install replacement units (same item, from chosen stock source)
     await siteInventoryModel.installItem(siteID, itemID, {

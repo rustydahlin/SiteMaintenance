@@ -384,6 +384,21 @@ async function adjustStockByStockID(stockID, delta) {
     `);
 }
 
+async function setUnallocated(itemID, unallocatedQty) {
+  // QuantityTotal = allocated (InventoryStock) + deployed (SiteInventory) + unallocated
+  const pool = await getPool();
+  await pool.request()
+    .input('ItemID',          sql.Int, itemID)
+    .input('UnallocatedQty',  sql.Int, Math.max(0, unallocatedQty))
+    .query(`
+      UPDATE Inventory SET QuantityTotal =
+        ISNULL((SELECT SUM(s.Quantity)  FROM InventoryStock s  WHERE s.ItemID = @ItemID), 0)
+        + ISNULL((SELECT SUM(si.Quantity) FROM SiteInventory si WHERE si.ItemID = @ItemID AND si.RemovedAt IS NULL), 0)
+        + @UnallocatedQty
+      WHERE ItemID = @ItemID
+    `);
+}
+
 async function adjustQuantityTotal(itemID, delta) {
   const pool = await getPool();
   await pool.request()
@@ -627,7 +642,7 @@ module.exports = {
   getAll, getByID, create, update, softDelete,
   updateStatus,
   getInStock, getRelatedParts, getSystemsList,
-  getStock, upsertStock, removeStock, adjustStock, adjustStockByStockID, adjustQuantityTotal,
+  getStock, upsertStock, removeStock, adjustStock, adjustStockByStockID, adjustQuantityTotal, setUnallocated,
   findByImportKey, searchForPicker, searchBulkForPicker,
   getByCommonName,
 };

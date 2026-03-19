@@ -260,11 +260,17 @@
                     <% } %>
                   </tr>
                   <% }) %>
-                  <tr>
+                  <tr id="unallocatedRow" <% if (isAdminUser) { %>style="cursor:pointer"<% } %>>
                     <td class="small text-muted fst-italic"><i class="bi bi-inbox me-1"></i>Unallocated</td>
-                    <td class="text-center text-muted"><%= unallocatedQty %></td>
-                    <td class="small text-muted">—</td>
-                    <% if (isAdminUser) { %><td></td><% } %>
+                    <td class="text-center text-muted fst-italic" id="unallocatedQtyCell"><%= unallocatedQty %></td>
+                    <td class="small text-muted fst-italic">—</td>
+                    <% if (isAdminUser) { %>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" id="editUnallocatedBtn" title="Edit unallocated quantity">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                    </td>
+                    <% } %>
                   </tr>
                 </tbody>
               </table>
@@ -279,6 +285,7 @@
                   <select name="holderType" id="holderType" class="form-select form-select-sm">
                     <option value="location">Stock Location</option>
                     <option value="user">Person</option>
+                    <option value="unallocated">Unallocated</option>
                   </select>
                 </div>
                 <div class="col-sm-3" id="stockLocGroup">
@@ -674,9 +681,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function toggleHolder() {
     if (!holderType) return;
-    var isPerson = holderType.value === 'user';
-    if (locGroup)  locGroup.style.display  = isPerson ? 'none' : '';
-    if (userGroup) userGroup.style.display = isPerson ? '' : 'none';
+    var val = holderType.value;
+    if (locGroup)  locGroup.style.display  = val === 'location' ? '' : 'none';
+    if (userGroup) userGroup.style.display = val === 'user'     ? '' : 'none';
   }
 
   if (holderType) {
@@ -739,6 +746,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (cancelBtn) {
     cancelBtn.addEventListener('click', resetStockForm);
+  }
+
+  // ── Unallocated row edit button ─────────────────────────────────────────────
+  var editUnallocatedBtn = document.getElementById('editUnallocatedBtn');
+  if (editUnallocatedBtn) {
+    var unallocatedQtyCell = document.getElementById('unallocatedQtyCell');
+    function activateUnallocated(e) {
+      e.stopPropagation();
+      if (holderType)  holderType.value = 'unallocated';
+      toggleHolder();
+      if (qtyInput) qtyInput.value = unallocatedQtyCell ? unallocatedQtyCell.textContent.trim() : '0';
+      if (notesInput) notesInput.value = '';
+      if (saveBtn) {
+        saveBtn.textContent = 'Update';
+        saveBtn.classList.replace('btn-primary', 'btn-success');
+      }
+      if (cancelBtn) cancelBtn.style.display = '';
+      document.querySelectorAll('.stock-row.table-active').forEach(function(r) { r.classList.remove('table-active'); });
+      document.getElementById('unallocatedRow').classList.add('table-active');
+      document.getElementById('stockForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    editUnallocatedBtn.addEventListener('click', activateUnallocated);
+    document.getElementById('unallocatedRow').addEventListener('click', activateUnallocated);
   }
 
 });

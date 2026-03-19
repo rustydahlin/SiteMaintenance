@@ -637,11 +637,16 @@ router.post('/:id/stock', isAdmin, async (req, res, next) => {
   try {
     const itemID = parseInt(req.params.id, 10);
     const { holderType, locationID, userID, quantity, notes } = req.body;
-    await inventoryModel.upsertStock(itemID, {
-      locationID: holderType === 'location' ? locationID : null,
-      userID:     holderType === 'user'     ? userID     : null,
-      quantity, notes,
-    });
+
+    if (holderType === 'unallocated') {
+      await inventoryModel.setUnallocated(itemID, parseInt(quantity, 10) || 0);
+    } else {
+      await inventoryModel.upsertStock(itemID, {
+        locationID: holderType === 'location' ? locationID : null,
+        userID:     holderType === 'user'     ? userID     : null,
+        quantity, notes,
+      });
+    }
     req.flash('success', 'Stock distribution updated.');
     res.redirect(`/inventory/${itemID}#overview`);
   } catch (err) {
