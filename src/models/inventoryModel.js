@@ -372,6 +372,26 @@ async function removeStock(stockID) {
     .query('DELETE FROM InventoryStock WHERE StockID = @StockID');
 }
 
+async function adjustStockByStockID(stockID, delta) {
+  const pool = await getPool();
+  await pool.request()
+    .input('StockID', sql.Int, stockID)
+    .input('Delta',   sql.Int, delta)
+    .query(`
+      UPDATE InventoryStock
+      SET Quantity = Quantity + @Delta, UpdatedAt = GETUTCDATE()
+      WHERE StockID = @StockID
+    `);
+}
+
+async function adjustQuantityTotal(itemID, delta) {
+  const pool = await getPool();
+  await pool.request()
+    .input('ItemID', sql.Int, itemID)
+    .input('Delta',  sql.Int, delta)
+    .query('UPDATE Inventory SET QuantityTotal = QuantityTotal + @Delta WHERE ItemID = @ItemID');
+}
+
 async function adjustStock(itemID, locationID, userID, delta) {
   if (!locationID && !userID) return;
   const pool = await getPool();
@@ -499,18 +519,21 @@ async function searchForPicker(q, { inStockOnly = false } = {}) {
   const result = await pool.request()
     .input('Term', sql.NVarChar(200), term)
     .query(`
-      SELECT TOP 50
+      SELECT TOP 100
         i.ItemID, i.TrackingType, i.SerialNumber, i.CommonName, i.ModelNumber,
         i.Manufacturer, s.StatusName,
+        l.LocationName     AS StockLocationName,
         si.SiteInventoryID AS CurrentSiteInventoryID,
         si.SiteID          AS CurrentSiteID,
         site.SiteName      AS CurrentSiteName
       FROM Inventory i
-      JOIN InventoryStatuses s    ON s.StatusID  = i.StatusID
-      LEFT JOIN SiteInventory si  ON si.ItemID   = i.ItemID AND si.RemovedAt IS NULL
-      LEFT JOIN Sites site        ON site.SiteID = si.SiteID
+      JOIN InventoryStatuses s      ON s.StatusID    = i.StatusID
+      LEFT JOIN StockLocations l    ON l.LocationID  = i.StockLocationID
+      LEFT JOIN SiteInventory si    ON si.ItemID     = i.ItemID AND si.RemovedAt IS NULL
+      LEFT JOIN Sites site          ON site.SiteID   = si.SiteID
       WHERE i.IsActive = 1 ${stockClause}
         AND (
+          @Term = '%%' OR
           i.SerialNumber LIKE @Term OR
           i.CommonName   LIKE @Term OR
           i.ModelNumber  LIKE @Term OR
@@ -519,6 +542,53 @@ async function searchForPicker(q, { inStockOnly = false } = {}) {
       ORDER BY i.Manufacturer, i.ModelNumber, i.CommonName, i.SerialNumber
     `);
   return result.recordset;
+}
+
+// Bulk items with available stock + per-item stock distributions (for repair picker)
+async function searchBulkForPicker(q) {
+  const pool = await getPool();
+  const term = `%${q || ''}%`;
+  const result = await pool.request()
+    .input('Term', sql.NVarChar(200), term)
+    .query(`
+      SELECT TOP 50
+        i.ItemID, i.TrackingType, i.CommonName, i.ModelNumber, i.Manufacturer,
+        i.QuantityTotal,
+        i.QuantityTotal - COALESCE(dep.qty, 0) AS QuantityAvailable,
+        (
+          SELECT s.StockID, s.Quantity, s.LocationID, s.UserID,
+                 COALESCE(sl.LocationName, u.DisplayName) AS Label,
+                 CASE WHEN s.LocationID IS NOT NULL THEN 'location' ELSE 'user' END AS StockType
+          FROM InventoryStock s
+          LEFT JOIN StockLocations sl ON sl.LocationID = s.LocationID
+          LEFT JOIN Users          u  ON u.UserID      = s.UserID
+          WHERE s.ItemID = i.ItemID AND s.Quantity > 0
+          ORDER BY sl.LocationName, u.DisplayName
+          FOR JSON PATH
+        ) AS DistribJSON
+      FROM Inventory i
+      LEFT JOIN (
+        SELECT ItemID, SUM(Quantity) AS qty
+        FROM SiteInventory WHERE RemovedAt IS NULL
+        GROUP BY ItemID
+      ) dep ON dep.ItemID = i.ItemID
+      WHERE i.IsActive = 1
+        AND i.TrackingType = 'bulk'
+        AND i.QuantityTotal - COALESCE(dep.qty, 0) > 0
+        AND (
+          @Term = '%%' OR
+          i.CommonName   LIKE @Term OR
+          i.ModelNumber  LIKE @Term OR
+          i.Manufacturer LIKE @Term
+        )
+      ORDER BY i.CommonName, i.ModelNumber
+    `);
+  // Parse the JSON distribution string for each item
+  return result.recordset.map(row => ({
+    ...row,
+    distributions: row.DistribJSON ? JSON.parse(row.DistribJSON) : [],
+    DistribJSON: undefined,
+  }));
 }
 
 // All active serialized items sharing a CommonName, with location info.
@@ -557,7 +627,7 @@ module.exports = {
   getAll, getByID, create, update, softDelete,
   updateStatus,
   getInStock, getRelatedParts, getSystemsList,
-  getStock, upsertStock, removeStock, adjustStock,
-  findByImportKey, searchForPicker,
+  getStock, upsertStock, removeStock, adjustStock, adjustStockByStockID, adjustQuantityTotal,
+  findByImportKey, searchForPicker, searchBulkForPicker,
   getByCommonName,
 };

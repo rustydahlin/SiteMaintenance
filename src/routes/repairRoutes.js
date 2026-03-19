@@ -48,13 +48,23 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// ── GET /inventory-search — JSON picker for item lookup ───────────────────────
+// ── GET /inventory-search — JSON picker for serialized item lookup ─────────────
 router.get('/inventory-search', isAdmin, async (req, res, next) => {
   try {
     const items = await inventoryModel.searchForPicker(
       req.query.q || '',
       { inStockOnly: req.query.inStock === '1' },
     );
+    res.json(items);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /bulk-inventory-search — JSON picker for bulk items with available stock
+router.get('/bulk-inventory-search', isAdmin, async (req, res, next) => {
+  try {
+    const items = await inventoryModel.searchBulkForPicker(req.query.q || '');
     res.json(items);
   } catch (err) {
     next(err);
@@ -101,9 +111,9 @@ router.post('/', isAdmin, async (req, res, next) => {
         itemID ? inventoryModel.getByID(parseInt(itemID, 10)) : Promise.resolve(null),
         userModel.getAll(),
       ]);
-      errors.forEach(e => req.flash('error', e));
       return res.render('repairs/form', {
         title:         'New Repair / RMA',
+        formErrors:    errors,
         repair: {
           SentDate:            sentDate,
           RMANumber:           req.body.rmaNumber           || null,
@@ -114,6 +124,7 @@ router.post('/', isAdmin, async (req, res, next) => {
           AssignedUserID:      req.body.assignedUserID      || null,
         },
         prefilledItem,
+        bulkStockLabel: req.body.bulkStockLabel || null,
         action:        '/repairs',
         isEdit:        false,
         users,
@@ -143,6 +154,13 @@ router.post('/', isAdmin, async (req, res, next) => {
           );
         }
       }
+    }
+
+    // If a bulk stock entry was selected, decrement the entry and the total
+    const bulkStockID = req.body.bulkStockID ? parseInt(req.body.bulkStockID, 10) : null;
+    if (bulkStockID) {
+      await inventoryModel.adjustStockByStockID(bulkStockID, -1);
+      await inventoryModel.adjustQuantityTotal(parseInt(itemID, 10), -1);
     }
 
     const repair = await repairModel.create({
@@ -267,12 +285,22 @@ router.post('/:id/receive', isAdmin, async (req, res, next) => {
       return res.redirect(`/repairs/${repairID}`);
     }
 
+    const repair = await repairModel.getByID(repairID);
+
     await repairModel.markReceived(repairID, {
       receivedDate,
       returnCondition:  returnCondition  || null,
       returnNotes:      returnNotes      || null,
       stockLocationID:  stockLocationID  || null,
     }, req.auditContext);
+
+    // For bulk items: restore QuantityTotal and credit the return location
+    if (repair && repair.ItemTrackingType === 'bulk') {
+      await inventoryModel.adjustQuantityTotal(repair.ItemID, +1);
+      if (stockLocationID) {
+        await inventoryModel.adjustStock(repair.ItemID, parseInt(stockLocationID, 10), null, +1);
+      }
+    }
 
     req.flash('success', 'Item marked as received.');
     res.redirect(`/repairs/${repairID}`);

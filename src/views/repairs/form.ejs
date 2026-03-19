@@ -11,6 +11,12 @@
   </a>
 </div>
 
+<% if (typeof formErrors !== 'undefined' && formErrors && formErrors.length) { %>
+<div class="alert alert-danger mb-3">
+  <% formErrors.forEach(e => { %><div><i class="bi bi-exclamation-circle me-1"></i><%= e %></div><% }) %>
+</div>
+<% } %>
+
 <div class="card shadow-sm">
   <div class="card-body">
     <form method="POST" action="<%= action %>" novalidate>
@@ -24,6 +30,9 @@
           </label>
           <% if (prefilledItem) { %>
             <input type="hidden" name="itemID" value="<%= prefilledItem.ItemID %>" />
+            <% if (typeof bulkStockLabel !== 'undefined' && bulkStockLabel) { %>
+              <input type="hidden" name="bulkStockLabel" value="<%= bulkStockLabel %>" />
+            <% } %>
             <div class="form-control bg-body-secondary">
               <i class="bi bi-box-seam me-1 text-muted"></i>
               <strong><%= prefilledItem.SerialNumber || prefilledItem.CommonName || prefilledItem.ModelNumber || `Item #${prefilledItem.ItemID}` %></strong>
@@ -32,21 +41,30 @@
               <% } else if (prefilledItem.ModelNumber && (prefilledItem.SerialNumber || prefilledItem.CommonName)) { %>
                 <span class="text-muted ms-1">— <%= prefilledItem.ModelNumber %></span>
               <% } %>
+              <% if (typeof bulkStockLabel !== 'undefined' && bulkStockLabel) { %>
+                <span class="text-muted ms-2">· from: <%= bulkStockLabel %></span>
+              <% } %>
             </div>
           <% } else { %>
             <input type="hidden" id="itemID" name="itemID" value="" required />
             <input type="hidden" id="siteInventoryID" name="siteInventoryID" value="" />
+            <input type="hidden" id="bulkStockID" name="bulkStockID" value="" />
+            <input type="hidden" id="bulkStockLabel" name="bulkStockLabel" value="" />
             <div class="input-group">
-              <input type="text" id="itemSearch" class="form-control"
-                     placeholder="Search by serial number, model, name…"
-                     autocomplete="off" />
-              <button type="button" class="btn btn-outline-secondary" id="clearItem"
+              <input type="text" id="itemDisplay" class="form-control" readonly
+                     placeholder="Click the search button to browse inventory…"
+                     style="cursor:pointer; background:var(--bs-body-bg)"
+                     data-bs-toggle="modal" data-bs-target="#itemPickerModal" />
+              <button type="button" class="btn btn-outline-secondary"
+                      data-bs-toggle="modal" data-bs-target="#itemPickerModal"
+                      title="Browse inventory">
+                <i class="bi bi-search"></i>
+              </button>
+              <button type="button" class="btn btn-outline-danger" id="clearItem"
                       style="display:none" title="Clear selection">
                 <i class="bi bi-x-lg"></i>
               </button>
             </div>
-            <div id="itemResults" class="list-group mt-1" style="display:none; max-height:220px; overflow-y:auto;"></div>
-            <div id="itemChosen" class="form-control bg-body-secondary mt-1" style="display:none;"></div>
           <% } %>
 
           <!-- Deployment warning (shown by JS when selected item is deployed) -->
@@ -179,14 +197,88 @@
   </div>
 </div>
 
+<!-- ── Inventory Picker Modal ─────────────────────────────────────────────── -->
 <% if (!prefilledItem) { %>
+<div class="modal fade" id="itemPickerModal" tabindex="-1" aria-labelledby="itemPickerModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title" id="itemPickerModalLabel">
+          <i class="bi bi-box-seam me-2"></i>Select Inventory Item
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <!-- Search bar -->
+        <div class="p-3 border-bottom">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" id="pickerSearch" class="form-control"
+                   placeholder="Search by serial number, common name, model, manufacturer…"
+                   autocomplete="off" />
+            <button type="button" class="btn btn-outline-secondary" id="pickerClearSearch"
+                    style="display:none" title="Clear search">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+        <!-- Results table -->
+        <div id="pickerLoading" class="text-center text-muted py-5" style="display:none">
+          <div class="spinner-border spinner-border-sm me-2"></div>Loading…
+        </div>
+        <div id="pickerEmpty" class="text-center text-muted py-5" style="display:none">
+          <i class="bi bi-inbox fs-3 d-block mb-2"></i>No items found.
+        </div>
+        <div class="table-responsive" id="pickerTableWrap">
+          <table class="table table-hover table-sm align-middle mb-0" style="cursor:pointer">
+            <thead class="table-dark sticky-top">
+              <tr>
+                <th style="width:110px">Status</th>
+                <th>Serial #</th>
+                <th>Common Name</th>
+                <th>Model #</th>
+                <th>Manufacturer</th>
+                <th>Location / Site</th>
+              </tr>
+            </thead>
+            <tbody id="pickerTableBody"></tbody>
+          </table>
+        </div>
+        <div id="pickerCount" class="px-3 py-2 border-top small text-muted" style="display:none"></div>
+
+        <!-- Bulk items section -->
+        <div id="pickerBulkSection" style="display:none">
+          <div class="px-3 pt-3 pb-1 border-top">
+            <span class="fw-semibold small">
+              <i class="bi bi-stack me-1 text-secondary"></i>Bulk Items with Available Stock
+            </span>
+            <span class="text-muted small ms-2">These items are tracked by quantity, not serial number.</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle mb-0" style="cursor:pointer">
+              <thead class="table-secondary">
+                <tr>
+                  <th>Common Name</th>
+                  <th>Model #</th>
+                  <th>Manufacturer</th>
+                  <th>Stock Location</th>
+                  <th class="text-center">Available</th>
+                </tr>
+              </thead>
+              <tbody id="pickerBulkBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
-  const searchInput   = document.getElementById('itemSearch');
   const hiddenInput   = document.getElementById('itemID');
   const siHidden      = document.getElementById('siteInventoryID');
-  const results       = document.getElementById('itemResults');
-  const chosen        = document.getElementById('itemChosen');
+  const displayInput  = document.getElementById('itemDisplay');
   const clearBtn      = document.getElementById('clearItem');
   const deployWarning = document.getElementById('deployedWarning');
   const deployedName  = document.getElementById('deployedSiteName');
@@ -198,9 +290,29 @@
   const replChosen    = document.getElementById('replacementChosen');
   const replClearBtn  = document.getElementById('clearReplacement');
 
-  if (!searchInput) return;
+  // Modal picker elements
+  const pickerSearch      = document.getElementById('pickerSearch');
+  const pickerClearSearch = document.getElementById('pickerClearSearch');
+  const pickerLoading     = document.getElementById('pickerLoading');
+  const pickerEmpty       = document.getElementById('pickerEmpty');
+  const pickerTableWrap   = document.getElementById('pickerTableWrap');
+  const pickerTableBody   = document.getElementById('pickerTableBody');
+  const pickerCount       = document.getElementById('pickerCount');
+  const bulkStockHidden      = document.getElementById('bulkStockID');
+  const bulkStockLabelHidden = document.getElementById('bulkStockLabel');
+  const pickerBulkSection = document.getElementById('pickerBulkSection');
+  const pickerBulkBody    = document.getElementById('pickerBulkBody');
+  const pickerModal       = document.getElementById('itemPickerModal');
 
-  let debounce, replDebounce;
+  let searchDebounce, replDebounce;
+
+  function statusBadge(name) {
+    const cls = name === 'In-Stock' ? 'bg-success'
+              : name === 'Deployed' ? 'bg-primary'
+              : name === 'In-Repair' ? 'bg-warning text-dark'
+              : 'bg-secondary';
+    return `<span class="badge ${cls}">${name || '—'}</span>`;
+  }
 
   function itemLabel(item) {
     const primary = item.SerialNumber || item.CommonName || item.ModelNumber || `Item #${item.ItemID}`;
@@ -211,42 +323,169 @@
     return primary + (parts.length ? ' — ' + parts.join(' / ') : '');
   }
 
-  function buildResults(container, items, onSelect) {
+  function renderPickerResults(items) {
+    pickerLoading.style.display = 'none';
     if (!items.length) {
-      container.innerHTML     = '<div class="list-group-item text-muted small">No items found.</div>';
-      container.style.display = 'block';
+      pickerTableWrap.style.display = 'none';
+      pickerCount.style.display     = 'none';
+      pickerEmpty.style.display     = 'block';
       return;
     }
-    container.innerHTML = items.map(item => `
-      <button type="button" class="list-group-item list-group-item-action small py-1 px-2"
-              data-item='${JSON.stringify(item).replace(/'/g, '&#39;')}'>
-        <span class="fw-semibold">${itemLabel(item)}</span>
-        <span class="badge ms-1 ${item.StatusName === 'In-Stock' ? 'bg-success' : 'bg-secondary'}">${item.StatusName}</span>
-        ${item.CurrentSiteName ? `<span class="badge bg-warning text-dark ms-1">At: ${item.CurrentSiteName}</span>` : ''}
-      </button>
-    `).join('');
-    container.style.display = 'block';
-    container.querySelectorAll('button').forEach(btn => {
-      btn.addEventListener('click', function () {
-        onSelect(JSON.parse(this.dataset.item));
+    pickerEmpty.style.display = 'none';
+    pickerTableWrap.style.display = '';
+    pickerCount.style.display = 'block';
+    pickerCount.textContent = `${items.length} item${items.length !== 1 ? 's' : ''} found`;
+    pickerTableBody.innerHTML = items.map(item => {
+      const location = item.CurrentSiteName
+        ? `<i class="bi bi-geo-alt-fill text-primary me-1"></i>${escHtml(item.CurrentSiteName)}`
+        : (item.StockLocationName
+            ? `<i class="bi bi-box-seam text-success me-1"></i>${escHtml(item.StockLocationName)}`
+            : '<span class="text-muted">—</span>');
+      return `<tr class="picker-row" data-item='${JSON.stringify(item).replace(/'/g, '&#39;').replace(/"/g, '&quot;')}'>
+        <td>${statusBadge(item.StatusName)}</td>
+        <td class="fw-semibold">${escHtml(item.SerialNumber || '—')}</td>
+        <td>${escHtml(item.CommonName || '—')}</td>
+        <td class="text-muted small">${escHtml(item.ModelNumber || '—')}</td>
+        <td class="text-muted small">${escHtml(item.Manufacturer || '—')}</td>
+        <td class="small">${location}</td>
+      </tr>`;
+    }).join('');
+
+    pickerTableBody.querySelectorAll('.picker-row').forEach(row => {
+      row.addEventListener('click', function () {
+        const item = JSON.parse(this.dataset.item.replace(/&quot;/g, '"'));
+        selectItem(item);
+        bootstrap.Modal.getInstance(pickerModal).hide();
       });
     });
   }
 
-  function selectItem(item) {
-    hiddenInput.value         = item.ItemID;
-    siHidden.value            = item.CurrentSiteInventoryID || '';
-    searchInput.style.display = 'none';
-    clearBtn.style.display    = 'inline-flex';
-    results.style.display     = 'none';
-    results.innerHTML         = '';
-    chosen.style.display      = 'block';
-    chosen.innerHTML = `<i class="bi bi-box-seam me-1 text-muted"></i><strong>${itemLabel(item)}</strong>`
-      + ` <span class="badge ms-2 ${item.StatusName === 'In-Stock' ? 'bg-success' : 'bg-secondary'}">${item.StatusName}</span>`;
+  function escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
 
-    // Show or hide the deployment warning
+  function renderBulkResults(items) {
+    if (!items.length) {
+      pickerBulkSection.style.display = 'none';
+      return;
+    }
+    pickerBulkSection.style.display = '';
+
+    let html = '';
+    for (const item of items) {
+      const distribs     = item.distributions || [];
+      const allocatedQty = distribs.reduce((s, d) => s + d.Quantity, 0);
+      const unallocated  = Math.max(0, item.QuantityAvailable - allocatedQty);
+      const itemJson     = JSON.stringify(item).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+
+      // Group header row (not clickable)
+      html += `<tr class="table-secondary">
+        <td colspan="4" class="fw-semibold ps-3 py-1">
+          <i class="bi bi-stack me-1"></i>${escHtml(item.CommonName || '—')}
+          <span class="text-muted fw-normal small ms-2">${escHtml(item.ModelNumber || '')}${item.ModelNumber && item.Manufacturer ? ' / ' : ''}${escHtml(item.Manufacturer || '')}</span>
+        </td>
+        <td class="text-center py-1 text-muted small">${item.QuantityAvailable} / ${item.QuantityTotal} avail.</td>
+      </tr>`;
+
+      // One sub-row per distribution
+      for (const d of distribs) {
+        const icon = d.StockType === 'location' ? 'bi-box-seam text-success' : 'bi-person text-info';
+        const subItem = JSON.stringify({ ...item, _stockID: d.StockID, _stockLabel: d.Label })
+          .replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+        html += `<tr class="picker-bulk-row" style="cursor:pointer" data-item='${subItem}'>
+          <td class="ps-4 small"><i class="bi ${icon} me-1"></i>${escHtml(d.Label)}</td>
+          <td class="text-muted small" colspan="3"></td>
+          <td class="text-center"><span class="badge bg-success">${d.Quantity}</span></td>
+        </tr>`;
+      }
+
+      // Unallocated sub-row (if any)
+      if (unallocated > 0) {
+        const subItem = JSON.stringify({ ...item, _stockID: null, _stockLabel: 'Unallocated' })
+          .replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+        html += `<tr class="picker-bulk-row" style="cursor:pointer" data-item='${subItem}'>
+          <td class="ps-4 small text-muted fst-italic"><i class="bi bi-inbox me-1"></i>Unallocated</td>
+          <td class="text-muted small" colspan="3"></td>
+          <td class="text-center"><span class="badge bg-secondary">${unallocated}</span></td>
+        </tr>`;
+      }
+    }
+
+    pickerBulkBody.innerHTML = html;
+    pickerBulkBody.querySelectorAll('.picker-bulk-row').forEach(row => {
+      row.addEventListener('click', function () {
+        const item = JSON.parse(this.dataset.item.replace(/&quot;/g, '"'));
+        selectBulkItem(item);
+        bootstrap.Modal.getInstance(pickerModal).hide();
+      });
+    });
+  }
+
+  function selectBulkItem(item) {
+    hiddenInput.value           = item.ItemID;
+    siHidden.value              = '';
+    bulkStockHidden.value       = item._stockID || '';
+    bulkStockLabelHidden.value  = item._stockLabel || '';
+    const nameParts = [item.CommonName, item.ModelNumber].filter(Boolean).join(' — ');
+    const from      = item._stockLabel ? ` · from: ${item._stockLabel}` : '';
+    displayInput.value          = `${nameParts}${from}`;
+    clearBtn.style.display      = 'inline-flex';
+    deployWarning.style.display = 'none';
+    clearReplacement();
+  }
+
+  async function loadPickerItems(q) {
+    pickerLoading.style.display   = 'block';
+    pickerTableWrap.style.display = 'none';
+    pickerEmpty.style.display     = 'none';
+    pickerCount.style.display     = 'none';
+    pickerBulkSection.style.display = 'none';
+    try {
+      const qs = encodeURIComponent(q || '');
+      const [serialized, bulk] = await Promise.all([
+        fetch(`/repairs/inventory-search?q=${qs}`).then(r => r.json()),
+        fetch(`/repairs/bulk-inventory-search?q=${qs}`).then(r => r.json()),
+      ]);
+      pickerLoading.style.display = 'none';
+      renderPickerResults(serialized);
+      renderBulkResults(bulk);
+    } catch (_) {
+      pickerLoading.style.display = 'none';
+      pickerEmpty.style.display   = 'block';
+    }
+  }
+
+  // Load all items when modal opens
+  pickerModal.addEventListener('show.bs.modal', () => {
+    pickerSearch.value = '';
+    pickerClearSearch.style.display = 'none';
+    loadPickerItems('');
+    setTimeout(() => pickerSearch.focus(), 300);
+  });
+
+  pickerSearch.addEventListener('input', function () {
+    const q = this.value.trim();
+    pickerClearSearch.style.display = q ? 'inline-flex' : 'none';
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => loadPickerItems(q), 250);
+  });
+
+  pickerClearSearch.addEventListener('click', () => {
+    pickerSearch.value = '';
+    pickerClearSearch.style.display = 'none';
+    loadPickerItems('');
+    pickerSearch.focus();
+  });
+
+  function selectItem(item) {
+    hiddenInput.value      = item.ItemID;
+    siHidden.value         = item.CurrentSiteInventoryID || '';
+    bulkStockHidden.value  = '';
+    displayInput.value     = itemLabel(item);
+    clearBtn.style.display = 'inline-flex';
+
     if (item.CurrentSiteID) {
-      deployedName.textContent   = item.CurrentSiteName;
+      deployedName.textContent    = item.CurrentSiteName;
       deployWarning.style.display = 'block';
     } else {
       deployWarning.style.display = 'none';
@@ -254,27 +493,46 @@
     }
   }
 
-  function clearSelection() {
-    hiddenInput.value         = '';
-    siHidden.value            = '';
-    searchInput.value         = '';
-    searchInput.style.display = '';
-    clearBtn.style.display    = 'none';
-    chosen.style.display      = 'none';
-    results.style.display     = 'none';
-    results.innerHTML         = '';
+  clearBtn.addEventListener('click', function () {
+    hiddenInput.value           = '';
+    siHidden.value              = '';
+    bulkStockHidden.value       = '';
+    bulkStockLabelHidden.value  = '';
+    displayInput.value          = '';
+    clearBtn.style.display      = 'none';
     deployWarning.style.display = 'none';
     clearReplacement();
-    searchInput.focus();
+  });
+
+  // ── Replacement inline picker (for deployed items) ──────────────────────────
+  function buildReplResults(items) {
+    if (!items.length) {
+      replResults.innerHTML     = '<div class="list-group-item text-muted small">No in-stock items found.</div>';
+      replResults.style.display = 'block';
+      return;
+    }
+    replResults.innerHTML = items.map(item => `
+      <button type="button" class="list-group-item list-group-item-action small py-1 px-2"
+              data-item='${JSON.stringify(item).replace(/'/g, '&#39;')}'>
+        <span class="fw-semibold">${itemLabel(item)}</span>
+        <span class="badge bg-success ms-1">In-Stock</span>
+      </button>
+    `).join('');
+    replResults.style.display = 'block';
+    replResults.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', function () {
+        selectReplacement(JSON.parse(this.dataset.item));
+      });
+    });
   }
 
   function selectReplacement(item) {
-    replHidden.value            = item.ItemID;
-    replSearch.style.display    = 'none';
-    replClearBtn.style.display  = 'inline-flex';
-    replResults.style.display   = 'none';
-    replResults.innerHTML       = '';
-    replChosen.style.display    = 'block';
+    replHidden.value           = item.ItemID;
+    replSearch.style.display   = 'none';
+    replClearBtn.style.display = 'inline-flex';
+    replResults.style.display  = 'none';
+    replResults.innerHTML      = '';
+    replChosen.style.display   = 'block';
     replChosen.innerHTML = `<i class="bi bi-box-seam me-1 text-muted"></i><strong>${itemLabel(item)}</strong>`;
   }
 
@@ -288,33 +546,19 @@
     replResults.innerHTML      = '';
   }
 
-  clearBtn.addEventListener('click', clearSelection);
   replClearBtn.addEventListener('click', clearReplacement);
-
-  searchInput.addEventListener('input', function () {
-    clearTimeout(debounce);
-    const q = this.value.trim();
-    if (!q) { results.style.display = 'none'; results.innerHTML = ''; return; }
-    debounce = setTimeout(async () => {
-      const resp  = await fetch(`/repairs/inventory-search?q=${encodeURIComponent(q)}`);
-      buildResults(results, await resp.json(), selectItem);
-    }, 250);
-  });
 
   replSearch.addEventListener('input', function () {
     clearTimeout(replDebounce);
     const q = this.value.trim();
     if (!q) { replResults.style.display = 'none'; replResults.innerHTML = ''; return; }
     replDebounce = setTimeout(async () => {
-      const resp  = await fetch(`/repairs/inventory-search?q=${encodeURIComponent(q)}&inStock=1`);
-      buildResults(replResults, await resp.json(), selectReplacement);
+      const resp = await fetch(`/repairs/inventory-search?q=${encodeURIComponent(q)}&inStock=1`);
+      buildReplResults(await resp.json());
     }, 250);
   });
 
-  // Hide dropdowns on outside click
   document.addEventListener('click', function (e) {
-    if (!results.contains(e.target) && e.target !== searchInput)
-      results.style.display = 'none';
     if (!replResults.contains(e.target) && e.target !== replSearch)
       replResults.style.display = 'none';
   });
