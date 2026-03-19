@@ -221,14 +221,17 @@
           </div>
           <div class="card-body">
             <!-- Current distribution table -->
-            <% if (stockDistribution && stockDistribution.length > 0) { %>
+            <%
+              const allocatedQty   = (stockDistribution || []).reduce((sum, r) => sum + r.Quantity, 0);
+              const unallocatedQty = Math.max(0, (item.QuantityAvailable || 0) - allocatedQty);
+            %>
             <div class="table-responsive mb-3">
               <table class="table table-sm table-hover align-middle mb-0">
                 <thead>
                   <tr><th>Location / Person</th><th class="text-center">Qty</th><th>Notes</th><% if (isAdminUser) { %><th></th><% } %></tr>
                 </thead>
                 <tbody>
-                  <% stockDistribution.forEach(row => { %>
+                  <% (stockDistribution || []).forEach(row => { %>
                   <tr class="stock-row" style="cursor:pointer"
                       data-stock-id="<%= row.StockID %>"
                       data-holder-type="<%= row.LocationName ? 'location' : 'user' %>"
@@ -257,12 +260,15 @@
                     <% } %>
                   </tr>
                   <% }) %>
+                  <tr>
+                    <td class="small text-muted fst-italic"><i class="bi bi-inbox me-1"></i>Unallocated</td>
+                    <td class="text-center text-muted"><%= unallocatedQty %></td>
+                    <td class="small text-muted">—</td>
+                    <% if (isAdminUser) { %><td></td><% } %>
+                  </tr>
                 </tbody>
               </table>
             </div>
-            <% } else { %>
-              <p class="text-muted small mb-3">No stock locations assigned yet. Add entries below to track where units are.</p>
-            <% } %>
 
             <!-- Add / update stock entry form -->
             <% if (isAdminUser) { %>

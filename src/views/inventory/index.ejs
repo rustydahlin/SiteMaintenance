@@ -1,11 +1,12 @@
 <%
   function statusBadge(statusName) {
     const map = {
-      'In-Stock':   'bg-success',
-      'Deployed':   'bg-primary',
-      'Checked-Out':'bg-warning text-dark',
-      'In-Repair':  'bg-danger',
-      'Retired':    'bg-secondary',
+      'In-Stock':    'bg-success',
+      'Out of Stock':'bg-danger',
+      'Deployed':    'bg-primary',
+      'Checked-Out': 'bg-warning text-dark',
+      'In-Repair':   'bg-danger',
+      'Retired':     'bg-secondary',
     };
     const cls = map[statusName] || 'bg-secondary';
     return `<span class="badge ${cls}">${statusName || '—'}</span>`;
@@ -154,7 +155,10 @@
           <% if (item.deployedCount > 0) { %><span class="badge bg-primary me-1"><%= item.deployedCount %> Deployed</span><% } %>
           <% if (item.otherCount > 0)    { %><span class="badge bg-secondary"><%= item.otherCount %> Other</span><% } %>
         </td>
-        <td class="text-center small fw-semibold"><%= item.totalCount %></td>
+        <td class="text-center small">
+          <span class="fw-semibold"><%= item.inStockCount %></span>
+          <span class="text-muted">/ <%= item.totalCount %></span>
+        </td>
         <td class="small text-muted">
           <% if (item.primaryLocation && item.locationCount > 1) { %>
             <i class="bi bi-box me-1"></i><%= item.primaryLocation %> +<%= item.locationCount - 1 %> more
@@ -188,7 +192,7 @@
           <%= item.TrackingType === 'bulk' ? '—' : (item.SerialNumber || '—') %>
         </td>
         <td class="small"><%= item.CategoryName || '—' %></td>
-        <td><%- statusBadge(item.StatusName) %></td>
+        <td><%- statusBadge(item.TrackingType === 'bulk' ? (item.QuantityAvailable > 0 ? 'In-Stock' : 'Out of Stock') : item.StatusName) %></td>
         <td class="text-center small">
           <% if (item.TrackingType === 'bulk') { %>
             <span class="fw-semibold"><%= item.QuantityAvailable %></span>
