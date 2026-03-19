@@ -378,12 +378,13 @@
 
   let searchDebounce;
 
-  function statusBadge(name) {
-    const cls = name === 'In-Stock' ? 'bg-success'
-              : name === 'Deployed' ? 'bg-primary'
-              : name === 'In-Repair' ? 'bg-warning text-dark'
-              : 'bg-secondary';
-    return `<span class="badge ${cls}">${name || '—'}</span>`;
+  function statusBadge(item) {
+    // Derive display status from location context, not raw inventory status
+    if (item.CurrentSiteID)      return `<span class="badge bg-primary">Deployed</span>`;
+    if (item.StockLocationName)  return `<span class="badge bg-success">In-Stock</span>`;
+    if (item.StatusName === 'In-Stock') return `<span class="badge bg-success">In-Stock</span>`;
+    if (item.StatusName)         return `<span class="badge bg-secondary">${escHtml(item.StatusName)}</span>`;
+    return '';
   }
 
   function itemLabel(item) {
@@ -414,7 +415,7 @@
             ? `<i class="bi bi-box-seam text-success me-1"></i>${escHtml(item.StockLocationName)}`
             : '<span class="text-muted">—</span>');
       return `<tr class="picker-row" data-item='${JSON.stringify(item).replace(/'/g, '&#39;').replace(/"/g, '&quot;')}'>
-        <td>${statusBadge(item.StatusName)}</td>
+        <td>${statusBadge(item)}</td>
         <td class="fw-semibold">${escHtml(item.SerialNumber || '—')}</td>
         <td>${escHtml(item.CommonName || '—')}</td>
         <td class="text-muted small">${escHtml(item.ModelNumber || '—')}</td>

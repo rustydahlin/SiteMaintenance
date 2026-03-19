@@ -555,7 +555,9 @@ async function searchForPicker(q, { inStockOnly = false } = {}) {
           i.SerialNumber LIKE @Term OR
           i.CommonName   LIKE @Term OR
           i.ModelNumber  LIKE @Term OR
-          i.Manufacturer LIKE @Term
+          i.Manufacturer LIKE @Term OR
+          site.SiteName  LIKE @Term OR
+          l.LocationName LIKE @Term
         )
       ORDER BY i.Manufacturer, i.ModelNumber, i.CommonName, i.SerialNumber
     `);
