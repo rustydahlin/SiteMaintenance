@@ -16,6 +16,11 @@ const importUpload = multer({
   },
 });
 
+router.use((_req, res, next) => {
+  if (!res.locals.vendorsEnabled) return res.status(404).render('errors/404', { title: 'Not Found' });
+  next();
+});
+
 router.use(isAuthenticated);
 
 // ── GET / — list ──────────────────────────────────────────────────────────────

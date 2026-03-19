@@ -37,7 +37,7 @@
           <span class="nav-label">Repairs / RMA</span>
         </a>
       </li>
-      <% if (user.roles && (user.roles.includes('Admin') || user.roles.includes('Maintenance') || user.roles.includes('Maintenance-Close'))) { %>
+      <% if (maintenanceEnabled && user.roles && (user.roles.includes('Admin') || user.roles.includes('Maintenance') || user.roles.includes('Maintenance-Close'))) { %>
       <li class="nav-item">
         <a class="nav-link <%= currentPath.startsWith('/maintenance') ? 'active' : '' %>" href="/maintenance" title="Maintenance">
           <i class="bi bi-tools"></i>
@@ -52,6 +52,7 @@
         </a>
       </li>
 
+      <% if (vendorsEnabled) { %>
       <li class="nav-item mt-2">
         <span class="sidebar-section-label">Vendors</span>
         <span class="sidebar-section-divider"></span>
@@ -62,6 +63,7 @@
           <span class="nav-label">Vendors</span>
         </a>
       </li>
+      <% } %>
 
       <% if (user.roles && (user.roles.includes('Admin') || user.roles.includes('Technician') || (systemKeysEnabled && user.roles.includes('SystemKeys')))) { %>
       <li class="nav-item mt-2">

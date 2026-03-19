@@ -9,6 +9,12 @@ const lookupModel      = require('../models/lookupModel');
 const userModel        = require('../models/userModel');
 const email            = require('../services/emailService');
 
+// Block access entirely when the Maintenance section is disabled
+router.use((_req, res, next) => {
+  if (!res.locals.maintenanceEnabled) return res.status(404).render('errors/404', { title: 'Not Found' });
+  next();
+});
+
 // All maintenance routes require at minimum canAccessMaintenance
 router.use(isAuthenticated);
 

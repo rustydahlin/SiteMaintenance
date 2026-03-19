@@ -23,6 +23,22 @@
         </select>
         <div class="form-text">Show / hide the System Keys section in the navigation.</div>
       </div>
+      <div class="col-md-3">
+        <label class="form-label">Enable Vendors Section</label>
+        <select name="vendors.enabled" class="form-select">
+          <option value="0" <%= settings['vendors.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+          <option value="1" <%= settings['vendors.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+        </select>
+        <div class="form-text">Show / hide the Vendors section in the navigation.</div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Enable Maintenance Section</label>
+        <select name="maintenance.enabled" class="form-select">
+          <option value="0" <%= settings['maintenance.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+          <option value="1" <%= settings['maintenance.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+        </select>
+        <div class="form-text">Show / hide the Maintenance section in the navigation.</div>
+      </div>
     </div>
   </div>
 

@@ -79,11 +79,21 @@ async function createApp() {
     res.locals.flash       = req.flash();
     res.locals.currentPath = req.path;
     try {
-      res.locals.appName           = await settingsModel.getSetting('app.name', null) || 'SiteMaintenance';
-      res.locals.systemKeysEnabled = (await settingsModel.getSetting('systemKeys.enabled', null)) === '1';
+      const [appName, sysKeys, vendors, maintenance] = await Promise.all([
+        settingsModel.getSetting('app.name', null),
+        settingsModel.getSetting('systemKeys.enabled', null),
+        settingsModel.getSetting('vendors.enabled', null),
+        settingsModel.getSetting('maintenance.enabled', null),
+      ]);
+      res.locals.appName             = appName || 'SiteMaintenance';
+      res.locals.systemKeysEnabled   = sysKeys      === '1';
+      res.locals.vendorsEnabled      = vendors      === '1';
+      res.locals.maintenanceEnabled  = maintenance  === '1';
     } catch (_) {
-      res.locals.appName           = 'SiteMaintenance';
-      res.locals.systemKeysEnabled = false;
+      res.locals.appName             = 'SiteMaintenance';
+      res.locals.systemKeysEnabled   = false;
+      res.locals.vendorsEnabled      = false;
+      res.locals.maintenanceEnabled  = false;
     }
     next();
   });
