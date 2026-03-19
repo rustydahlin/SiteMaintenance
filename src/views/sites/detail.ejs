@@ -1174,4 +1174,11 @@
       }
     });
   }
+
+  // Activate tab from URL hash on load
+  const hash = window.location.hash;
+  if (hash) {
+    const tabEl = document.querySelector('.nav-link[href="' + hash + '"]');
+    if (tabEl) bootstrap.Tab.getOrCreateInstance(tabEl).show();
+  }
 </script>

@@ -150,9 +150,9 @@
       <% if (upcomingPMs.length === 0) { %>
         <div class="card-body text-muted small">No upcoming PMs.</div>
       <% } else { %>
-      <ul class="list-group list-group-flush">
+      <div class="list-group list-group-flush">
         <% upcomingPMs.forEach(pm => { %>
-        <li class="list-group-item py-2">
+        <a href="/sites/<%= pm.SiteID %>#pm" class="list-group-item list-group-item-action py-2">
           <div class="d-flex justify-content-between align-items-start">
             <div>
               <div class="small fw-semibold"><%= pm.Title %></div>
@@ -168,9 +168,9 @@
               <%= daysLeft < 0 ? Math.abs(daysLeft) + 'd overdue' : daysLeft === 0 ? 'Due today' : daysLeft + 'd' %>
             </span>
           </div>
-        </li>
+        </a>
         <% }) %>
-      </ul>
+      </div>
       <% } %>
     </div>
 
@@ -180,16 +180,14 @@
       <div class="card-header text-warning">
         <i class="bi bi-exclamation-triangle me-2"></i>Repair Follow-Ups Due
       </div>
-      <ul class="list-group list-group-flush">
+      <div class="list-group list-group-flush">
         <% repairsFollowUp.forEach(r => { %>
-        <li class="list-group-item py-2">
-          <a href="/repairs/<%= r.RepairID %>" class="text-decoration-none">
-            <div class="small fw-semibold"><%= r.SerialNumber %></div>
-            <div class="text-muted" style="font-size:.75rem">Follow-up: <%= new Date(r.FollowUpDate).toLocaleDateString() %></div>
-          </a>
-        </li>
+        <a href="/repairs/<%= r.RepairID %>" class="list-group-item list-group-item-action py-2">
+          <div class="small fw-semibold"><%= r.SerialNumber %></div>
+          <div class="text-muted" style="font-size:.75rem">Follow-up: <%= new Date(r.FollowUpDate).toLocaleDateString() %></div>
+        </a>
         <% }) %>
-      </ul>
+      </div>
     </div>
     <% } %>
 
@@ -198,38 +196,34 @@
       <div class="card-header text-danger">
         <i class="bi bi-key me-2"></i>System Keys — Expired / Expiring
       </div>
-      <ul class="list-group list-group-flush">
+      <div class="list-group list-group-flush">
         <% expiredKeys.forEach(k => { %>
-        <li class="list-group-item py-2">
-          <a href="/system-keys/<%= k.KeyID %>" class="text-decoration-none">
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <div class="small fw-semibold"><%= k.IssuedToName || '—' %></div>
-                <div class="text-muted" style="font-size:.75rem">
-                  <%= k.Organization || '' %><% if (k.SerialNumber) { %> &bull; <%= k.SerialNumber %><% } %>
-                </div>
+        <a href="/system-keys/<%= k.KeyID %>" class="list-group-item list-group-item-action py-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="small fw-semibold"><%= k.IssuedToName || '—' %></div>
+              <div class="text-muted" style="font-size:.75rem">
+                <%= k.Organization || '' %><% if (k.SerialNumber) { %> &bull; <%= k.SerialNumber %><% } %>
               </div>
-              <span class="badge bg-danger ms-2">Expired <%= new Date(k.ExpirationDate).toLocaleDateString() %></span>
             </div>
-          </a>
-        </li>
+            <span class="badge bg-danger ms-2">Expired <%= new Date(k.ExpirationDate).toLocaleDateString() %></span>
+          </div>
+        </a>
         <% }) %>
         <% expiringKeys.forEach(k => { %>
-        <li class="list-group-item py-2">
-          <a href="/system-keys/<%= k.KeyID %>" class="text-decoration-none">
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <div class="small fw-semibold"><%= k.IssuedToName || '—' %></div>
-                <div class="text-muted" style="font-size:.75rem">
-                  <%= k.Organization || '' %><% if (k.SerialNumber) { %> &bull; <%= k.SerialNumber %><% } %>
-                </div>
+        <a href="/system-keys/<%= k.KeyID %>" class="list-group-item list-group-item-action py-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="small fw-semibold"><%= k.IssuedToName || '—' %></div>
+              <div class="text-muted" style="font-size:.75rem">
+                <%= k.Organization || '' %><% if (k.SerialNumber) { %> &bull; <%= k.SerialNumber %><% } %>
               </div>
-              <span class="badge bg-warning text-dark ms-2">Expires <%= new Date(k.ExpirationDate).toLocaleDateString() %></span>
             </div>
-          </a>
-        </li>
+            <span class="badge bg-warning text-dark ms-2">Expires <%= new Date(k.ExpirationDate).toLocaleDateString() %></span>
+          </div>
+        </a>
         <% }) %>
-      </ul>
+      </div>
     </div>
     <% } %>
   </div>
