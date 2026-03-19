@@ -29,7 +29,7 @@
 
 <div class="row g-4 mb-4">
   <!-- Vendor Info -->
-  <div class="col-md-6">
+  <div class="col-md-12">
     <div class="card shadow-sm h-100">
       <div class="card-header fw-semibold"><i class="bi bi-info-circle me-2"></i>Details</div>
       <div class="card-body">
@@ -74,52 +74,18 @@
     </div>
   </div>
 
-  <!-- Add Contact form -->
-  <% if (isAdminUser) { %>
-  <div class="col-md-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-header fw-semibold"><i class="bi bi-person-plus me-2"></i>Add Contact</div>
-      <div class="card-body">
-        <form method="POST" action="/vendors/<%= vendor.VendorID %>/contacts">
-          <div class="row g-2">
-            <div class="col-md-6">
-              <input type="text" name="firstName" class="form-control form-control-sm" placeholder="First Name *" required maxlength="100" />
-            </div>
-            <div class="col-md-6">
-              <input type="text" name="lastName" class="form-control form-control-sm" placeholder="Last Name" maxlength="100" />
-            </div>
-            <div class="col-md-6">
-              <input type="text" name="title" class="form-control form-control-sm" placeholder="Title / Role" maxlength="150" />
-            </div>
-            <div class="col-md-6">
-              <input type="text" name="phone" class="form-control form-control-sm" placeholder="Phone" maxlength="50" />
-            </div>
-            <div class="col-12">
-              <input type="email" name="email" class="form-control form-control-sm" placeholder="Email" maxlength="255" />
-            </div>
-            <div class="col-12">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="receivePMEmails" id="newReceivePM" value="1" />
-                <label class="form-check-label small" for="newReceivePM">Receive PM reminder emails</label>
-              </div>
-            </div>
-            <div class="col-12">
-              <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Notes" maxlength="2000"></textarea>
-            </div>
-            <div class="col-12">
-              <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Contact</button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-  <% } %>
 </div>
 
 <!-- Contacts list -->
 <div class="card shadow-sm">
-  <div class="card-header fw-semibold"><i class="bi bi-people me-2"></i>Contacts (<%= vendor.contacts.length %>)</div>
+  <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-people me-2"></i>Contacts (<%= vendor.contacts.length %>)</span>
+    <% if (isAdminUser) { %>
+      <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addContactModal">
+        <i class="bi bi-plus-lg me-1"></i>New Contact
+      </button>
+    <% } %>
+  </div>
   <% if (vendor.contacts.length === 0) { %>
     <div class="card-body text-muted">No contacts added yet.</div>
   <% } else { %>
@@ -200,6 +166,58 @@
   </div>
   <% } %>
 </div>
+
+<!-- Add Contact Modal -->
+<% if (isAdminUser) { %>
+<div class="modal fade" id="addContactModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>New Contact</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="/vendors/<%= vendor.VendorID %>/contacts">
+        <div class="modal-body row g-3">
+          <div class="col-md-6">
+            <label class="form-label">First Name <span class="text-danger">*</span></label>
+            <input type="text" name="firstName" class="form-control" required maxlength="100" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Last Name</label>
+            <input type="text" name="lastName" class="form-control" maxlength="100" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Title / Role</label>
+            <input type="text" name="title" class="form-control" maxlength="150" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Phone</label>
+            <input type="text" name="phone" class="form-control" maxlength="50" />
+          </div>
+          <div class="col-12">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-control" maxlength="255" />
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="receivePMEmails" id="newReceivePM" value="1" />
+              <label class="form-check-label" for="newReceivePM">Receive PM reminder emails</label>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" class="form-control" rows="3" maxlength="2000"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add Contact</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<% } %>
 
 <!-- Edit Contact Modal -->
 <% if (isAdminUser) { %>
