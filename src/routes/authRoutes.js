@@ -12,17 +12,18 @@ const router     = express.Router();
 router.get('/login', async (req, res) => {
   if (req.isAuthenticated()) return res.redirect('/');
   const settings = require('../models/settingsModel');
-  let ldapEnabled = false, oidcEnabled = false;
+  let oidcEnabled = false, oidcButtonLabel = '', loginNote = '';
   try {
-    [ldapEnabled, oidcEnabled] = await Promise.all([
-      settings.getSettingsBool('ldap.enabled', 'LDAP_ENABLED'),
+    [oidcEnabled, oidcButtonLabel, loginNote] = await Promise.all([
       settings.getSettingsBool('oidc.enabled', 'OIDC_ENABLED'),
+      settings.getSetting('login.oidcButtonLabel', null),
+      settings.getSetting('login.note', null),
     ]);
   } catch (_) {}
-  res.render('auth/login', { title: 'Sign In', layout: 'layouts/auth', ldapEnabled, oidcEnabled });
+  res.render('auth/login', { title: 'Sign In', layout: 'layouts/auth', oidcEnabled, oidcButtonLabel, loginNote });
 });
 
-// ── POST /auth/login (local) ──────────────────────────────────────────────────
+// ── POST /auth/login — unified local + LDAP handler ──────────────────────────
 router.post('/login',
   body('username').trim().notEmpty().withMessage('Username is required'),
   body('password').notEmpty().withMessage('Password is required'),
@@ -34,60 +35,55 @@ router.post('/login',
     }
     next();
   },
-  (req, res, next) => {
-    passport.authenticate('local', async (err, user, info) => {
-      if (err) return next(err);
-      if (!user) {
-        await writeAudit({ tableName: 'Users', action: 'LOGIN_FAILED',
-          notes: `username=${req.body.username}`,
-          ip: req.ip, userAgent: req.headers['user-agent'] });
-        req.flash('error', info?.message || 'Invalid credentials.');
-        return res.redirect('/auth/login');
+  async (req, res, next) => {
+    try {
+      const settings = require('../models/settingsModel');
+      const ldapEnabled = await settings.getSettingsBool('ldap.enabled', 'LDAP_ENABLED');
+
+      // Determine strategy: look up the user's AuthProvider if LDAP is available
+      let strategy = 'local';
+      if (ldapEnabled) {
+        const existing = await userModel.findByUsername(req.body.username.trim());
+        // Known LDAP user → use LDAP; unknown user → try LDAP so new AD accounts auto-provision
+        if (!existing || existing.AuthProvider === 'ldap') strategy = 'ldapauth';
       }
-      req.session.regenerate((err2) => {
-        if (err2) return next(err2);
-        req.logIn(user, async (err3) => {
-          if (err3) return next(err3);
-          await userModel.updateLastLogin(user.UserID);
-          await writeAudit({ tableName: 'Users', recordID: user.UserID, action: 'LOGIN',
-            userID: user.UserID, ip: req.ip, userAgent: req.headers['user-agent'] });
-          logger.info(`Login: ${user.Username} (local)`);
-          res.redirect(req.session.returnTo || '/');
+
+      const handleAuth = (err, user, info) => {
+        if (err) {
+          if (strategy === 'ldapauth') {
+            logger.warn(`LDAP auth error [${err.name}]: ${err.message}`);
+            req.flash('error', 'Invalid username or password.');
+            return res.redirect('/auth/login');
+          }
+          return next(err);
+        }
+        if (!user) {
+          writeAudit({ tableName: 'Users', action: 'LOGIN_FAILED',
+            notes: `username=${req.body.username}`,
+            ip: req.ip, userAgent: req.headers['user-agent'] }).catch(() => {});
+          req.flash('error', info?.message || 'Invalid credentials.');
+          return res.redirect('/auth/login');
+        }
+        req.session.regenerate((err2) => {
+          if (err2) return next(err2);
+          req.logIn(user, async (err3) => {
+            if (err3) return next(err3);
+            await userModel.updateLastLogin(user.UserID);
+            await writeAudit({ tableName: 'Users', recordID: user.UserID, action: 'LOGIN',
+              userID: user.UserID, ip: req.ip, userAgent: req.headers['user-agent'],
+              notes: strategy === 'ldapauth' ? 'ldap' : undefined });
+            logger.info(`Login: ${user.Username} (${strategy === 'ldapauth' ? 'ldap' : 'local'})`);
+            res.redirect(req.session.returnTo || '/');
+          });
         });
-      });
-    })(req, res, next);
+      };
+
+      passport.authenticate(strategy, handleAuth)(req, res, next);
+    } catch (err) {
+      next(err);
+    }
   }
 );
-
-// ── POST /auth/ldap ───────────────────────────────────────────────────────────
-router.post('/ldap', (req, res, next) => {
-  passport.authenticate('ldapauth', async (err, user, info) => {
-    if (err) {
-      // Treat all LDAP errors as auth failures rather than 500s
-      logger.warn(`LDAP auth error [${err.name}]: ${err.message}`);
-      let msg = 'Invalid username or password.';
-      if (err.name === 'InvalidCredentialsError') msg = 'Invalid username or password.';
-      else msg = `LDAP error (${err.name}): ${err.message}`;
-      req.flash('error', msg);
-      return res.redirect('/auth/login');
-    }
-    if (!user) {
-      req.flash('error', info?.message || 'LDAP authentication failed.');
-      return res.redirect('/auth/login');
-    }
-    req.session.regenerate((err2) => {
-      if (err2) return next(err2);
-      req.logIn(user, async (err3) => {
-        if (err3) return next(err3);
-        await userModel.updateLastLogin(user.UserID);
-        await writeAudit({ tableName: 'Users', recordID: user.UserID, action: 'LOGIN',
-          userID: user.UserID, ip: req.ip, userAgent: req.headers['user-agent'], notes: 'ldap' });
-        logger.info(`Login: ${user.Username} (ldap)`);
-        res.redirect('/');
-      });
-    });
-  })(req, res, next);
-});
 
 // ── GET /auth/oidc ────────────────────────────────────────────────────────────
 router.get('/oidc', (req, res, next) => {

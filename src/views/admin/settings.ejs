@@ -42,6 +42,27 @@
     </div>
   </div>
 
+  <!-- Login Page -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-door-open me-2"></i>Login Page</div>
+    <div class="card-body row g-3">
+      <div class="col-md-4">
+        <label class="form-label">SSO Button Label</label>
+        <input type="text" name="login.oidcButtonLabel" class="form-control"
+               value="<%= settings['login.oidcButtonLabel'] || '' %>"
+               placeholder="Sign in with Microsoft / Entra ID" maxlength="80" />
+        <div class="form-text">Label for the OIDC / SSO login button. Leave blank for default.</div>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">Login Page Note</label>
+        <input type="text" name="login.note" class="form-control"
+               value="<%= settings['login.note'] || '' %>"
+               placeholder="e.g. Use your network username and password" maxlength="200" />
+        <div class="form-text">Optional message displayed on the login page below the password field.</div>
+      </div>
+    </div>
+  </div>
+
   <!-- OIDC / Entra ID -->
   <div class="card shadow-sm mb-4">
     <div class="card-header fw-semibold"><i class="bi bi-microsoft me-2"></i>OIDC / Entra ID Authentication</div>

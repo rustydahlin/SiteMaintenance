@@ -144,8 +144,8 @@ async function initLDAP() {
           searchFilter: searchFilter || '(sAMAccountName={{username}})',
           tlsOptions:   { rejectUnauthorized: rejectUnauthorized !== false },
         },
-        usernameField: 'ldapUsername',
-        passwordField: 'ldapPassword',
+        usernameField: 'username',
+        passwordField: 'password',
         passReqToCallback: true,
       },
       async (req, ldapUser, done) => {
