@@ -5,7 +5,7 @@
   function statusBadge() {
     if (isClosed)          return '<span class="badge bg-success">Closed</span>';
     if (!repair.SentDate)  return '<span class="badge bg-secondary">Not Sent</span>';
-    const now = new Date();
+    const now = new Date(); now.setUTCHours(0, 0, 0, 0);
     const exp = repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate) : null;
     if (exp && exp < now) return '<span class="badge bg-danger">Overdue</span>';
     return '<span class="badge bg-warning text-dark">Open</span>';
@@ -92,7 +92,7 @@
           <dt class="col-sm-5 text-muted">Sent Date</dt>
           <dd class="col-sm-7 text-nowrap">
             <% if (repair.SentDate) { %>
-              <%= new Date(repair.SentDate).toLocaleDateString() %>
+              <%= new Date(repair.SentDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) %>
             <% } else { %>
               <span class="text-muted fst-italic">Not shipped yet</span>
             <% } %>
@@ -109,7 +109,7 @@
 
           <dt class="col-sm-5 text-muted">Expected Return</dt>
           <dd class="col-sm-7 text-nowrap">
-            <%= repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate).toLocaleDateString() : '—' %>
+            <%= repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—' %>
           </dd>
 
         </dl>
@@ -135,7 +135,7 @@
         <dl class="row mb-0">
           <dt class="col-sm-5 text-muted">Received Date</dt>
           <dd class="col-sm-7 text-nowrap">
-            <%= new Date(repair.ReceivedDate).toLocaleDateString() %>
+            <%= new Date(repair.ReceivedDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) %>
           </dd>
 
           <dt class="col-sm-5 text-muted">Condition</dt>
@@ -173,7 +173,7 @@
             </label>
             <input type="date" id="receivedDate" name="receivedDate"
                    class="form-control" required
-                   value="<%= new Date().toISOString().split('T')[0] %>" />
+                   value="<%= new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10) %>" />
           </div>
 
           <div class="col-md-3">

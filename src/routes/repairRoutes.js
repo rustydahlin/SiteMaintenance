@@ -15,25 +15,37 @@ router.use(isAuthenticated);
 // ── GET / — list repairs ──────────────────────────────────────────────────────
 router.get('/', async (req, res, next) => {
   try {
-    const { status = 'open', itemID, page = 1, sort = 'sentDate', dir = 'desc' } = req.query;
+    const { status = 'open', itemID, search, assignedUserID, manufacturer, page = 1, sort = 'sentDate', dir = 'desc' } = req.query;
 
-    const result = await repairModel.getAll({
-      status,
-      itemID: itemID ? parseInt(itemID, 10) : undefined,
-      page: parseInt(page, 10),
-      sort,
-      dir,
-    });
+    const [result, users, manufacturers] = await Promise.all([
+      repairModel.getAll({
+        status,
+        itemID:         itemID         ? parseInt(itemID, 10)         : undefined,
+        search:         search         || undefined,
+        assignedUserID: assignedUserID ? parseInt(assignedUserID, 10) : undefined,
+        manufacturer:   manufacturer   || undefined,
+        page: parseInt(page, 10),
+        sort,
+        dir,
+      }),
+      userModel.getAll(),
+      repairModel.getManufacturers(),
+    ]);
 
     const queryParts = [`status=${encodeURIComponent(status)}`];
-    if (itemID) queryParts.push(`itemID=${encodeURIComponent(itemID)}`);
+    if (itemID)         queryParts.push(`itemID=${encodeURIComponent(itemID)}`);
+    if (search)         queryParts.push(`search=${encodeURIComponent(search)}`);
+    if (assignedUserID) queryParts.push(`assignedUserID=${encodeURIComponent(assignedUserID)}`);
+    if (manufacturer)   queryParts.push(`manufacturer=${encodeURIComponent(manufacturer)}`);
     if (sort && sort !== 'sentDate') queryParts.push(`sort=${encodeURIComponent(sort)}`);
     if (dir  && dir  !== 'desc')     queryParts.push(`dir=${encodeURIComponent(dir)}`);
 
     res.render('repairs/index', {
       title:   'Repairs & RMAs',
       repairs: result.rows,
-      filters: { status },
+      users,
+      manufacturers,
+      filters: { status, search: search || '', assignedUserID: assignedUserID ? parseInt(assignedUserID, 10) : '', manufacturer: manufacturer || '' },
       sort,
       dir,
       pagination: {

@@ -2,7 +2,7 @@
   function statusBadge(repair) {
     if (repair.ReceivedDate) return '<span class="badge bg-success">Closed</span>';
     if (!repair.SentDate)    return '<span class="badge bg-secondary">Not Sent</span>';
-    const now = new Date();
+    const now = new Date(); now.setUTCHours(0, 0, 0, 0);
     const exp = repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate) : null;
     if (exp && exp < now) return '<span class="badge bg-danger">Overdue</span>';
     return '<span class="badge bg-warning text-dark">Open</span>';
@@ -21,6 +21,9 @@
     const newDir = (curSort === col && curDir === defaultDir) ? (defaultDir === 'asc' ? 'desc' : 'asc') : defaultDir;
     const f = typeof filters !== 'undefined' ? filters : {};
     const parts = [`status=${encodeURIComponent(f.status || 'open')}`];
+    if (f.search)         parts.push(`search=${encodeURIComponent(f.search)}`);
+    if (f.manufacturer)   parts.push(`manufacturer=${encodeURIComponent(f.manufacturer)}`);
+    if (f.assignedUserID) parts.push(`assignedUserID=${encodeURIComponent(f.assignedUserID)}`);
     parts.push(`sort=${col}`, `dir=${newDir}`);
     return `/repairs?${parts.join('&')}`;
   }
@@ -41,21 +44,50 @@
   <% } %>
 </div>
 
-<!-- Status tabs -->
-<ul class="nav nav-tabs mb-3">
-  <li class="nav-item">
-    <a class="nav-link <%= filters.status === 'open' ? 'active' : '' %>"
-       href="/repairs?status=open">Open</a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link <%= filters.status === 'all' ? 'active' : '' %>"
-       href="/repairs?status=all">All</a>
-  </li>
-</ul>
+<!-- Filters -->
+<form method="get" action="/repairs" class="mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-sm-auto">
+      <label class="form-label small mb-1">Search</label>
+      <input type="text" name="search" class="form-control form-control-sm" placeholder="Item, serial, RMA#, manufacturer…" value="<%= filters.search %>">
+    </div>
+    <div class="col-sm-auto">
+      <label class="form-label small mb-1">Status</label>
+      <select name="status" class="form-select form-select-sm">
+        <option value="open"    <%= filters.status === 'open'    ? 'selected' : '' %>>Open</option>
+        <option value="notsent" <%= filters.status === 'notsent' ? 'selected' : '' %>>Not Sent</option>
+        <option value="closed"  <%= filters.status === 'closed'  ? 'selected' : '' %>>Closed</option>
+        <option value="all"     <%= filters.status === 'all'     ? 'selected' : '' %>>All</option>
+      </select>
+    </div>
+    <div class="col-sm-auto">
+      <label class="form-label small mb-1">Manufacturer</label>
+      <select name="manufacturer" class="form-select form-select-sm">
+        <option value="">All Manufacturers</option>
+        <% manufacturers.forEach(m => { %>
+          <option value="<%= m %>" <%= filters.manufacturer === m ? 'selected' : '' %>><%= m %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-sm-auto">
+      <label class="form-label small mb-1">Assigned To</label>
+      <select name="assignedUserID" class="form-select form-select-sm">
+        <option value="">All Users</option>
+        <% users.forEach(u => { %>
+          <option value="<%= u.UserID %>" <%= filters.assignedUserID === u.UserID ? 'selected' : '' %>><%= u.DisplayName %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-sm-auto d-flex gap-2">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
+      <a href="/repairs" class="btn btn-outline-secondary btn-sm">Clear</a>
+    </div>
+  </div>
+</form>
 
 <% if (repairs.length === 0) { %>
   <div class="alert alert-info">
-    No <%= filters.status === 'open' ? 'open' : '' %> repairs found.
+    No <%= filters.status !== 'all' ? filters.status : '' %> repairs found.
   </div>
 <% } else { %>
 <div class="table-responsive">
@@ -95,11 +127,11 @@
           <%= repair.CreatedAt ? new Date(repair.CreatedAt).toLocaleDateString() : '—' %>
         </td>
         <td class="small text-muted text-nowrap">
-          <%= repair.SentDate ? new Date(repair.SentDate).toLocaleDateString() : '—' %>
+          <%= repair.SentDate ? new Date(repair.SentDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—' %>
         </td>
         <td class="small"><%= repair.RMANumber || '—' %></td>
         <td class="small text-muted text-nowrap">
-          <%= repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate).toLocaleDateString() : '—' %>
+          <%= repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—' %>
         </td>
         <td class="small text-muted"><%= repair.AssignedUserName || '—' %></td>
         <td><%- statusBadge(repair) %></td>

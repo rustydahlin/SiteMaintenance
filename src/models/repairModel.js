@@ -33,21 +33,35 @@ const REPAIR_JOINS = `
   LEFT JOIN Users    au  ON au.UserID = rt.AssignedUserID
 `;
 
-async function getAll({ status, itemID, page = 1, pageSize = 25, sort = 'sentDate', dir = 'desc' } = {}) {
+async function getAll({ status, itemID, search, assignedUserID, manufacturer, page = 1, pageSize = 25, sort = 'sentDate', dir = 'desc' } = {}) {
   const pool = await getPool();
   const request = pool.request();
   const conditions = ['1=1'];
 
   if (status === 'open') {
     conditions.push('rt.ReceivedDate IS NULL');
-  } else if (status && status !== 'all') {
-    conditions.push('rt.RepairStatus = @Status');
-    request.input('Status', sql.NVarChar(50), status);
+  } else if (status === 'closed') {
+    conditions.push('rt.ReceivedDate IS NOT NULL');
+  } else if (status === 'notsent') {
+    conditions.push('rt.SentDate IS NULL AND rt.ReceivedDate IS NULL');
   }
+  // status === 'all' — no filter
   // status === 'all' — no filter, return everything
   if (itemID) {
     conditions.push('rt.ItemID = @ItemID');
     request.input('ItemID', sql.Int, itemID);
+  }
+  if (search) {
+    conditions.push('(i.CommonName LIKE @Search OR i.SerialNumber LIKE @Search OR i.ModelNumber LIKE @Search OR rt.RMANumber LIKE @Search OR i.Manufacturer LIKE @Search)');
+    request.input('Search', sql.NVarChar(200), `%${search}%`);
+  }
+  if (assignedUserID) {
+    conditions.push('rt.AssignedUserID = @AssignedUserID');
+    request.input('AssignedUserID', sql.Int, assignedUserID);
+  }
+  if (manufacturer) {
+    conditions.push('i.Manufacturer = @Manufacturer');
+    request.input('Manufacturer', sql.NVarChar(200), manufacturer);
   }
 
   const orderCol = REPAIR_SORT_COLUMNS[sort] || 'rt.SentDate';
@@ -59,8 +73,10 @@ async function getAll({ status, itemID, page = 1, pageSize = 25, sort = 'sentDat
   request.input('PageSize', sql.Int, pageSize);
 
   const countReq = pool.request();
-  if (status && status !== 'open' && status !== 'all') countReq.input('Status', sql.NVarChar(50), status);
   if (itemID) countReq.input('ItemID', sql.Int, itemID);
+  if (search) countReq.input('Search', sql.NVarChar(200), `%${search}%`);
+  if (assignedUserID) countReq.input('AssignedUserID', sql.Int, assignedUserID);
+  if (manufacturer) countReq.input('Manufacturer', sql.NVarChar(200), manufacturer);
 
   const countResult = await countReq.query(`SELECT COUNT(*) AS Total ${REPAIR_JOINS} WHERE ${where}`);
   const total = countResult.recordset[0].Total;
@@ -269,7 +285,20 @@ async function deleteRepair(repairID, auditContext = {}) {
   });
 }
 
+async function getManufacturers() {
+  const pool = await getPool();
+  const result = await pool.request().query(`
+    SELECT DISTINCT i.Manufacturer
+    FROM RepairTracking rt
+    JOIN Inventory i ON i.ItemID = rt.ItemID
+    WHERE i.Manufacturer IS NOT NULL
+    ORDER BY i.Manufacturer
+  `);
+  return result.recordset.map(r => r.Manufacturer);
+}
+
 module.exports = {
   getAll, getByID, create, update,
   markReceived, getOverdueExpected, getUnsentReminders, deleteRepair,
+  getManufacturers,
 };
