@@ -75,9 +75,15 @@ async function createApp() {
   // ── Global locals for every view ──────────────────────────────────────────
   const settingsModel = require('./models/settingsModel');
   app.use(async (req, res, next) => {
-    res.locals.user        = req.user || null;
-    res.locals.flash       = req.flash();
-    res.locals.currentPath = req.path;
+    res.locals.user               = req.user || null;
+    res.locals.flash              = req.flash ? req.flash() : {};
+    res.locals.currentPath        = req.path;
+    res.locals.appName            = 'SiteMaintenance';
+    res.locals.systemKeysEnabled  = false;
+    res.locals.vendorsEnabled     = false;
+    res.locals.maintenanceEnabled = false;
+    res.locals.sidebarLogoUrl     = '/images/publicsafetyteam.png';
+    res.locals.sidebarFooterHtml  = 'Call Darron. (701) 328-6974';
     try {
       const [appName, sysKeys, vendors, maintenance, sidebarLogoUrl, sidebarFooterHtml] = await Promise.all([
         settingsModel.getSetting('app.name', null),
