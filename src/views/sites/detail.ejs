@@ -207,7 +207,7 @@
           <tr>
             <td><%- logTypeBadge(log.TypeName) %></td>
             <td class="small text-muted text-nowrap">
-              <%= log.EntryDate ? new Date(log.EntryDate).toLocaleDateString() : '—' %>
+              <%= log.EntryDate ? new Date(log.EntryDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—' %>
             </td>
             <td class="small"><%= log.Subject || '—' %></td>
             <td class="small text-muted"><%= log.PerformedBy || '—' %></td>

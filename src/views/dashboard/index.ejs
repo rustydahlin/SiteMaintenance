@@ -125,7 +125,7 @@
         <a href="/sites/<%= log.SiteID %>/logs/<%= log.LogEntryID %>" class="list-group-item list-group-item-action py-2">
           <div class="d-flex justify-content-between">
             <span class="fw-semibold"><%= log.Subject || log.TypeName %></span>
-            <small class="text-muted"><%= new Date(log.EntryDate).toLocaleDateString() %></small>
+            <small class="text-muted"><%= new Date(log.EntryDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) %></small>
           </div>
           <div class="text-muted small">
             <i class="bi bi-building me-1"></i><%= log.SiteName %> &bull;

@@ -39,9 +39,7 @@
           </label>
           <input type="datetime-local" id="entryDate" name="entryDate"
                  class="form-control" required
-                 value="<%= log && log.EntryDate
-                   ? new Date(log.EntryDate).toISOString().slice(0,16)
-                   : new Date().toISOString().slice(0,16) %>" />
+                 value="<%= (() => { const d = log && log.EntryDate ? new Date(log.EntryDate) : new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,16); })() %>" />
         </div>
 
         <!-- Performed By -->

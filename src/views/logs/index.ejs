@@ -79,7 +79,7 @@ function sortIcon(col) {
         <tr><td colspan="5" class="text-center text-muted py-4">No log entries found.</td></tr>
         <% } %>
         <% rows.forEach(row => {
-          const entryDate = row.EntryDate ? new Date(row.EntryDate).toLocaleDateString() : '—';
+          const entryDate = row.EntryDate ? new Date(row.EntryDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—';
           const performer = row.PerformedByUserName || row.PerformedBy || '—';
         %>
         <tr>
@@ -167,7 +167,7 @@ function sortIcon(col) {
             <div class="col-md-6">
               <label class="form-label">Entry Date <span class="text-danger">*</span></label>
               <input type="datetime-local" name="entryDate" class="form-control" required
-                     value="<%= new Date().toISOString().slice(0,16) %>" />
+                     value="<%= (() => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,16); })() %>" />
             </div>
 
             <!-- Performed By -->
