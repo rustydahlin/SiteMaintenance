@@ -249,7 +249,7 @@ async function getSimpleList() {
     FROM Sites s
     LEFT JOIN Sites p ON p.SiteID = s.ParentSiteID
     WHERE s.IsActive = 1
-    ORDER BY p.SiteName, s.SiteName
+    ORDER BY COALESCE(p.SiteName, s.SiteName), s.SiteName
   `);
   return result.recordset;
 }

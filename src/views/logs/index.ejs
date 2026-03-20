@@ -14,7 +14,7 @@
     <select name="siteID" class="form-select form-select-sm">
       <option value="">All Sites</option>
       <% sites.forEach(s => { %>
-        <option value="<%= s.SiteID %>" <%= filters.siteID === s.SiteID ? 'selected' : '' %>><%= s.SiteName %></option>
+        <option value="<%= s.SiteID %>" <%= filters.siteID === s.SiteID ? 'selected' : '' %>><%= s.ParentSiteName ? `${s.ParentSiteName} / ${s.SiteName}` : s.SiteName %></option>
       <% }) %>
     </select>
   </div>
@@ -147,7 +147,7 @@ function sortIcon(col) {
               <select name="siteID" class="form-select" required>
                 <option value="">— Select Site —</option>
                 <% sites.forEach(s => { %>
-                  <option value="<%= s.SiteID %>"><%= s.SiteName %></option>
+                  <option value="<%= s.SiteID %>"><%= s.ParentSiteName ? `${s.ParentSiteName} / ${s.SiteName}` : s.SiteName %></option>
                 <% }) %>
               </select>
             </div>

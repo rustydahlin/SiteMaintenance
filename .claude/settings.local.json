@@ -27,7 +27,8 @@
       "Bash(find c:/SiteMaintenance/src/node_modules -name package.json -path */ldapauth-fork/package.json -o -name package.json -path */ldapjs/package.json)",
       "Bash(ipconfig)",
       "Bash(grep -l \"export\\\\|download\\\\|csv\\\\|xlsx\" /c/SiteMaintenance/src/routes/*.js)",
-      "Bash(grep -n \"xlsx\\\\|XLSX\" /c/SiteMaintenance/src/routes/*.js)"
+      "Bash(grep -n \"xlsx\\\\|XLSX\" /c/SiteMaintenance/src/routes/*.js)",
+      "Bash(grep -v \"^--$\")"
     ]
   }
 }

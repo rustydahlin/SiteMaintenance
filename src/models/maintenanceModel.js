@@ -60,7 +60,9 @@ async function getAll({ siteID, assignedToUserID, open, closed, overdueOnly, sor
       m.DueDate, m.ExternalReference, m.WorkToComplete,
       m.ClosedAt, m.ClosedByUserID, m.ClosureNotes,
       m.IsActive, m.CreatedAt, m.CreatedByUserID,
-      s.SiteName,
+      CASE WHEN s.ParentSiteID IS NOT NULL
+           THEN ps.SiteName + ' / ' + s.SiteName
+           ELSE s.SiteName END AS SiteName,
       t.TypeName    AS MaintenanceTypeName,
       u.DisplayName AS AssignedToUserName,
       u.Email       AS AssignedToUserEmail,
@@ -68,12 +70,13 @@ async function getAll({ siteID, assignedToUserID, open, closed, overdueOnly, sor
       cr.DisplayName AS CreatedByUserName
     FROM MaintenanceItems m
     JOIN Sites            s  ON s.SiteID              = m.SiteID
+    LEFT JOIN Sites       ps ON ps.SiteID             = s.ParentSiteID
     LEFT JOIN MaintenanceTypes t  ON t.MaintenanceTypeID = m.MaintenanceTypeID
     LEFT JOIN Users        u  ON u.UserID              = m.AssignedToUserID
     LEFT JOIN Users        cb ON cb.UserID             = m.ClosedByUserID
     LEFT JOIN Users        cr ON cr.UserID             = m.CreatedByUserID
     WHERE ${where}
-    ORDER BY ${orderCol} ${orderDir}, m.CreatedAt DESC
+    ORDER BY ${orderCol} ${orderDir}${orderCol !== 'm.CreatedAt' ? ', m.CreatedAt DESC' : ''}
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
   `);
 
@@ -99,7 +102,9 @@ async function getByID(maintenanceID) {
         CASE WHEN m.ClosedAt IS NULL AND m.DueDate IS NOT NULL
              THEN DATEDIFF(day, CAST(m.DueDate AS DATE), CAST(GETUTCDATE() AS DATE))
              ELSE 0 END AS DaysOverdue,
-        s.SiteName,
+        CASE WHEN s.ParentSiteID IS NOT NULL
+             THEN ps.SiteName + ' / ' + s.SiteName
+             ELSE s.SiteName END AS SiteName,
         t.TypeName    AS MaintenanceTypeName,
         u.DisplayName AS AssignedToUserName,
         u.Email       AS AssignedToUserEmail,
@@ -107,6 +112,7 @@ async function getByID(maintenanceID) {
         cr.DisplayName AS CreatedByUserName
       FROM MaintenanceItems m
       JOIN Sites            s  ON s.SiteID              = m.SiteID
+      LEFT JOIN Sites       ps ON ps.SiteID             = s.ParentSiteID
       LEFT JOIN MaintenanceTypes t  ON t.MaintenanceTypeID = m.MaintenanceTypeID
       LEFT JOIN Users        u  ON u.UserID              = m.AssignedToUserID
       LEFT JOIN Users        cb ON cb.UserID             = m.ClosedByUserID
