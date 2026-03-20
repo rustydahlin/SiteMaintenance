@@ -1,6 +1,7 @@
 'use strict';
 
 const express       = require('express');
+const multer        = require('multer');
 const router        = express.Router();
 const logModel      = require('../models/logModel');
 const siteModel     = require('../models/siteModel');
@@ -8,6 +9,8 @@ const lookupModel   = require('../models/lookupModel');
 const documentModel = require('../models/documentModel');
 const emailService  = require('../services/emailService');
 const { isAuthenticated, isAdmin, canWrite } = require('../middleware/auth');
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 // All routes require authentication
 router.use(isAuthenticated);
@@ -49,7 +52,7 @@ router.get('/sites/:siteID/logs/new', canWrite, async (req, res, next) => {
 });
 
 // ── POST /sites/:siteID/logs — create log entry ───────────────────────────────
-router.post('/sites/:siteID/logs', canWrite, async (req, res, next) => {
+router.post('/sites/:siteID/logs', canWrite, upload.array('files', 20), async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.siteID, 10);
     const site = await siteModel.getByID(siteID);
@@ -87,6 +90,20 @@ router.post('/sites/:siteID/logs', canWrite, async (req, res, next) => {
     } catch (emailErr) {
       // log but do not block the user
       console.error('Email notification failed:', emailErr.message);
+    }
+
+    // Save any uploaded attachments
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        await documentModel.create({
+          originalFilename:  file.originalname,
+          mimeType:          file.mimetype,
+          fileSizeBytes:     file.size,
+          fileBuffer:        file.buffer,
+          logEntryID:        log.LogEntryID,
+          uploadedByUserID:  req.auditContext?.userID || null,
+        }, req.auditContext);
+      }
     }
 
     req.flash('success', 'Log entry created successfully.');
@@ -162,7 +179,7 @@ router.get('/sites/:siteID/logs/:logID/edit', canWrite, async (req, res, next) =
 });
 
 // ── POST /sites/:siteID/logs/:logID — update log entry ───────────────────────
-router.post('/sites/:siteID/logs/:logID', canWrite, async (req, res, next) => {
+router.post('/sites/:siteID/logs/:logID', canWrite, upload.none(), async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.siteID, 10);
     const logID  = parseInt(req.params.logID, 10);
@@ -175,6 +192,7 @@ router.post('/sites/:siteID/logs/:logID', canWrite, async (req, res, next) => {
     }
 
     await logModel.update(logID, {
+      siteID,
       logTypeID,
       entryDate,
       subject:     subject     || null,
