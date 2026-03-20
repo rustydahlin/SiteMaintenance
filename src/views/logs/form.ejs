@@ -1,0 +1,118 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">
+    <i class="bi bi-journal-plus me-2"></i>
+    <%= log ? `Edit Log Entry` : `New Log Entry` %>
+    <small class="text-muted fs-6 ms-2">— <%= site.SiteName %></small>
+  </h1>
+  <a href="<%= log ? `/sites/${site.SiteID}/logs/${log.LogEntryID}` : `/sites/${site.SiteID}` %>"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Cancel
+  </a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="POST" action="<%= action %>" enctype="multipart/form-data" novalidate>
+
+      <div class="row g-3">
+
+        <!-- Log Type -->
+        <div class="col-md-4">
+          <label for="logTypeID" class="form-label">
+            Log Type <span class="text-danger">*</span>
+          </label>
+          <select id="logTypeID" name="logTypeID" class="form-select" required>
+            <option value="">— Select Type —</option>
+            <% logTypes.forEach(t => { %>
+              <option value="<%= t.LogTypeID %>"
+                <%= (log && log.LogTypeID == t.LogTypeID) ? 'selected' : '' %>>
+                <%= t.TypeName %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Entry Date -->
+        <div class="col-md-4">
+          <label for="entryDate" class="form-label">
+            Entry Date <span class="text-danger">*</span>
+          </label>
+          <input type="datetime-local" id="entryDate" name="entryDate"
+                 class="form-control" required
+                 value="<%= log && log.EntryDate
+                   ? new Date(log.EntryDate).toISOString().slice(0,16)
+                   : new Date().toISOString().slice(0,16) %>" />
+        </div>
+
+        <!-- Performed By -->
+        <div class="col-md-4">
+          <label for="performedBy" class="form-label">Performed By</label>
+          <input type="text" id="performedBy" name="performedBy"
+                 class="form-control"
+                 placeholder="Technician or contractor name"
+                 value="<%= log && log.PerformedBy ? log.PerformedBy : '' %>"
+                 maxlength="200" />
+        </div>
+
+        <!-- Subject -->
+        <div class="col-12">
+          <label for="subject" class="form-label">Subject</label>
+          <input type="text" id="subject" name="subject"
+                 class="form-control"
+                 placeholder="Brief summary of this log entry"
+                 value="<%= log && log.Subject ? log.Subject : '' %>"
+                 maxlength="500" />
+        </div>
+
+        <!-- Description -->
+        <div class="col-12">
+          <label for="description" class="form-label">Description</label>
+          <textarea id="description" name="description"
+                    class="form-control" rows="8"
+                    placeholder="Detailed description of work performed, observations, etc."
+                    maxlength="8000"><%= log && log.Description ? log.Description : '' %></textarea>
+        </div>
+
+        <!-- Notes -->
+        <div class="col-12">
+          <label for="notes" class="form-label">Notes</label>
+          <textarea id="notes" name="notes"
+                    class="form-control" rows="3"
+                    placeholder="Additional notes, follow-up items, etc."
+                    maxlength="2000"><%= log && log.Notes ? log.Notes : '' %></textarea>
+        </div>
+
+        <!-- File Upload (new entries only) -->
+        <% if (!log) { %>
+        <div class="col-12">
+          <div class="card bg-body-secondary border-dashed">
+            <div class="card-body">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-paperclip me-1"></i>Attachments
+              </label>
+              <input type="file" name="files" class="form-control form-control-sm" multiple
+                     accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" />
+              <div class="form-text">
+                You can attach photos, PDFs, or documents. Multiple files allowed.
+              </div>
+            </div>
+          </div>
+        </div>
+        <% } %>
+
+      </div><!-- /.row -->
+
+      <hr class="my-4" />
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-floppy me-1"></i>
+          <%= log ? 'Save Changes' : 'Create Log Entry' %>
+        </button>
+        <a href="<%= log ? `/sites/${site.SiteID}/logs/${log.LogEntryID}` : `/sites/${site.SiteID}` %>"
+           class="btn btn-outline-secondary">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+</div>

@@ -1,0 +1,134 @@
+<%
+  const isAdminUser  = user && user.roles && user.roles.includes('Admin');
+  const canWriteUser = user && user.roles &&
+    (user.roles.includes('Admin') || user.roles.includes('Technician') || user.roles.includes('Contractor'));
+
+  function logTypeBadge(typeName) {
+    const map = {
+      'Maintenance':  'bg-warning text-dark',
+      'Repair':       'bg-danger',
+      'Inspection':   'bg-info text-dark',
+      'Installation': 'bg-primary',
+      'Note':         'bg-secondary',
+    };
+    const cls = map[typeName] || 'bg-secondary';
+    return `<span class="badge ${cls}">${typeName || ''}</span>`;
+  }
+%>
+
+<!-- Back link -->
+<a href="/sites/<%= site.SiteID %>#logs" class="text-decoration-none text-muted small">
+  <i class="bi bi-arrow-left me-1"></i>Back to <%= site.SiteName %>
+</a>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-start mt-3 mb-4 flex-wrap gap-2">
+  <div>
+    <h1 class="h2 mb-1">
+      <i class="bi bi-journal-text me-2"></i>
+      <%= log.Subject || `Log Entry #${log.LogEntryID}` %>
+    </h1>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <%- logTypeBadge(log.TypeName) %>
+      <span class="text-muted small">
+        <i class="bi bi-calendar me-1"></i>
+        <%= log.EntryDate ? new Date(log.EntryDate).toLocaleString() : '—' %>
+      </span>
+      <span class="text-muted small">
+        <i class="bi bi-building me-1"></i>
+        <a href="/sites/<%= site.SiteID %>" class="text-decoration-none text-muted">
+          <%= site.SiteName %>
+        </a>
+      </span>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <% if (canWriteUser) { %>
+      <a href="/sites/<%= site.SiteID %>/logs/<%= log.LogEntryID %>/edit"
+         class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-pencil me-1"></i>Edit
+      </a>
+    <% } %>
+    <% if (isAdminUser) { %>
+      <form method="POST" action="/sites/<%= site.SiteID %>/logs/<%= log.LogEntryID %>/delete"
+            data-confirm="Delete this log entry? This action cannot be undone.">
+        <button type="submit" class="btn btn-sm btn-outline-danger">
+          <i class="bi bi-trash me-1"></i>Delete
+        </button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<!-- Log entry details -->
+<div class="row g-3">
+
+  <!-- Summary card -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header small fw-semibold">
+        <i class="bi bi-info-circle me-1"></i>Summary
+      </div>
+      <div class="card-body small">
+        <dl class="row mb-0">
+          <dt class="col-sm-5 text-muted">Type</dt>
+          <dd class="col-sm-7"><%- logTypeBadge(log.TypeName) %></dd>
+
+          <dt class="col-sm-5 text-muted">Date</dt>
+          <dd class="col-sm-7 text-nowrap">
+            <%= log.EntryDate ? new Date(log.EntryDate).toLocaleString() : '—' %>
+          </dd>
+
+          <dt class="col-sm-5 text-muted">Performed By</dt>
+          <dd class="col-sm-7"><%= log.PerformedBy || log.PerformedByUserName || '—' %></dd>
+
+          <dt class="col-sm-5 text-muted">Logged By</dt>
+          <dd class="col-sm-7"><%= log.CreatedByName || '—' %></dd>
+
+          <% if (log.CreatedAt) { %>
+          <dt class="col-sm-5 text-muted">Created</dt>
+          <dd class="col-sm-7"><%= new Date(log.CreatedAt).toLocaleDateString() %></dd>
+          <% } %>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Description -->
+  <div class="col-md-8">
+    <% if (log.Description) { %>
+    <div class="card mb-3">
+      <div class="card-header small fw-semibold">
+        <i class="bi bi-text-paragraph me-1"></i>Description
+      </div>
+      <div class="card-body small" style="white-space: pre-wrap;"><%= log.Description %></div>
+    </div>
+    <% } %>
+
+    <% if (log.Notes) { %>
+    <div class="card">
+      <div class="card-header small fw-semibold">
+        <i class="bi bi-sticky me-1"></i>Notes
+      </div>
+      <div class="card-body small" style="white-space: pre-wrap;"><%= log.Notes %></div>
+    </div>
+    <% } %>
+
+    <% if (!log.Description && !log.Notes) { %>
+      <p class="text-muted">No description or notes recorded for this entry.</p>
+    <% } %>
+  </div>
+
+</div>
+
+<!-- Attachments -->
+<div class="mt-4">
+  <%- include('../partials/fileList', {
+    documents:  documents,
+    uploadUrl:  `/documents/upload`,
+    canUpload:  canWriteUser,
+    entityType: 'log',
+    entityId:   log.LogEntryID,
+    returnTo:   `/logs/${log.LogEntryID}`
+  }) %>
+</div>
