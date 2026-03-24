@@ -4,9 +4,10 @@ const express           = require('express');
 const router            = express.Router();
 const multer            = require('multer');
 const XLSX              = require('xlsx');
-const siteModel          = require('../models/siteModel');
-const lookupModel        = require('../models/lookupModel');
-const logModel           = require('../models/logModel');
+const siteModel              = require('../models/siteModel');
+const lookupModel            = require('../models/lookupModel');
+const networkResourceModel   = require('../models/networkResourceModel');
+const logModel               = require('../models/logModel');
 const documentModel      = require('../models/documentModel');
 const siteInventoryModel = require('../models/siteInventoryModel');
 const inventoryModel     = require('../models/inventoryModel');
@@ -270,7 +271,10 @@ router.get('/new', isAdmin, async (req, res, next) => {
   try {
     const parentSiteID = req.query.parentSiteID ? parseInt(req.query.parentSiteID, 10) : null;
 
-    const siteTypes = await lookupModel.getSiteTypes();
+    const [siteTypes, monitoringLocationTypes] = await Promise.all([
+      lookupModel.getSiteTypes(),
+      lookupModel.getMonitoringLocationTypes(),
+    ]);
 
     let parentSite = null;
     if (parentSiteID) {
@@ -282,6 +286,7 @@ router.get('/new', isAdmin, async (req, res, next) => {
       site:        null,
       action:      '/sites',
       siteTypes,
+      monitoringLocationTypes,
       parentSiteID: parentSiteID || null,
       parentSiteName: parentSite ? parentSite.SiteName : null,
     });
@@ -300,19 +305,20 @@ router.post('/', isAdmin, async (req, res, next) => {
     }
 
     const site = await siteModel.create({
-      siteName:        siteName.trim(),
-      siteNumber:      req.body.siteNumber     || null,
-      contractNumber:  req.body.contractNumber || null,
-      siteTypeID:      req.body.siteTypeID     || null,
-      address:         req.body.address        || null,
-      city:            req.body.city           || null,
-      state:           req.body.state          || null,
-      zipCode:         req.body.zipCode        || null,
-      latitude:        req.body.latitude       || null,
-      longitude:       req.body.longitude      || null,
-      description:     req.body.description    || null,
-      warrantyExpires: req.body.warrantyExpires || null,
-      parentSiteID:    req.body.parentSiteID   || null,
+      siteName:                 siteName.trim(),
+      siteNumber:               req.body.siteNumber              || null,
+      contractNumber:           req.body.contractNumber          || null,
+      siteTypeID:               req.body.siteTypeID              || null,
+      address:                  req.body.address                 || null,
+      city:                     req.body.city                    || null,
+      state:                    req.body.state                   || null,
+      zipCode:                  req.body.zipCode                 || null,
+      latitude:                 req.body.latitude                || null,
+      longitude:                req.body.longitude               || null,
+      description:              req.body.description             || null,
+      warrantyExpires:          req.body.warrantyExpires         || null,
+      parentSiteID:             req.body.parentSiteID            || null,
+      monitoringLocationTypeID: req.body.monitoringLocationTypeID || null,
     }, req.auditContext);
 
     req.flash('success', `Site "${site.SiteName}" created successfully.`);
@@ -327,7 +333,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
 
-    const [site, inventory, recentLogs, documents, pmSchedules, inStockItems, categories, stockLocations, allUsers, pmVendors] = await Promise.all([
+    const [site, inventory, recentLogs, documents, pmSchedules, inStockItems, categories, stockLocations, allUsers, pmVendors, networkResources, networkDeviceTypes, circuitTypes] = await Promise.all([
       siteModel.getByID(siteID),
       siteInventoryModel.getCurrentItems(siteID),
       logModel.getBySite(siteID, { pageSize: 10 }).then(r => r.rows),
@@ -338,6 +344,9 @@ router.get('/:id', async (req, res, next) => {
       lookupModel.getStockLocations(),
       userModel.getAll(),
       vendorModel.getPMEnabled(),
+      networkResourceModel.getBySite(siteID),
+      lookupModel.getNetworkDeviceTypes(),
+      lookupModel.getCircuitTypes(),
     ]);
 
     // Fetch subsites for parent sites; subsites themselves get an empty array
@@ -384,6 +393,9 @@ router.get('/:id', async (req, res, next) => {
       stockLocations,
       allUsers,
       pmVendors,
+      networkResources,
+      networkDeviceTypes,
+      circuitTypes,
       isAdminUser: isAdmin,
       canWrite:    canWriteFlag,
       uploadUrl:   `/documents/upload`,
@@ -398,9 +410,10 @@ router.get('/:id', async (req, res, next) => {
 router.get('/:id/edit', isAdmin, async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
-    const [site, siteTypes] = await Promise.all([
+    const [site, siteTypes, monitoringLocationTypes] = await Promise.all([
       siteModel.getByID(siteID),
       lookupModel.getSiteTypes(),
+      lookupModel.getMonitoringLocationTypes(),
     ]);
 
     if (!site) {
@@ -413,6 +426,7 @@ router.get('/:id/edit', isAdmin, async (req, res, next) => {
       site,
       action:      `/sites/${siteID}`,
       siteTypes,
+      monitoringLocationTypes,
       parentSiteID:   site.ParentSiteID   || null,
       parentSiteName: site.ParentSiteName || null,
     });
@@ -433,19 +447,20 @@ router.post('/:id', isAdmin, async (req, res, next) => {
     }
 
     const site = await siteModel.update(siteID, {
-      siteName:        siteName.trim(),
-      siteNumber:      req.body.siteNumber     || null,
-      contractNumber:  req.body.contractNumber || null,
-      siteTypeID:      req.body.siteTypeID     || null,
-      address:         req.body.address        || null,
-      city:            req.body.city           || null,
-      state:           req.body.state          || null,
-      zipCode:         req.body.zipCode        || null,
-      latitude:        req.body.latitude       || null,
-      longitude:       req.body.longitude      || null,
-      description:     req.body.description    || null,
-      warrantyExpires: req.body.warrantyExpires || null,
-      parentSiteID:    req.body.parentSiteID   || null,
+      siteName:                 siteName.trim(),
+      siteNumber:               req.body.siteNumber              || null,
+      contractNumber:           req.body.contractNumber          || null,
+      siteTypeID:               req.body.siteTypeID              || null,
+      address:                  req.body.address                 || null,
+      city:                     req.body.city                    || null,
+      state:                    req.body.state                   || null,
+      zipCode:                  req.body.zipCode                 || null,
+      latitude:                 req.body.latitude                || null,
+      longitude:                req.body.longitude               || null,
+      description:              req.body.description             || null,
+      warrantyExpires:          req.body.warrantyExpires         || null,
+      parentSiteID:             req.body.parentSiteID            || null,
+      monitoringLocationTypeID: req.body.monitoringLocationTypeID || null,
     }, req.auditContext);
 
     req.flash('success', `Site "${site.SiteName}" updated successfully.`);
@@ -706,6 +721,98 @@ router.post('/:id/inventory/:itemID/remove-bulk', isAdmin, async (req, res, next
     }
     next(err);
   }
+});
+
+// ── Network Resources sub-routes ──────────────────────────────────────────────
+
+// GET /:id/network-resources — list as JSON (consumed by detail page JS)
+router.get('/:id/network-resources', async (req, res, next) => {
+  try {
+    const siteID    = parseInt(req.params.id, 10);
+    const resources = await networkResourceModel.getBySite(siteID);
+    res.json(resources);
+  } catch (err) { next(err); }
+});
+
+// POST /:id/network-resources — create
+router.post('/:id/network-resources', isAdmin, async (req, res, next) => {
+  try {
+    const siteID = parseInt(req.params.id, 10);
+    const { hostname, ipAddress, deviceTypeID, alertStatus,
+            solarwindsNodeId, circuitTypeID, circuitID, notes, sortOrder } = req.body;
+
+    if (!hostname?.trim()) {
+      return res.status(400).json({ error: 'Hostname is required.' });
+    }
+    if (!deviceTypeID) {
+      return res.status(400).json({ error: 'Device Type is required.' });
+    }
+
+    const resource = await networkResourceModel.create(siteID, {
+      hostname:         hostname.trim(),
+      ipAddress:        ipAddress        || null,
+      deviceTypeID:     parseInt(deviceTypeID, 10),
+      alertStatus:      alertStatus !== '0' && alertStatus !== 'false',
+      solarwindsNodeId: solarwindsNodeId || null,
+      circuitTypeID:    circuitTypeID    || null,
+      circuitID:        circuitID        || null,
+      notes:            notes            || null,
+      sortOrder:        sortOrder        || 0,
+    }, req.auditContext);
+
+    res.status(201).json(resource);
+  } catch (err) { next(err); }
+});
+
+// POST /:id/network-resources/:resID — update
+router.post('/:id/network-resources/:resID', isAdmin, async (req, res, next) => {
+  try {
+    const siteID  = parseInt(req.params.id,    10);
+    const resID   = parseInt(req.params.resID, 10);
+    const { hostname, ipAddress, deviceTypeID, alertStatus,
+            solarwindsNodeId, circuitTypeID, circuitID, notes, sortOrder } = req.body;
+
+    const existing = await networkResourceModel.getByID(resID);
+    if (!existing || existing.SiteID !== siteID) {
+      return res.status(404).json({ error: 'Network resource not found.' });
+    }
+    if (!hostname?.trim()) {
+      return res.status(400).json({ error: 'Hostname is required.' });
+    }
+    if (!deviceTypeID) {
+      return res.status(400).json({ error: 'Device Type is required.' });
+    }
+
+    const resource = await networkResourceModel.update(resID, {
+      hostname:         hostname.trim(),
+      ipAddress:        ipAddress        || null,
+      deviceTypeID:     parseInt(deviceTypeID, 10),
+      alertStatus:      alertStatus !== '0' && alertStatus !== 'false',
+      solarwindsNodeId: solarwindsNodeId || null,
+      circuitTypeID:    circuitTypeID    || null,
+      circuitID:        circuitID        || null,
+      notes:            notes            || null,
+      sortOrder:        sortOrder        || 0,
+    }, req.auditContext);
+
+    res.json(resource);
+  } catch (err) { next(err); }
+});
+
+// POST /:id/network-resources/:resID/delete — soft delete
+router.post('/:id/network-resources/:resID/delete', isAdmin, async (req, res, next) => {
+  try {
+    const siteID = parseInt(req.params.id,    10);
+    const resID  = parseInt(req.params.resID, 10);
+
+    const existing = await networkResourceModel.getByID(resID);
+    if (!existing || existing.SiteID !== siteID) {
+      return res.status(404).json({ error: 'Network resource not found.' });
+    }
+
+    await networkResourceModel.softDelete(resID, req.auditContext);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

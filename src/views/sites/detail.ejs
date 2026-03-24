@@ -84,6 +84,7 @@
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#pm">PM Schedules</a></li>
   <% } %>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#docs">Documents & Photos</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#network-resources">Network Resources</a></li>
 </ul>
 
 <div class="tab-content border border-top-0 rounded-bottom p-3 bg-body shadow-sm">
@@ -501,7 +502,297 @@
     </div>
   </div>
 
+  <!-- ── Network Resources ───────────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="network-resources">
+    <div class="d-flex justify-content-between align-items-center mt-2 mb-3">
+      <h6 class="mb-0">
+        <i class="bi bi-broadcast-pin me-1"></i>Network Resources
+        <% if (site.MonitoringLocationTypeName) { %>
+          <span class="badge bg-body-secondary text-body border ms-1"><%= site.MonitoringLocationTypeName %></span>
+        <% } else { %>
+          <span class="badge bg-warning text-dark ms-1" title="Set Monitoring Location Type on the Edit page to include this site on the tower map">Not on Tower Map</span>
+        <% } %>
+      </h6>
+      <% if (isAdminUser) { %>
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addResourceModal">
+        <i class="bi bi-plus-lg me-1"></i>Add Resource
+      </button>
+      <% } %>
+    </div>
+
+    <div id="networkResourceTableWrapper">
+      <% if (networkResources && networkResources.length > 0) { %>
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Hostname</th>
+            <th>IP Address</th>
+            <th>Type</th>
+            <th>Alert Status</th>
+            <th>SolarWinds ID</th>
+            <th>Circuit Type</th>
+            <th>Circuit ID</th>
+            <% if (isAdminUser) { %><th class="text-end">Actions</th><% } %>
+          </tr>
+        </thead>
+        <tbody id="networkResourceTbody">
+          <% networkResources.forEach(r => { %>
+          <tr data-res-id="<%= r.ResourceID %>">
+            <td class="fw-semibold"><%= r.Hostname %></td>
+            <td class="font-monospace small"><%= r.IPAddress || '—' %></td>
+            <td><span class="badge bg-body-secondary text-body border"><%= r.DeviceTypeName %></span></td>
+            <td>
+              <% if (r.AlertStatus) { %>
+                <span class="badge bg-danger">Yes</span>
+              <% } else { %>
+                <span class="badge bg-secondary">No</span>
+              <% } %>
+            </td>
+            <td class="small"><%= r.SolarwindsNodeId || '—' %></td>
+            <td class="small"><%= r.CircuitTypeName || '—' %></td>
+            <td class="small"><%= r.CircuitID || '—' %></td>
+            <% if (isAdminUser) { %>
+            <td class="text-end text-nowrap">
+              <% if (r.Notes) { %>
+              <button class="btn btn-sm btn-link p-0 me-2 text-muted" title="<%= r.Notes.replace(/"/g, '&quot;') %>"
+                      data-bs-toggle="tooltip"><i class="bi bi-sticky me-1"></i></button>
+              <% } %>
+              <button class="btn btn-sm btn-outline-secondary py-0 me-1 js-edit-resource"
+                data-id="<%= r.ResourceID %>"
+                data-hostname="<%= r.Hostname %>"
+                data-ip="<%= r.IPAddress || '' %>"
+                data-device-type-id="<%= r.DeviceTypeID %>"
+                data-alert-status="<%= r.AlertStatus ? '1' : '0' %>"
+                data-solarwinds-node-id="<%= r.SolarwindsNodeId != null ? r.SolarwindsNodeId : '' %>"
+                data-sort-order="<%= r.SortOrder != null ? r.SortOrder : 0 %>"
+                data-circuit-type-id="<%= r.CircuitTypeID || '' %>"
+                data-circuit-id="<%= r.CircuitID || '' %>"
+                data-notes="<%= (r.Notes || '').replace(/"/g, '&quot;') %>">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger py-0" onclick="deleteResource(<%= r.ResourceID %>)">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+            <% } %>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } else { %>
+      <div class="text-muted small py-3" id="networkResourceEmpty">
+        <i class="bi bi-info-circle me-1"></i>No network resources assigned.
+        <% if (isAdminUser) { %>Add one to include this site on the tower map.<% } %>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
 </div><!-- /.tab-content -->
+
+<!-- ── Add/Edit Network Resource Modal ────────────────────────────────────── -->
+<% if (isAdminUser) { %>
+<div class="modal fade" id="addResourceModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="resourceModalTitle"><i class="bi bi-broadcast-pin me-2"></i>Add Network Resource</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="resourceModalMode" value="add" />
+        <input type="hidden" id="resourceModalID"   value="" />
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label for="res_hostname" class="form-label">Hostname <span class="text-danger">*</span></label>
+            <input type="text" id="res_hostname" class="form-control" maxlength="150" placeholder="e.g. 04397-amidon-srx-m" />
+          </div>
+          <div class="col-md-4">
+            <label for="res_ipAddress" class="form-label">IP Address</label>
+            <input type="text" id="res_ipAddress" class="form-control" maxlength="45" placeholder="10.x.x.x" />
+          </div>
+          <div class="col-md-6">
+            <label for="res_deviceTypeID" class="form-label">Device Type <span class="text-danger">*</span></label>
+            <select id="res_deviceTypeID" class="form-select">
+              <option value="">— Select —</option>
+              <% (typeof networkDeviceTypes !== 'undefined' ? networkDeviceTypes : []).forEach(t => { %>
+              <option value="<%= t.DeviceTypeID %>"><%= t.TypeName %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label for="res_solarwindsNodeId" class="form-label">SolarWinds Node ID</label>
+            <input type="number" id="res_solarwindsNodeId" class="form-control" min="1" />
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Alert Status</label>
+            <div class="form-check form-switch mt-1">
+              <input class="form-check-input" type="checkbox" id="res_alertStatus" checked />
+              <label class="form-check-label" for="res_alertStatus">Affects site status</label>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label for="res_sortOrder" class="form-label">Sort Order</label>
+            <input type="number" id="res_sortOrder" class="form-control" value="0" min="0" />
+          </div>
+          <div class="col-12"><hr class="my-1" /></div>
+          <div class="col-md-6">
+            <label for="res_circuitTypeID" class="form-label">Circuit Type</label>
+            <select id="res_circuitTypeID" class="form-select">
+              <option value="">— None —</option>
+              <% (typeof circuitTypes !== 'undefined' ? circuitTypes : []).forEach(t => { %>
+              <option value="<%= t.CircuitTypeID %>"><%= t.TypeName %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label for="res_circuitID" class="form-label">Circuit ID</label>
+            <input type="text" id="res_circuitID" class="form-control" maxlength="150" />
+          </div>
+          <div class="col-12">
+            <label for="res_notes" class="form-label">Notes</label>
+            <textarea id="res_notes" class="form-control" rows="2" maxlength="2000"></textarea>
+          </div>
+        </div>
+        <div id="resourceModalError" class="alert alert-danger mt-3 d-none small"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="resourceModalSaveBtn" onclick="saveResource()">
+          <i class="bi bi-floppy me-1"></i>Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SITE_ID_FOR_RESOURCES = <%= site.SiteID %>;
+
+// ── Activate tab from URL hash (e.g. after save reload) ──────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+  const hash = window.location.hash.replace('#', '');
+  if (hash) {
+    const tabEl = document.querySelector('.nav-link[href="#' + hash + '"]');
+    if (tabEl) bootstrap.Tab.getOrCreateInstance(tabEl).show();
+    history.replaceState(null, '', window.location.pathname);
+  }
+});
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function clearResourceModal() {
+  document.getElementById('resourceModalMode').value   = 'add';
+  document.getElementById('resourceModalID').value     = '';
+  document.getElementById('resourceModalTitle').textContent = '🛜 Add Network Resource';
+  document.getElementById('res_hostname').value        = '';
+  document.getElementById('res_ipAddress').value       = '';
+  document.getElementById('res_deviceTypeID').value    = '';
+  document.getElementById('res_alertStatus').checked   = true;
+  document.getElementById('res_solarwindsNodeId').value = '';
+  document.getElementById('res_sortOrder').value       = '0';
+  document.getElementById('res_circuitTypeID').value   = '';
+  document.getElementById('res_circuitID').value       = '';
+  document.getElementById('res_notes').value           = '';
+  document.getElementById('resourceModalError').classList.add('d-none');
+}
+
+document.getElementById('addResourceModal').addEventListener('show.bs.modal', function(e) {
+  if (!e.relatedTarget) return; // triggered by openEditResourceModal — already populated
+  clearResourceModal();
+});
+
+// ── Open edit modal ───────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.js-edit-resource').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      clearResourceModal();
+      const d = this.dataset;
+      document.getElementById('resourceModalMode').value       = 'edit';
+      document.getElementById('resourceModalID').value         = d.id;
+      document.getElementById('resourceModalTitle').textContent = '🛜 Edit Network Resource';
+      document.getElementById('res_hostname').value            = d.hostname        || '';
+      document.getElementById('res_ipAddress').value           = d.ip              || '';
+      document.getElementById('res_deviceTypeID').value        = d.deviceTypeId    || '';
+      document.getElementById('res_alertStatus').checked       = d.alertStatus === '1';
+      document.getElementById('res_solarwindsNodeId').value    = d.solarwindsNodeId || '';
+      document.getElementById('res_sortOrder').value           = d.sortOrder       || '0';
+      document.getElementById('res_circuitTypeID').value       = d.circuitTypeId   || '';
+      document.getElementById('res_circuitID').value           = d.circuitId       || '';
+      document.getElementById('res_notes').value               = d.notes           || '';
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('addResourceModal')).show();
+    });
+  });
+});
+
+// ── Save (add or edit) ────────────────────────────────────────────────────────
+async function saveResource() {
+  const saveBtn = document.getElementById('resourceModalSaveBtn');
+  const errEl   = document.getElementById('resourceModalError');
+  errEl.classList.add('d-none');
+  saveBtn.disabled = true;
+
+  try {
+    const mode  = document.getElementById('resourceModalMode').value;
+    const resID = document.getElementById('resourceModalID').value;
+    const body  = {
+      hostname:         document.getElementById('res_hostname').value.trim(),
+      ipAddress:        document.getElementById('res_ipAddress').value.trim() || null,
+      deviceTypeID:     document.getElementById('res_deviceTypeID').value || null,
+      alertStatus:      document.getElementById('res_alertStatus').checked ? '1' : '0',
+      solarwindsNodeId: document.getElementById('res_solarwindsNodeId').value || null,
+      sortOrder:        document.getElementById('res_sortOrder').value || 0,
+      circuitTypeID:    document.getElementById('res_circuitTypeID').value || null,
+      circuitID:        document.getElementById('res_circuitID').value.trim() || null,
+      notes:            document.getElementById('res_notes').value.trim() || null,
+    };
+
+    const url = mode === 'edit'
+      ? `/sites/${SITE_ID_FOR_RESOURCES}/network-resources/${resID}`
+      : `/sites/${SITE_ID_FOR_RESOURCES}/network-resources`;
+
+    const resp = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    });
+
+    let data;
+    try { data = await resp.json(); } catch (_) { data = {}; }
+
+    if (!resp.ok) {
+      errEl.textContent = data.error || `Server error (${resp.status}).`;
+      errEl.classList.remove('d-none');
+      return;
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById('addResourceModal'))?.hide();
+    window.location.href = window.location.pathname + '#network-resources';
+    window.location.reload();
+  } catch (err) {
+    console.error('saveResource error:', err);
+    errEl.textContent = 'Network error: ' + err.message;
+    errEl.classList.remove('d-none');
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+async function deleteResource(resID) {
+  if (!confirm('Remove this network resource?')) return;
+  try {
+    const resp = await fetch(`/sites/${SITE_ID_FOR_RESOURCES}/network-resources/${resID}/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!resp.ok) { const d = await resp.json(); alert(d.error || 'Failed to delete.'); return; }
+    window.location.reload();
+  } catch (err) {
+    alert('Network error. Please try again.');
+  }
+}
+</script>
+<% } %>
 
 <!-- ── Install Item Modal ──────────────────────────────────────────────────── -->
 <% if (isAdminUser) { %>

@@ -195,6 +195,7 @@ Open your browser to: **http://localhost:3000**
    - Add **Site Types** appropriate for your environment
    - Add **Inventory Categories** for your equipment types
    - Add **Stock Locations** for your storage areas
+   - Add **Monitoring Location Types**, **Network Device Types**, and **Circuit Types** if using the tower map integration
 
 5. **Create users** (Admin → Users):
    - Create accounts for your team members
@@ -251,6 +252,11 @@ When new database migrations are released:
 | `015_email_templates.sql` | Inserts default email template bodies into `AppSettings` for all 12 notification types |
 | `016_user_organization.sql` | Adds `Organization` column to `Users` table for displaying user's organization on System Keys list |
 | `017_import_export_role.sql` | Adds `ImportExport` role — grants non-admin users the ability to import and export data |
+| `018_vendor_documents.sql` | Adds document attachment support for Vendors; adds `VendorID` foreign key option to `Documents` table |
+| `019_user_deleted.sql` | Adds `DeletedAt` column to `Users` for soft-delete with name preservation |
+| `020_network_resources.sql` | Adds `MonitoringLocationTypes`, `NetworkDeviceTypes`, `CircuitTypes` lookup tables; adds `MonitoringLocationTypeID` to `Sites`; creates `NetworkResources` table for tower map integration; seeds `towerMap.apiKey` AppSetting |
+
+> **Note:** After running migration 020, set the `towerMap.apiKey` value in **Admin → Settings** before connecting SIRNnetworkmap. Generate a key with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 
 > **Note:** `database/schema.sql` always reflects the current full schema. Fresh installs only need to run `schema.sql` + `seed.sql` — migrations are only needed when upgrading an existing database.
 

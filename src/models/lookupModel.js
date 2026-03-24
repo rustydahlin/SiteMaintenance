@@ -284,6 +284,99 @@ async function toggleMaintenanceType(id) {
     .query('UPDATE MaintenanceTypes SET IsActive = 1 - IsActive WHERE MaintenanceTypeID = @ID');
 }
 
+// ── Monitoring Location Types ─────────────────────────────────────────────────
+async function getMonitoringLocationTypes(activeOnly = true) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('ActiveOnly', sql.Bit, activeOnly ? 1 : 0)
+    .query(`SELECT * FROM MonitoringLocationTypes WHERE (@ActiveOnly = 0 OR IsActive = 1) ORDER BY TypeName`);
+  return r.recordset;
+}
+
+async function upsertMonitoringLocationType(id, typeName, description) {
+  const pool = await getPool();
+  if (id) {
+    await pool.request()
+      .input('ID',          sql.Int,          id)
+      .input('TypeName',    sql.NVarChar(100), typeName)
+      .input('Description', sql.NVarChar(255), description || null)
+      .query('UPDATE MonitoringLocationTypes SET TypeName = @TypeName, Description = @Description WHERE LocationTypeID = @ID');
+  } else {
+    await pool.request()
+      .input('TypeName',    sql.NVarChar(100), typeName)
+      .input('Description', sql.NVarChar(255), description || null)
+      .query('INSERT INTO MonitoringLocationTypes (TypeName, Description) VALUES (@TypeName, @Description)');
+  }
+}
+
+async function toggleMonitoringLocationType(id) {
+  const pool = await getPool();
+  await pool.request().input('ID', sql.Int, id)
+    .query('UPDATE MonitoringLocationTypes SET IsActive = 1 - IsActive WHERE LocationTypeID = @ID');
+}
+
+// ── Network Device Types ──────────────────────────────────────────────────────
+async function getNetworkDeviceTypes(activeOnly = true) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('ActiveOnly', sql.Bit, activeOnly ? 1 : 0)
+    .query(`SELECT * FROM NetworkDeviceTypes WHERE (@ActiveOnly = 0 OR IsActive = 1) ORDER BY TypeName`);
+  return r.recordset;
+}
+
+async function upsertNetworkDeviceType(id, typeName, description) {
+  const pool = await getPool();
+  if (id) {
+    await pool.request()
+      .input('ID',          sql.Int,          id)
+      .input('TypeName',    sql.NVarChar(100), typeName)
+      .input('Description', sql.NVarChar(255), description || null)
+      .query('UPDATE NetworkDeviceTypes SET TypeName = @TypeName, Description = @Description WHERE DeviceTypeID = @ID');
+  } else {
+    await pool.request()
+      .input('TypeName',    sql.NVarChar(100), typeName)
+      .input('Description', sql.NVarChar(255), description || null)
+      .query('INSERT INTO NetworkDeviceTypes (TypeName, Description) VALUES (@TypeName, @Description)');
+  }
+}
+
+async function toggleNetworkDeviceType(id) {
+  const pool = await getPool();
+  await pool.request().input('ID', sql.Int, id)
+    .query('UPDATE NetworkDeviceTypes SET IsActive = 1 - IsActive WHERE DeviceTypeID = @ID');
+}
+
+// ── Circuit Types ─────────────────────────────────────────────────────────────
+async function getCircuitTypes(activeOnly = true) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('ActiveOnly', sql.Bit, activeOnly ? 1 : 0)
+    .query(`SELECT * FROM CircuitTypes WHERE (@ActiveOnly = 0 OR IsActive = 1) ORDER BY TypeName`);
+  return r.recordset;
+}
+
+async function upsertCircuitType(id, typeName, description) {
+  const pool = await getPool();
+  if (id) {
+    await pool.request()
+      .input('ID',          sql.Int,          id)
+      .input('TypeName',    sql.NVarChar(100), typeName)
+      .input('Description', sql.NVarChar(255), description || null)
+      .query('UPDATE CircuitTypes SET TypeName = @TypeName, Description = @Description WHERE CircuitTypeID = @ID');
+  } else {
+    await pool.request()
+      .input('TypeName',    sql.NVarChar(100), typeName)
+      .input('Description', sql.NVarChar(255), description || null)
+      .query('INSERT INTO CircuitTypes (TypeName, Description) VALUES (@TypeName, @Description)');
+  }
+}
+
+async function toggleCircuitType(id) {
+  const pool = await getPool();
+  await pool.request().input('ID', sql.Int, id)
+    .query('UPDATE CircuitTypes SET IsActive = 1 - IsActive WHERE CircuitTypeID = @ID');
+}
+
 // ── Key Manufacturers ─────────────────────────────────────────────────────────
 async function getKeyManufacturers(activeOnly = true) {
   const pool = await getPool();
@@ -324,6 +417,9 @@ module.exports = {
   getInventoryStatuses, getInventoryStatusByName,
   getStockLocations, upsertStockLocation, toggleStockLocation,
   getMaintenanceTypes, upsertMaintenanceType, toggleMaintenanceType,
+  getMonitoringLocationTypes, upsertMonitoringLocationType, toggleMonitoringLocationType,
+  getNetworkDeviceTypes, upsertNetworkDeviceType, toggleNetworkDeviceType,
+  getCircuitTypes, upsertCircuitType, toggleCircuitType,
   getKeyManufacturers, upsertKeyManufacturer, toggleKeyManufacturer,
   getInventoryCommonNames, upsertInventoryCommonName, toggleInventoryCommonName,
   getInventoryModelNumbers, upsertInventoryModelNumber, toggleInventoryModelNumber,

@@ -95,7 +95,7 @@ async function getByID(siteID) {
     .query(`
       SELECT
         s.SiteID, s.SiteName, s.SiteNumber, s.ContractNumber,
-        s.SiteTypeID, s.SiteStatusID,
+        s.SiteTypeID, s.SiteStatusID, s.MonitoringLocationTypeID,
         s.Address, s.City, s.State, s.ZipCode,
         s.Latitude, s.Longitude, s.Description, s.WarrantyExpires,
         s.IsActive, s.CreatedAt, s.CreatedByUserID,
@@ -103,12 +103,14 @@ async function getByID(siteID) {
         p.SiteName    AS ParentSiteName,
         t.TypeName    AS SiteTypeName,
         ss.StatusName AS SiteStatusName,
+        mlt.TypeName  AS MonitoringLocationTypeName,
         u.DisplayName AS CreatedByName
       FROM Sites s
-      LEFT JOIN Sites         p  ON p.SiteID       = s.ParentSiteID
-      LEFT JOIN SiteTypes    t  ON t.SiteTypeID   = s.SiteTypeID
-      LEFT JOIN SiteStatuses ss ON ss.SiteStatusID = s.SiteStatusID
-      LEFT JOIN Users        u  ON u.UserID        = s.CreatedByUserID
+      LEFT JOIN Sites                   p   ON p.SiteID         = s.ParentSiteID
+      LEFT JOIN SiteTypes               t   ON t.SiteTypeID     = s.SiteTypeID
+      LEFT JOIN SiteStatuses            ss  ON ss.SiteStatusID  = s.SiteStatusID
+      LEFT JOIN MonitoringLocationTypes mlt ON mlt.LocationTypeID = s.MonitoringLocationTypeID
+      LEFT JOIN Users                   u   ON u.UserID          = s.CreatedByUserID
       WHERE s.SiteID = @SiteID
     `);
   return result.recordset[0] || null;
@@ -118,36 +120,37 @@ async function create(data, auditContext = {}) {
   const {
     siteName, siteNumber, contractNumber, siteTypeID,
     address, city, state, zipCode, latitude, longitude, description,
-    warrantyExpires, parentSiteID,
+    warrantyExpires, parentSiteID, monitoringLocationTypeID,
   } = data;
 
   const pool = await getPool();
   const result = await pool.request()
-    .input('SiteName',        sql.NVarChar(200),   siteName)
-    .input('SiteNumber',      sql.NVarChar(100),   siteNumber      || null)
-    .input('ContractNumber',  sql.NVarChar(100),   contractNumber  || null)
-    .input('SiteTypeID',      sql.Int,             siteTypeID      || null)
-    .input('Address',         sql.NVarChar(255),   address         || null)
-    .input('City',            sql.NVarChar(100),   city            || null)
-    .input('State',           sql.NVarChar(50),    state           || null)
-    .input('ZipCode',         sql.NVarChar(20),    zipCode         || null)
-    .input('Latitude',        sql.Decimal(10, 7),  latitude        ?? null)
-    .input('Longitude',       sql.Decimal(10, 7),  longitude       ?? null)
-    .input('Description',     sql.NVarChar(sql.MAX), description   || null)
-    .input('WarrantyExpires', sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
-    .input('CreatedByUserID', sql.Int,             auditContext.userID || null)
-    .input('ParentSiteID',    sql.Int,             parentSiteID    || null)
+    .input('SiteName',                  sql.NVarChar(200),   siteName)
+    .input('SiteNumber',                sql.NVarChar(100),   siteNumber              || null)
+    .input('ContractNumber',            sql.NVarChar(100),   contractNumber          || null)
+    .input('SiteTypeID',                sql.Int,             siteTypeID              || null)
+    .input('Address',                   sql.NVarChar(255),   address                 || null)
+    .input('City',                      sql.NVarChar(100),   city                    || null)
+    .input('State',                     sql.NVarChar(50),    state                   || null)
+    .input('ZipCode',                   sql.NVarChar(20),    zipCode                 || null)
+    .input('Latitude',                  sql.Decimal(10, 7),  latitude                ?? null)
+    .input('Longitude',                 sql.Decimal(10, 7),  longitude               ?? null)
+    .input('Description',               sql.NVarChar(sql.MAX), description           || null)
+    .input('WarrantyExpires',           sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
+    .input('CreatedByUserID',           sql.Int,             auditContext.userID     || null)
+    .input('ParentSiteID',              sql.Int,             parentSiteID            || null)
+    .input('MonitoringLocationTypeID',  sql.Int,             monitoringLocationTypeID || null)
     .query(`
       INSERT INTO Sites
         (SiteName, SiteNumber, ContractNumber, SiteTypeID,
          SiteStatusID,
          Address, City, State, ZipCode, Latitude, Longitude, Description,
-         WarrantyExpires, CreatedByUserID, ParentSiteID)
+         WarrantyExpires, CreatedByUserID, ParentSiteID, MonitoringLocationTypeID)
       VALUES
         (@SiteName, @SiteNumber, @ContractNumber, @SiteTypeID,
          (SELECT TOP 1 SiteStatusID FROM SiteStatuses WHERE StatusName = 'Current' AND IsActive = 1),
          @Address, @City, @State, @ZipCode, @Latitude, @Longitude, @Description,
-         @WarrantyExpires, @CreatedByUserID, @ParentSiteID);
+         @WarrantyExpires, @CreatedByUserID, @ParentSiteID, @MonitoringLocationTypeID);
       SELECT SCOPE_IDENTITY() AS NewID
     `);
 
@@ -164,42 +167,45 @@ async function update(siteID, data, auditContext = {}) {
   const {
     siteName, siteNumber, contractNumber, siteTypeID,
     address, city, state, zipCode, latitude, longitude, description,
-    warrantyExpires, parentSiteID,
+    warrantyExpires, parentSiteID, monitoringLocationTypeID,
   } = data;
 
   const pool = await getPool();
   const old  = await getByID(siteID);
 
   await pool.request()
-    .input('SiteID',          sql.Int,             siteID)
-    .input('SiteName',        sql.NVarChar(200),   siteName)
-    .input('SiteNumber',      sql.NVarChar(100),   siteNumber      || null)
-    .input('ContractNumber',  sql.NVarChar(100),   contractNumber  || null)
-    .input('SiteTypeID',      sql.Int,             siteTypeID      || null)
-    .input('Address',         sql.NVarChar(255),   address         || null)
-    .input('City',            sql.NVarChar(100),   city            || null)
-    .input('State',           sql.NVarChar(50),    state           || null)
-    .input('ZipCode',         sql.NVarChar(20),    zipCode         || null)
-    .input('Latitude',        sql.Decimal(10, 7),  latitude        ?? null)
-    .input('Longitude',       sql.Decimal(10, 7),  longitude       ?? null)
-    .input('Description',     sql.NVarChar(sql.MAX), description   || null)
-    .input('WarrantyExpires', sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
-    .input('ParentSiteID',    sql.Int,             parentSiteID    || null)
+    .input('SiteID',                    sql.Int,             siteID)
+    .input('SiteName',                  sql.NVarChar(200),   siteName)
+    .input('SiteNumber',                sql.NVarChar(100),   siteNumber              || null)
+    .input('ContractNumber',            sql.NVarChar(100),   contractNumber          || null)
+    .input('SiteTypeID',                sql.Int,             siteTypeID              || null)
+    .input('Address',                   sql.NVarChar(255),   address                 || null)
+    .input('City',                      sql.NVarChar(100),   city                    || null)
+    .input('State',                     sql.NVarChar(50),    state                   || null)
+    .input('ZipCode',                   sql.NVarChar(20),    zipCode                 || null)
+    .input('Latitude',                  sql.Decimal(10, 7),  latitude                ?? null)
+    .input('Longitude',                 sql.Decimal(10, 7),  longitude               ?? null)
+    .input('Description',               sql.NVarChar(sql.MAX), description           || null)
+    .input('WarrantyExpires',           sql.Date,            warrantyExpires ? new Date(warrantyExpires) : null)
+    .input('ParentSiteID',              sql.Int,             parentSiteID            || null)
+    .input('MonitoringLocationTypeID',  sql.Int,             monitoringLocationTypeID || null)
     .query(`
       UPDATE Sites SET
-        SiteName        = @SiteName,
-        SiteNumber      = @SiteNumber,
-        ContractNumber  = @ContractNumber,
-        SiteTypeID      = @SiteTypeID,
-        Address         = @Address,
-        City            = @City,
-        State           = @State,
-        ZipCode         = @ZipCode,
-        Latitude        = @Latitude,
-        Longitude       = @Longitude,
-        Description     = @Description,
-        WarrantyExpires = @WarrantyExpires,
-        ParentSiteID    = @ParentSiteID
+        SiteName                 = @SiteName,
+        SiteNumber               = @SiteNumber,
+        ContractNumber           = @ContractNumber,
+        SiteTypeID               = @SiteTypeID,
+        Address                  = @Address,
+        City                     = @City,
+        State                    = @State,
+        ZipCode                  = @ZipCode,
+        Latitude                 = @Latitude,
+        Longitude                = @Longitude,
+        Description              = @Description,
+        WarrantyExpires          = @WarrantyExpires,
+        ParentSiteID             = @ParentSiteID,
+        MonitoringLocationTypeID = @MonitoringLocationTypeID,
+        UpdatedAt                = GETUTCDATE()
       WHERE SiteID = @SiteID
     `);
 

@@ -22,7 +22,8 @@ async function createApp() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc:  ["'self'"],
-        scriptSrc:   ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
+        scriptSrc:     ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
+        scriptSrcAttr: ["'unsafe-inline'"],
         styleSrc:    ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
         fontSrc:     ["'self'", 'cdn.jsdelivr.net'],
         imgSrc:      ["'self'", 'data:', 'blob:'],
@@ -114,6 +115,9 @@ async function createApp() {
   app.use(require('./middleware/audit'));
 
   // ── Routes ────────────────────────────────────────────────────────────────
+  // Public API (no session auth — uses X-API-Key header)
+  app.use('/api', require('./routes/towerMapApiRoute'));
+
   app.use('/',           require('./routes/index'));
   app.use('/auth',       require('./routes/authRoutes'));
   app.use('/sites',      require('./routes/siteRoutes'));

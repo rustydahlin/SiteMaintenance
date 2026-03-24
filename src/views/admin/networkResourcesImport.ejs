@@ -1,0 +1,102 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-cloud-upload me-2"></i>Network Resources Import / Export</h1>
+  <div class="d-flex gap-2">
+    <a href="/admin/network-resources-export" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-download me-1"></i>Export devices.json
+    </a>
+    <a href="/admin" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  </div>
+</div>
+
+<% if (error) { %>
+<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i><%= error %></div>
+<% } %>
+
+<% if (!preview) { %>
+<!-- ── Step 1: Upload ──────────────────────────────────────────────────────── -->
+<div class="card shadow-sm" style="max-width:520px">
+  <div class="card-header">Step 1 — Upload devices.json</div>
+  <div class="card-body">
+    <p class="small text-muted mb-3">
+      Upload a <code>devices.json</code> file in the standard SIRNnetworkmap format.
+      Each entry will be matched to a site by <strong>Site Number + Site Name</strong>
+      (e.g. <code>"86 Amidon"</code>). Unmatched entries are skipped.
+    </p>
+    <form action="/admin/network-resources-import" method="POST" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label for="devicesJson" class="form-label">devices.json file</label>
+        <input type="file" id="devicesJson" name="devicesJson" class="form-control" accept=".json" required />
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-search me-1"></i>Preview Import
+      </button>
+    </form>
+  </div>
+</div>
+
+<% } else { %>
+<!-- ── Step 2: Preview ────────────────────────────────────────────────────── -->
+<div class="row g-4">
+  <div class="col-12">
+    <div class="alert alert-info py-2 small mb-0">
+      <strong><%= preview.matched.length %></strong> site(s) matched &mdash;
+      <strong><%= preview.unmatched.length %></strong> unmatched (will be skipped).
+    </div>
+  </div>
+
+  <% if (preview.matched.length > 0) { %>
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Matched Sites (<%= preview.matched.length %>)</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Entry Name</th><th>Site ID</th><th>Loc Type</th><th>Devices</th></tr></thead>
+          <tbody>
+            <% preview.matched.forEach(function(m) { %>
+            <tr>
+              <td><%= m.entry.name %></td>
+              <td class="text-muted small">#<%= m.siteID %></td>
+              <td class="small"><%= m.entry.locType || '—' %></td>
+              <td class="small"><%= Array.isArray(m.entry.devices) ? m.entry.devices.length : 0 %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (preview.unmatched.length > 0) { %>
+  <div class="col-12">
+    <div class="card shadow-sm border-warning">
+      <div class="card-header fw-semibold text-warning-emphasis bg-warning-subtle">Unmatched Entries — Skipped (<%= preview.unmatched.length %>)</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Entry Name</th></tr></thead>
+          <tbody>
+            <% preview.unmatched.forEach(function(name) { %>
+            <tr><td class="text-muted small"><%= name %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="col-12 d-flex gap-2">
+    <% if (preview.matched.length > 0) { %>
+    <form action="/admin/network-resources-import/confirm" method="POST">
+      <input type="hidden" name="payload" value="<%= preview.payloadJson %>" />
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check2-circle me-1"></i>Confirm Import
+      </button>
+    </form>
+    <% } %>
+    <a href="/admin/network-resources-import" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Upload Different File
+    </a>
+  </div>
+</div>
+<% } %>

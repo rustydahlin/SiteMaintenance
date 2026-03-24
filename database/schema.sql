@@ -144,6 +144,33 @@ CREATE TABLE StockLocations (
     CreatedAt    DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE()
 );
 
+CREATE TABLE MonitoringLocationTypes (
+    LocationTypeID  INT           IDENTITY(1,1) PRIMARY KEY,
+    TypeName        NVARCHAR(100) NOT NULL,
+    Description     NVARCHAR(255) NULL,
+    IsActive        BIT           NOT NULL DEFAULT 1,
+    CreatedAt       DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT UQ_MonitoringLocationTypes_TypeName UNIQUE (TypeName)
+);
+
+CREATE TABLE NetworkDeviceTypes (
+    DeviceTypeID  INT           IDENTITY(1,1) PRIMARY KEY,
+    TypeName      NVARCHAR(100) NOT NULL,
+    Description   NVARCHAR(255) NULL,
+    IsActive      BIT           NOT NULL DEFAULT 1,
+    CreatedAt     DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT UQ_NetworkDeviceTypes_TypeName UNIQUE (TypeName)
+);
+
+CREATE TABLE CircuitTypes (
+    CircuitTypeID  INT           IDENTITY(1,1) PRIMARY KEY,
+    TypeName       NVARCHAR(100) NOT NULL,
+    Description    NVARCHAR(255) NULL,
+    IsActive       BIT           NOT NULL DEFAULT 1,
+    CreatedAt      DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT UQ_CircuitTypes_TypeName UNIQUE (TypeName)
+);
+
 -- ============================================================
 -- SITES
 -- ============================================================
@@ -162,19 +189,50 @@ CREATE TABLE Sites (
     Longitude       DECIMAL(10,7)   NULL,
     Description     NVARCHAR(MAX)   NULL,
     WarrantyExpires DATE            NULL,
-    ParentSiteID    INT             NULL,       -- NULL = top-level site; set for sub-sites
+    ParentSiteID              INT             NULL,       -- NULL = top-level site; set for sub-sites
+    MonitoringLocationTypeID  INT             NULL,       -- set to include site on SIRNnetworkmap
     IsActive        BIT             NOT NULL DEFAULT 1,
     CreatedAt       DATETIME2(0)    NOT NULL DEFAULT GETUTCDATE(),
     UpdatedAt       DATETIME2(0)    NOT NULL DEFAULT GETUTCDATE(),
     CreatedByUserID INT             NULL,
-    CONSTRAINT FK_Sites_SiteType   FOREIGN KEY (SiteTypeID)   REFERENCES SiteTypes(SiteTypeID),
-    CONSTRAINT FK_Sites_SiteStatus FOREIGN KEY (SiteStatusID) REFERENCES SiteStatuses(SiteStatusID),
-    CONSTRAINT FK_Sites_CreatedBy  FOREIGN KEY (CreatedByUserID) REFERENCES Users(UserID),
-    CONSTRAINT FK_Sites_ParentSite FOREIGN KEY (ParentSiteID) REFERENCES Sites(SiteID)
+    CONSTRAINT FK_Sites_SiteType        FOREIGN KEY (SiteTypeID)              REFERENCES SiteTypes(SiteTypeID),
+    CONSTRAINT FK_Sites_SiteStatus      FOREIGN KEY (SiteStatusID)            REFERENCES SiteStatuses(SiteStatusID),
+    CONSTRAINT FK_Sites_CreatedBy       FOREIGN KEY (CreatedByUserID)         REFERENCES Users(UserID),
+    CONSTRAINT FK_Sites_ParentSite      FOREIGN KEY (ParentSiteID)            REFERENCES Sites(SiteID),
+    CONSTRAINT FK_Sites_MonitoringLocType FOREIGN KEY (MonitoringLocationTypeID) REFERENCES MonitoringLocationTypes(LocationTypeID)
 );
 CREATE INDEX IX_Sites_SiteTypeID   ON Sites(SiteTypeID);
 CREATE INDEX IX_Sites_SiteStatusID ON Sites(SiteStatusID);
 CREATE INDEX IX_Sites_IsActive     ON Sites(IsActive);
+
+-- ============================================================
+-- NETWORK RESOURCES (Tower Map)
+-- ============================================================
+CREATE TABLE NetworkResources (
+    ResourceID        INT           IDENTITY(1,1) PRIMARY KEY,
+    SiteID            INT           NOT NULL,
+    Hostname          NVARCHAR(150) NOT NULL,
+    IPAddress         NVARCHAR(45)  NULL,
+    DeviceTypeID      INT           NOT NULL,
+    AlertStatus       BIT           NOT NULL DEFAULT 1,
+    SolarwindsNodeId  INT           NULL,
+    CircuitTypeID     INT           NULL,
+    CircuitID         NVARCHAR(150) NULL,
+    Notes             NVARCHAR(MAX) NULL,
+    SortOrder         INT           NOT NULL DEFAULT 0,
+    IsActive          BIT           NOT NULL DEFAULT 1,
+    CreatedAt         DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE(),
+    UpdatedAt         DATETIME2(0)  NOT NULL DEFAULT GETUTCDATE(),
+    CreatedByUserID   INT           NULL,
+    UpdatedByUserID   INT           NULL,
+    CONSTRAINT FK_NetworkResources_Site        FOREIGN KEY (SiteID)          REFERENCES Sites(SiteID),
+    CONSTRAINT FK_NetworkResources_DevType     FOREIGN KEY (DeviceTypeID)    REFERENCES NetworkDeviceTypes(DeviceTypeID),
+    CONSTRAINT FK_NetworkResources_CircuitType FOREIGN KEY (CircuitTypeID)   REFERENCES CircuitTypes(CircuitTypeID),
+    CONSTRAINT FK_NetworkResources_CreatedBy   FOREIGN KEY (CreatedByUserID) REFERENCES Users(UserID),
+    CONSTRAINT FK_NetworkResources_UpdatedBy   FOREIGN KEY (UpdatedByUserID) REFERENCES Users(UserID)
+);
+CREATE INDEX IX_NetworkResources_SiteID   ON NetworkResources(SiteID);
+CREATE INDEX IX_NetworkResources_IsActive ON NetworkResources(IsActive);
 
 -- ============================================================
 -- INVENTORY

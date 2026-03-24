@@ -143,6 +143,29 @@
                     maxlength="4000"><%= site && site.Description ? site.Description : '' %></textarea>
         </div>
 
+        <!-- ── Tower Map ──────────────────────────────────────────────────── -->
+        <div class="col-12"><hr class="mt-1 mb-2" /></div>
+
+        <div class="col-12">
+          <h6 class="mb-2 text-body-secondary">
+            <i class="bi bi-broadcast-pin me-1"></i>Tower Map
+          </h6>
+        </div>
+
+        <div class="col-md-4">
+          <label for="monitoringLocationTypeID" class="form-label">Monitoring Location Type</label>
+          <select id="monitoringLocationTypeID" name="monitoringLocationTypeID" class="form-select">
+            <option value="">— None (not on tower map) —</option>
+            <% (typeof monitoringLocationTypes !== 'undefined' ? monitoringLocationTypes : []).forEach(t => { %>
+              <option value="<%= t.LocationTypeID %>"
+                <%= (site && site.MonitoringLocationTypeID == t.LocationTypeID) ? 'selected' : '' %>>
+                <%= t.TypeName %>
+              </option>
+            <% }) %>
+          </select>
+          <div class="form-text">Set to include this site on the SIRNnetworkmap. Requires Latitude &amp; Longitude and at least one Network Resource.</div>
+        </div>
+
       </div><!-- /.row -->
 
       <hr class="my-4" />

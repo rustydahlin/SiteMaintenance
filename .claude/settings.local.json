@@ -28,7 +28,16 @@
       "Bash(ipconfig)",
       "Bash(grep -l \"export\\\\|download\\\\|csv\\\\|xlsx\" /c/SiteMaintenance/src/routes/*.js)",
       "Bash(grep -n \"xlsx\\\\|XLSX\" /c/SiteMaintenance/src/routes/*.js)",
-      "Bash(grep -v \"^--$\")"
+      "Bash(grep -v \"^--$\")",
+      "Bash(grep -E \"\\\\.\\(json|py|js|ts\\)$\")",
+      "Bash(grep -c \"\"\"name\"\"\" /c/SIRNnetworkmap/src/frontend/overlays/devices.json)",
+      "Bash(grep -c '\"\"name\"\"' /c/SIRNnetworkmap/src/frontend/overlays/devices.json)",
+      "Bash(ls /c/SIRNnetworkmap/src/backend/*.env)",
+      "Bash(ls /c/SIRNnetworkmap/src/backend/.env*)",
+      "Bash(ls /c/SIRNnetworkmap/src/backend/*.tmpl)",
+      "Bash(ls /c/SIRNnetworkmap/src/backend/*.example)",
+      "Bash(Get-Content \"C:\\\\SiteMaintenance\\\\src\\\\routes\\\\adminRoutes.js\")",
+      "Bash(Measure-Object -Line)"
     ]
   }
 }

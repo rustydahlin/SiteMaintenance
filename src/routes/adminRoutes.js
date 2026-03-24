@@ -3,15 +3,26 @@
 const express    = require('express');
 const path       = require('path');
 const fs         = require('fs');
+const multer     = require('multer');
 const { isAdmin } = require('../middleware/auth');
-const lookupModel   = require('../models/lookupModel');
-const userModel     = require('../models/userModel');
-const settingsModel = require('../models/settingsModel');
+const lookupModel            = require('../models/lookupModel');
+const userModel              = require('../models/userModel');
+const settingsModel          = require('../models/settingsModel');
+const networkResourceModel   = require('../models/networkResourceModel');
 const { getAuditLog } = require('../models/auditModel');
 const passportConfig  = require('../config/passport');
 const { body, validationResult } = require('express-validator');
 const XLSX = require('xlsx');
 const router = express.Router();
+
+const jsonUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (/\.json$/i.test(file.originalname)) cb(null, true);
+    else cb(new Error('Only .json files are accepted'));
+  },
+});
 
 const logDir = process.env.LOG_DIR
   ? path.resolve(process.env.LOG_DIR)
@@ -170,6 +181,11 @@ simplePicklistRoute('/inventory/manufacturers',  'Manufacturers',  lookupModel.g
 // ── Maintenance Types ─────────────────────────────────────────────────────────
 simplePicklistRoute('/maintenance-types', 'Maintenance Types', lookupModel.getMaintenanceTypes, lookupModel.upsertMaintenanceType, lookupModel.toggleMaintenanceType, 'maintenanceTypes');
 
+// ── Network / Tower Map Lookups ───────────────────────────────────────────────
+simplePicklistRoute('/monitoring-location-types', 'Monitoring Location Types', lookupModel.getMonitoringLocationTypes, lookupModel.upsertMonitoringLocationType, lookupModel.toggleMonitoringLocationType, 'monitoringLocationTypes');
+simplePicklistRoute('/network-device-types',      'Network Device Types',      lookupModel.getNetworkDeviceTypes,      lookupModel.upsertNetworkDeviceType,      lookupModel.toggleNetworkDeviceType,      'networkDeviceTypes');
+simplePicklistRoute('/circuit-types',             'Circuit Types',             lookupModel.getCircuitTypes,             lookupModel.upsertCircuitType,             lookupModel.toggleCircuitType,             'circuitTypes');
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 router.get('/users', async (req, res, next) => {
   try {
@@ -297,7 +313,7 @@ router.post('/settings', async (req, res, next) => {
     }
 
     // Password/secret fields: skip saving if left blank (preserve existing stored value)
-    const secretKeys = ['ldap.bindCredentials', 'oidc.clientSecret', 'email.password'];
+    const secretKeys = ['ldap.bindCredentials', 'oidc.clientSecret', 'email.password', 'towerMap.apiKey'];
     const keys = Object.keys(req.body).filter(k => k !== '_csrf');
     for (const key of keys) {
       if (secretKeys.includes(key) && !req.body[key]) continue;
@@ -662,6 +678,137 @@ router.get('/logs/download', (req, res, next) => {
     const filePath = path.join(logDir, filename);
     if (!fs.existsSync(filePath)) return res.status(404).send('File not found.');
     res.download(filePath, filename);
+  } catch (err) { next(err); }
+});
+
+// ── Network Resources Export ──────────────────────────────────────────────────
+router.get('/network-resources-export', async (_req, res, next) => {
+  try {
+    const data = await networkResourceModel.getTowerMapData();
+    const json = JSON.stringify(data, null, 2);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="devices.json"');
+    res.send(json);
+  } catch (err) { next(err); }
+});
+
+// ── Network Resources Import ──────────────────────────────────────────────────
+router.get('/network-resources-import', (_req, res) => {
+  res.render('admin/networkResourcesImport', { title: 'Network Resources Import', preview: null, error: null });
+});
+
+router.post('/network-resources-import', jsonUpload.single('devicesJson'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.render('admin/networkResourcesImport', { title: 'Network Resources Import', preview: null, error: 'Please select a devices.json file.' });
+    }
+
+    let entries;
+    try {
+      entries = JSON.parse(req.file.buffer.toString('utf-8'));
+      if (!Array.isArray(entries)) throw new Error('Root element must be an array.');
+    } catch (parseErr) {
+      return res.render('admin/networkResourcesImport', { title: 'Network Resources Import', preview: null, error: `Invalid JSON: ${parseErr.message}` });
+    }
+
+    // Load all sites for matching
+    const { getPool, sql } = require('../config/database');
+    const pool = await getPool();
+    const sitesResult = await pool.request().query(
+      `SELECT SiteID, LOWER(ISNULL(SiteNumber + ' ', '') + SiteName) AS MatchKey FROM Sites WHERE IsActive = 1`
+    );
+    const siteMap = new Map(sitesResult.recordset.map(r => [r.MatchKey.trim(), r.SiteID]));
+
+    const matched   = [];
+    const unmatched = [];
+
+    for (const entry of entries) {
+      if (!entry || typeof entry.name !== 'string') continue;
+      const key    = entry.name.trim().toLowerCase();
+      const siteID = siteMap.get(key);
+      if (siteID) {
+        matched.push({ entry, siteID });
+      } else {
+        unmatched.push(entry.name);
+      }
+    }
+
+    // Serialize for confirm form
+    const payloadJson = JSON.stringify(matched.map(m => ({ siteID: m.siteID, entry: m.entry })));
+
+    res.render('admin/networkResourcesImport', {
+      title:   'Network Resources Import',
+      preview: { matched, unmatched, payloadJson },
+      error:   null,
+    });
+  } catch (err) {
+    if (err instanceof multer.MulterError || err.message?.includes('Only .json')) {
+      return res.render('admin/networkResourcesImport', { title: 'Network Resources Import', preview: null, error: err.message });
+    }
+    next(err);
+  }
+});
+
+router.post('/network-resources-import/confirm', express.urlencoded({ extended: true, limit: '20mb' }), async (req, res, next) => {
+  try {
+    const rows = JSON.parse(req.body.payload || '[]');
+
+    // Load lookup maps
+    const [monitoringTypes, deviceTypes] = await Promise.all([
+      lookupModel.getMonitoringLocationTypes(false),
+      lookupModel.getNetworkDeviceTypes(false),
+    ]);
+    const monTypeMap = new Map(monitoringTypes.map(t => [t.TypeName.toLowerCase(), t.LocationTypeID]));
+    const devTypeMap = new Map(deviceTypes.map(t => [t.TypeName.toLowerCase(), t.DeviceTypeID]));
+
+    const { getPool, sql } = require('../config/database');
+    const pool = await getPool();
+
+    let sitesUpdated = 0;
+    let devicesAdded = 0;
+    let devicesSkipped = 0;
+
+    for (const { siteID, entry } of rows) {
+      // Set MonitoringLocationTypeID on the site
+      const locTypeID = entry.locType ? monTypeMap.get(entry.locType.toLowerCase()) : null;
+      if (locTypeID) {
+        await pool.request()
+          .input('SiteID',    sql.Int, siteID)
+          .input('LocTypeID', sql.Int, locTypeID)
+          .query('UPDATE Sites SET MonitoringLocationTypeID = @LocTypeID WHERE SiteID = @SiteID');
+        sitesUpdated++;
+      }
+
+      // Insert devices
+      const devices = Array.isArray(entry.devices) ? entry.devices : [];
+      for (const dev of devices) {
+        const devTypeID = dev.type ? devTypeMap.get(dev.type.toLowerCase()) : null;
+        if (!devTypeID || !dev.name) { devicesSkipped++; continue; }
+
+        // Skip if Hostname+SiteID already exists
+        const exists = await pool.request()
+          .input('SiteID',   sql.Int,          siteID)
+          .input('Hostname', sql.NVarChar(150), dev.name)
+          .query('SELECT 1 AS n FROM NetworkResources WHERE SiteID = @SiteID AND Hostname = @Hostname AND IsActive = 1');
+        if (exists.recordset.length > 0) { devicesSkipped++; continue; }
+
+        await networkResourceModel.create(siteID, {
+          hostname:         dev.name,
+          ipAddress:        dev.ip             || null,
+          deviceTypeID:     devTypeID,
+          alertStatus:      dev.affectsStatus  !== false,
+          solarwindsNodeId: dev.solarwindsNodeId || null,
+          circuitTypeID:    null,
+          circuitID:        null,
+          notes:            null,
+          sortOrder:        0,
+        }, req.auditContext);
+        devicesAdded++;
+      }
+    }
+
+    req.flash('success', `Import complete: ${sitesUpdated} site(s) updated, ${devicesAdded} device(s) added, ${devicesSkipped} skipped.`);
+    res.redirect('/admin/network-resources-import');
   } catch (err) { next(err); }
 });
 

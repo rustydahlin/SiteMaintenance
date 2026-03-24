@@ -7,7 +7,7 @@ const crypto           = require('crypto');
 
 // ── Encryption ────────────────────────────────────────────────────────────────
 // Keys that are encrypted at rest in AppSettings (IsEncrypted = 1)
-const ENCRYPTED_KEYS = new Set(['ldap.bindCredentials', 'oidc.clientSecret', 'email.password']);
+const ENCRYPTED_KEYS = new Set(['ldap.bindCredentials', 'oidc.clientSecret', 'email.password', 'towerMap.apiKey']);
 
 // Derive a 32-byte key from SETTINGS_ENCRYPTION_KEY env var (or fall back to SESSION_SECRET).
 // Using SHA-256 so any-length passphrase becomes a valid AES-256 key.
@@ -85,7 +85,7 @@ async function upsert(key, value, userID = null, auditContext = {}) {
   const isEncrypted   = shouldEncrypt ? 1 : 0;
 
   // Mask sensitive keys in audit log
-  const SENSITIVE  = ['clientSecret', 'bindCredentials', 'password', 'Password'];
+  const SENSITIVE  = ['clientSecret', 'bindCredentials', 'password', 'Password', 'apiKey'];
   const isSensitive = SENSITIVE.some(s => key.toLowerCase().includes(s.toLowerCase()));
   const auditValue  = isSensitive ? '••••••' : value;
 
