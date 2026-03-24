@@ -543,9 +543,9 @@
             <td><span class="badge bg-body-secondary text-body border"><%= r.DeviceTypeName %></span></td>
             <td>
               <% if (r.AlertStatus) { %>
-                <span class="badge bg-danger">Yes</span>
+                <span class="badge bg-success">Yes</span>
               <% } else { %>
-                <span class="badge bg-secondary">No</span>
+                <span class="badge bg-warning text-dark">No</span>
               <% } %>
             </td>
             <td class="small"><%= r.SolarwindsNodeId || '—' %></td>
