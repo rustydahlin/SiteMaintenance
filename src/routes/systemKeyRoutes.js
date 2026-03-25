@@ -134,12 +134,22 @@ router.post('/import', canImportExport, importUpload.single('file'), async (req,
       return [name, c.ContactID];
     }));
 
-    const plan = [];
-    for (const row of rows) {
-      const serial = String(row.SerialNumber || '').trim();
-      if (!serial) { plan.push({ row, action: 'skip', reason: 'Missing SerialNumber' }); continue; }
+    const norm = v => (v == null || v === '') ? null : String(v).trim();
 
-      const existing      = await systemKeyModel.findBySerial(serial);
+    const plan    = [];
+    const summary = { total: rows.length, created: 0, updated: 0, skipped: 0, removed: 0, errors: 0 };
+
+    for (let i = 0; i < rows.length; i++) {
+      const row    = rows[i];
+      const rowNum = i + 2;
+      const serial = String(row.SerialNumber || '').trim();
+
+      if (!serial) {
+        summary.skipped++;
+        plan.push({ action: 'skip', rowNum, display: { serialNumber: '' }, message: 'SerialNumber is blank' });
+        continue;
+      }
+
       const issuedToType  = String(row.IssuedToType || 'user').trim().toLowerCase();
       const issuedToName  = String(row.IssuedTo     || '').trim().toLowerCase();
       const mfgName       = String(row.Manufacturer || '').trim().toLowerCase();
@@ -161,48 +171,76 @@ router.post('/import', canImportExport, importUpload.single('file'), async (req,
         manufacturerID:    mfgName ? (mfgMap[mfgName] || null) : null,
         dateIssued:        parseDate(row.DateIssued),
         expirationDate:    parseDate(row.ExpirationDate),
-        keyCode:           String(row.KeyCode  || '').trim() || null,
-        keyType:           String(row.KeyType  || 'Unlimited').trim(),
-        notes:             String(row.Notes    || '').trim() || null,
+        keyCode:           norm(row.KeyCode) || null,
+        keyType:           norm(row.KeyType) || 'Unlimited',
+        notes:             norm(row.Notes)   || null,
       };
 
+      const existing = await systemKeyModel.findBySerial(serial);
       if (existing) {
-        const diffs = [];
-        if (existing.SerialNumber !== data.serialNumber)    diffs.push(`SerialNumber: "${existing.SerialNumber}" → "${data.serialNumber}"`);
-        if (existing.KeyCode      !== data.keyCode)         diffs.push(`KeyCode: "${existing.KeyCode || ''}" → "${data.keyCode || ''}"`);
-        if (existing.KeyType      !== data.keyType)         diffs.push(`KeyType: "${existing.KeyType}" → "${data.keyType}"`);
-        plan.push({ row, action: 'update', keyID: existing.KeyID, serial, diffs, data });
+        const diff = [
+          ['Key Code',    norm(existing.KeyCode),        data.keyCode],
+          ['Key Type',    norm(existing.KeyType),        data.keyType],
+          ['Expiration',  norm(existing.ExpirationDate), data.expirationDate],
+          ['Notes',       norm(existing.Notes),          data.notes],
+        ].filter(([, from, to]) => from !== to)
+         .map(([field, from, to]) => ({ field, from, to }));
+
+        if (diff.length === 0) {
+          summary.skipped++;
+          plan.push({ action: 'skip', rowNum, display: { serialNumber: serial, keyCode: data.keyCode, keyType: data.keyType }, existingID: existing.KeyID, message: 'No changes' });
+        } else {
+          summary.updated++;
+          plan.push({ action: 'update', rowNum, display: { serialNumber: serial, keyCode: data.keyCode, keyType: data.keyType }, existingID: existing.KeyID, data, diff });
+        }
       } else {
-        plan.push({ row, action: 'create', serial, data });
+        summary.created++;
+        plan.push({ action: 'create', rowNum, display: { serialNumber: serial, keyCode: data.keyCode, keyType: data.keyType }, data });
       }
     }
 
-    req.session.systemKeyImportPlan = plan;
-    res.render('system-keys/import-preview', { title: 'Import Preview — System Keys', plan });
+    // Detect keys in DB not matched by any CSV row
+    const seenIDs  = new Set(plan.filter(e => e.existingID).map(e => e.existingID));
+    const allKeys  = await systemKeyModel.getAll({ includeInactive: false });
+    for (const k of allKeys) {
+      if (!seenIDs.has(k.KeyID)) {
+        summary.removed++;
+        plan.push({ action: 'remove', display: { serialNumber: k.SerialNumber, keyCode: k.KeyCode, keyType: k.KeyType } });
+      }
+    }
+
+    res.render('system-keys/import-preview', { title: 'Import Preview — System Keys', summary, plan, importPlan: JSON.stringify(plan) });
   } catch (err) { next(err); }
 });
 
 // ── POST /import/confirm — execute import ─────────────────────────────────────
 router.post('/import/confirm', canImportExport, async (req, res, next) => {
   try {
-    const plan = req.session.systemKeyImportPlan || [];
-    const auditContext = { userID: req.user.UserID, username: req.user.Username };
-    let created = 0, updated = 0, skipped = 0;
+    const plan    = JSON.parse(req.body.importPlan || '[]');
+    const results = { total: plan.length, created: 0, updated: 0, skipped: 0, errors: 0, rows: [] };
 
-    for (const item of plan) {
-      if (item.action === 'create') {
-        await systemKeyModel.create(item.data, auditContext);
-        created++;
-      } else if (item.action === 'update') {
-        await systemKeyModel.update(item.keyID, item.data, auditContext);
-        updated++;
-      } else {
-        skipped++;
+    for (const entry of plan) {
+      if (entry.action === 'skip' || entry.action === 'remove') {
+        results.skipped++;
+        continue;
+      }
+      try {
+        if (entry.action === 'create') {
+          await systemKeyModel.create(entry.data, req.auditContext);
+          results.created++;
+          results.rows.push({ ...entry.display, result: 'created' });
+        } else if (entry.action === 'update') {
+          await systemKeyModel.update(entry.existingID, entry.data, req.auditContext);
+          results.updated++;
+          results.rows.push({ ...entry.display, result: 'updated' });
+        }
+      } catch (err) {
+        results.errors++;
+        results.rows.push({ ...entry.display, result: 'error', message: err.message || 'Database error' });
       }
     }
 
-    delete req.session.systemKeyImportPlan;
-    req.flash('success', `Import complete: ${created} created, ${updated} updated, ${skipped} skipped.`);
+    req.flash('success', `Import complete: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped.`);
     res.redirect('/system-keys');
   } catch (err) { next(err); }
 });

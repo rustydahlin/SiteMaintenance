@@ -41,6 +41,7 @@ router.get('/export', canImportExport, async (req, res, next) => {
       VendorName: v.VendorName || '',
       Phone:      v.Phone      || '',
       Email:      v.Email      || '',
+      Address:    v.Address    || '',
       City:       v.City       || '',
       State:      v.State      || '',
       Zip:        v.Zip        || '',
@@ -125,7 +126,7 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
     const norm = v => (v == null || v === '') ? null : String(v).trim();
 
     const plan    = [];
-    const summary = { total: rows.length, created: 0, updated: 0, skipped: 0, errors: 0 };
+    const summary = { total: rows.length, created: 0, updated: 0, skipped: 0, removed: 0, errors: 0 };
 
     for (let i = 0; i < rows.length; i++) {
       const row        = rows[i];
@@ -168,11 +169,97 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
         ].filter(([, from, to]) => from !== to)
          .map(([field, from, to]) => ({ field, from, to }));
 
-        summary.updated++;
-        plan.push({ action: 'update', rowNum, display: { vendorName }, existingID, data, diff });
+        if (diff.length === 0) {
+          summary.skipped++;
+          plan.push({ action: 'skip', rowNum, display: { vendorName }, existingID, message: 'No changes' });
+        } else {
+          summary.updated++;
+          plan.push({ action: 'update', rowNum, display: { vendorName }, existingID, data, diff });
+        }
       } else {
         summary.created++;
         plan.push({ action: 'create', rowNum, display: { vendorName }, data });
+      }
+    }
+
+    // Detect vendors in DB not matched by any CSV row
+    const seenIDs   = new Set(plan.filter(e => e.existingID).map(e => e.existingID));
+    const allVendors = await vendorModel.getAll({ includeInactive: false });
+    for (const v of allVendors) {
+      if (!seenIDs.has(v.VendorID)) {
+        summary.removed++;
+        plan.push({ action: 'remove', display: { vendorName: v.VendorName, city: v.City, state: v.State } });
+      }
+    }
+
+    // ── Process Contacts sheet ────────────────────────────────────────────────
+    const wsContacts = wb.Sheets['Contacts'];
+    if (wsContacts) {
+      const contactRows = XLSX.utils.sheet_to_json(wsContacts, { defval: '' });
+
+      // Build vendorName → vendorID map from DB (active vendors only)
+      const vendorNameMap = Object.fromEntries(
+        allVendors.map(v => [v.VendorName.toLowerCase(), v.VendorID])
+      );
+
+      for (let i = 0; i < contactRows.length; i++) {
+        const crow      = contactRows[i];
+        const rowNum    = i + 2;
+        const firstName  = (crow['FirstName']  || '').toString().trim();
+        const vendorName = (crow['VendorName'] || '').toString().trim();
+
+        if (!firstName || !vendorName) continue;
+
+        const vendorID = vendorNameMap[vendorName.toLowerCase()];
+        // Also check if a new vendor with this name is being created in this same import
+        const isPendingVendor = !vendorID && plan.some(
+          e => !e.entity && e.action === 'create' && e.data.vendorName.toLowerCase() === vendorName.toLowerCase()
+        );
+
+        if (!vendorID && !isPendingVendor) {
+          summary.errors++;
+          plan.push({ entity: 'contact', action: 'error', rowNum, display: { vendorName, firstName }, message: `Vendor "${vendorName}" not found` });
+          continue;
+        }
+
+        const lastName   = norm(crow['LastName']);
+        const contactData = {
+          firstName,
+          lastName,
+          title:           norm(crow['Title']),
+          phone:           norm(crow['Phone']),
+          email:           norm(crow['Email']),
+          receivePMEmails: (crow['ReceivePMEmails'] || '').toString().toLowerCase() === 'yes',
+          notes:           norm(crow['Notes']),
+        };
+
+        const existingContactID = vendorID
+          ? await vendorModel.findContact(vendorID, firstName, lastName)
+          : null;
+
+        if (existingContactID) {
+          const existing = await vendorModel.getContactByID(existingContactID);
+          const diff = [
+            ['Last Name', norm(existing.LastName),  contactData.lastName],
+            ['Title',     norm(existing.Title),      contactData.title],
+            ['Phone',     norm(existing.Phone),      contactData.phone],
+            ['Email',     norm(existing.Email),      contactData.email],
+            ['PM Emails', existing.ReceivePMEmails ? 'Yes' : 'No', contactData.receivePMEmails ? 'Yes' : 'No'],
+            ['Notes',     norm(existing.Notes),      contactData.notes],
+          ].filter(([, from, to]) => from !== to)
+           .map(([field, from, to]) => ({ field, from, to }));
+
+          if (diff.length === 0) {
+            plan.push({ entity: 'contact', action: 'skip', rowNum, display: { vendorName, firstName, lastName }, existingID: existingContactID, vendorID, message: 'No changes' });
+          } else {
+            summary.updated++;
+            plan.push({ entity: 'contact', action: 'update', rowNum, display: { vendorName, firstName, lastName }, existingID: existingContactID, vendorID, data: contactData, diff });
+          }
+        } else {
+          summary.created++;
+          // vendorID is null when vendor is new in this same import — resolved at confirm time via pendingVendorName
+          plan.push({ entity: 'contact', action: 'create', rowNum, display: { vendorName, firstName, lastName }, vendorID: vendorID || null, pendingVendorName: vendorID ? null : vendorName, data: contactData });
+        }
       }
     }
 
@@ -189,26 +276,40 @@ router.post('/import/confirm', canImportExport, async (req, res, next) => {
     const plan = JSON.parse(req.body.importPlan || '[]');
     const results = { total: plan.length, created: 0, updated: 0, skipped: 0, errors: 0, rows: [] };
 
+    // Pass 1: create new vendors first, collecting their new IDs so contacts can reference them
+    const newVendorIDMap = {}; // vendorName.lower → new VendorID
     for (const entry of plan) {
-      if (entry.action === 'skip') {
-        results.skipped++;
-        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'skipped', message: entry.message });
-        continue;
-      }
-      if (entry.action === 'error') {
-        results.errors++;
-        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: entry.message });
-        continue;
-      }
+      if (entry.entity || entry.action !== 'create') continue;
       try {
-        if (entry.action === 'update') {
+        const vendor = await vendorModel.create(entry.data, req.auditContext);
+        results.created++;
+        newVendorIDMap[entry.data.vendorName.toLowerCase()] = vendor.VendorID;
+        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'created', vendorID: vendor.VendorID });
+      } catch (err) {
+        results.errors++;
+        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: err.message || 'Database error' });
+      }
+    }
+
+    // Pass 2: vendor updates + all contacts (contacts for new vendors resolve via newVendorIDMap)
+    for (const entry of plan) {
+      if (entry.action === 'skip' || entry.action === 'remove') { results.skipped++; continue; }
+      if (entry.action === 'error') { results.errors++; continue; }
+      if (!entry.entity && entry.action === 'create') continue; // already done in pass 1
+      try {
+        if (entry.entity === 'contact') {
+          const vendorID = entry.vendorID || newVendorIDMap[entry.pendingVendorName?.toLowerCase()];
+          if (!vendorID) { results.errors++; continue; }
+          if (entry.action === 'update') {
+            await vendorModel.updateContact(entry.existingID, entry.data, req.auditContext);
+          } else {
+            await vendorModel.createContact(vendorID, entry.data, req.auditContext);
+          }
+          entry.action === 'update' ? results.updated++ : results.created++;
+        } else {
           await vendorModel.update(entry.existingID, entry.data, req.auditContext);
           results.updated++;
           results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'updated', vendorID: entry.existingID });
-        } else {
-          const vendor = await vendorModel.create(entry.data, req.auditContext);
-          results.created++;
-          results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'created', vendorID: vendor.VendorID });
         }
       } catch (err) {
         results.errors++;

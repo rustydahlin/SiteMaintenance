@@ -643,11 +643,58 @@ async function getByCommonName(commonName) {
   return result.recordset;
 }
 
+async function replaceStock(itemID, allocations, unallocatedQty, auditContext = {}) {
+  const pool = await getPool();
+
+  // Deployed qty (site inventory) cannot be changed via stock import
+  const deployedRes = await pool.request()
+    .input('ItemID', sql.Int, itemID)
+    .query(`SELECT ISNULL(SUM(Quantity), 0) AS DeployedQty FROM SiteInventory WHERE ItemID = @ItemID AND RemovedAt IS NULL`);
+  const deployedQty = deployedRes.recordset[0].DeployedQty;
+
+  const oldStock = await getStock(itemID);
+
+  await pool.request()
+    .input('ItemID', sql.Int, itemID)
+    .query(`DELETE FROM InventoryStock WHERE ItemID = @ItemID`);
+
+  let newStockTotal = 0;
+  for (const alloc of allocations) {
+    const qty = parseInt(alloc.quantity, 10) || 0;
+    if (qty <= 0) continue;
+    newStockTotal += qty;
+    const req = pool.request()
+      .input('ItemID',   sql.Int, itemID)
+      .input('Quantity', sql.Int, qty);
+    if (alloc.locationID) {
+      req.input('LocationID', sql.Int, alloc.locationID);
+      await req.query(`INSERT INTO InventoryStock (ItemID, LocationID, Quantity) VALUES (@ItemID, @LocationID, @Quantity)`);
+    } else if (alloc.userID) {
+      req.input('UserID', sql.Int, alloc.userID);
+      await req.query(`INSERT INTO InventoryStock (ItemID, UserID, Quantity) VALUES (@ItemID, @UserID, @Quantity)`);
+    }
+  }
+
+  const newTotal = newStockTotal + deployedQty + Math.max(0, unallocatedQty || 0);
+  await pool.request()
+    .input('ItemID', sql.Int, itemID)
+    .input('Total',  sql.Int, newTotal)
+    .query(`UPDATE Inventory SET QuantityTotal = @Total WHERE ItemID = @ItemID`);
+
+  await writeAudit({
+    tableName: 'InventoryStock', recordID: itemID, action: 'REPLACE',
+    oldValues: { stock: oldStock },
+    newValues: { allocations, unallocatedQty, newTotal },
+    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent,
+  });
+}
+
 module.exports = {
   getAll, getByID, create, update, softDelete,
   updateStatus,
   getInStock, getRelatedParts, getSystemsList,
   getStock, upsertStock, removeStock, adjustStock, adjustStockByStockID, adjustQuantityTotal, setUnallocated,
+  replaceStock,
   findByImportKey, searchForPicker, searchBulkForPicker,
   getByCommonName,
 };

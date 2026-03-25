@@ -9,7 +9,7 @@
 <div class="d-flex gap-3 mb-4 flex-wrap">
   <div class="card text-center px-4 py-3 border-success">
     <div class="fs-2 fw-bold text-success"><%= summary.created %></div>
-    <div class="small text-muted">Will Create</div>
+    <div class="small text-muted">New Items</div>
   </div>
   <div class="card text-center px-4 py-3 border-primary">
     <div class="fs-2 fw-bold text-primary"><%= summary.updated %></div>
@@ -23,73 +23,91 @@
     <div class="fs-2 fw-bold text-danger"><%= summary.errors %></div>
     <div class="small text-muted">Errors</div>
   </div>
-  <div class="card text-center px-4 py-3">
-    <div class="fs-2 fw-bold"><%= summary.total %></div>
-    <div class="small text-muted">Total Rows</div>
-  </div>
 </div>
 
 <% if (summary.errors > 0) { %>
 <div class="alert alert-warning d-flex align-items-center gap-2 mb-4">
   <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
-  <span><%= summary.errors %> row<%= summary.errors !== 1 ? 's' : '' %> have errors and will be skipped. Review below before confirming.</span>
+  <span><%= summary.errors %> row<%= summary.errors !== 1 ? 's' : '' %> have errors and will be skipped.</span>
 </div>
 <% } %>
 
 <form method="POST" action="/inventory/import/confirm">
   <input type="hidden" name="importPlan" value="<%= importPlan %>" />
 
+  <%
+    const newEntries     = plan.filter(e => e.action === 'create'  && !e.entity);
+    const updatedEntries = plan.filter(e => e.action === 'update'  && !e.entity);
+    const stockEntries   = plan.filter(e => e.entity === 'stock');
+    const errorEntries   = plan.filter(e => e.action === 'error');
+  %>
+
+  <!-- ── New Items ──────────────────────────────────────────────────────────── -->
+  <% if (newEntries.length > 0) { %>
   <div class="card shadow-sm mb-4">
-    <div class="card-header"><strong>Row-by-Row Preview</strong></div>
+    <div class="card-header bg-success bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-plus-circle text-success"></i>
+      <strong>New Items</strong>
+      <span class="badge bg-success ms-1"><%= newEntries.length %></span>
+    </div>
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0">
         <thead>
           <tr>
-            <th style="width:3rem">Row</th>
             <th>Common Name</th>
             <th>Serial #</th>
             <th>Type</th>
             <th>Category</th>
-            <th style="width:6rem">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% newEntries.forEach(e => { %>
+          <tr>
+            <td class="small fw-semibold"><%= e.display.commonName %></td>
+            <td class="small text-muted"><%= e.display.serialNumber || '—' %></td>
+            <td class="small text-muted"><%= e.display.trackingType || '—' %></td>
+            <td class="small text-muted"><%= e.display.category || '—' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- ── Updated Items ─────────────────────────────────────────────────────── -->
+  <% if (updatedEntries.length > 0) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-pencil text-primary"></i>
+      <strong>Updated Items</strong>
+      <span class="badge bg-primary ms-1"><%= updatedEntries.length %></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Common Name</th>
+            <th>Serial #</th>
+            <th>Category</th>
             <th>Changes</th>
           </tr>
         </thead>
         <tbody>
-          <% plan.forEach(entry => { %>
+          <% updatedEntries.forEach(e => { %>
           <tr>
-            <td class="text-muted small"><%= entry.rowNum %></td>
-            <td class="small fw-semibold"><%= entry.display.commonName || '—' %></td>
-            <td class="small text-muted"><%= entry.display.serialNumber || '—' %></td>
-            <td class="small text-muted"><%= entry.display.trackingType || '—' %></td>
-            <td class="small text-muted"><%= entry.display.category || '—' %></td>
-            <td>
-              <% if (entry.action === 'create') { %>
-                <span class="badge bg-success">New</span>
-              <% } else if (entry.action === 'update') { %>
-                <span class="badge bg-primary">Update</span>
-              <% } else if (entry.action === 'skip') { %>
-                <span class="badge bg-warning text-dark">Skip</span>
-              <% } else { %>
-                <span class="badge bg-danger">Error</span>
-              <% } %>
-            </td>
+            <td class="small fw-semibold"><%= e.display.commonName %></td>
+            <td class="small text-muted"><%= e.display.serialNumber || '—' %></td>
+            <td class="small text-muted"><%= e.display.category || '—' %></td>
             <td class="small">
-              <% if (entry.action === 'update' && entry.diff && entry.diff.length > 0) { %>
-                <% entry.diff.forEach(d => { %>
-                  <div>
-                    <span class="text-muted"><%= d.field %>:</span>
-                    <span class="text-danger text-decoration-line-through"><%= d.from ?? '—' %></span>
-                    <i class="bi bi-arrow-right mx-1 text-muted"></i>
-                    <span class="text-success"><%= d.to ?? '—' %></span>
-                  </div>
-                <% }) %>
-              <% } else if (entry.action === 'update') { %>
-                <span class="text-muted fst-italic">No changes</span>
-              <% } else if (entry.action === 'create') { %>
-                <span class="text-muted fst-italic">New record</span>
-              <% } else if (entry.message) { %>
-                <span class="text-danger"><%= entry.message %></span>
-              <% } %>
+              <% e.diff.forEach(d => { %>
+              <div>
+                <span class="text-muted"><%= d.field %>:</span>
+                <span class="text-danger text-decoration-line-through"><%= d.from ?? '—' %></span>
+                <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                <span class="text-success"><%= d.to ?? '—' %></span>
+              </div>
+              <% }) %>
             </td>
           </tr>
           <% }) %>
@@ -97,12 +115,144 @@
       </table>
     </div>
   </div>
+  <% } %>
 
+  <!-- ── Stock Distribution Replacements ─────────────────────────────────── -->
+  <% if (stockEntries.length > 0) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-info bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-box-seam text-info"></i>
+      <strong>Stock Distribution</strong>
+      <span class="badge bg-info ms-1"><%= stockEntries.length %></span>
+      <span class="ms-2 small text-muted fw-normal">Current allocations will be replaced with the values below.</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>New Distribution</th>
+            <th>Current Distribution</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% stockEntries.forEach(e => { %>
+          <%
+            // Build lookup maps for diff highlighting
+            // newMap: label (lowercase) → quantity
+            const newMap = {};
+            e.allocations.forEach(a => {
+              const label = a.locationID ? (a.locationName || String(a.locationID)) : (a.userName || String(a.userID));
+              newMap[label.toLowerCase()] = a.quantity;
+            });
+            if (e.unallocatedQty > 0) newMap['unallocated'] = e.unallocatedQty;
+
+            // curMap: label (lowercase) → quantity
+            const curMap = {};
+            (e.currentStock || []).forEach(s => {
+              const label = s.LocationName || s.UserDisplayName || '';
+              if (label) curMap[label.toLowerCase()] = s.Quantity;
+            });
+            if (e.currentUnallocated > 0) curMap['unallocated'] = e.currentUnallocated;
+          %>
+          <tr>
+            <td class="small fw-semibold"><%= e.display.commonName %><% if (e.display.modelNumber) { %><br><span class="text-muted fw-normal"><%= e.display.modelNumber %></span><% } %></td>
+            <td class="small">
+              <% e.allocations.forEach(a => { %>
+              <% const label = a.locationID ? (a.locationName || String(a.locationID)) : (a.userName || String(a.userID)); %>
+              <% const curQty = curMap[label.toLowerCase()]; %>
+              <% const isNew = curQty === undefined; const isChanged = !isNew && curQty !== a.quantity; %>
+              <div class="<%= isNew ? 'text-success' : (isChanged ? 'text-warning' : '') %>">
+                <%= a.locationID ? ('Loc: ' + label) : ('User: ' + label) %>: <strong><%= a.quantity %></strong>
+                <% if (isNew) { %><span class="ms-1 small fst-italic">(added)</span><% } %>
+                <% if (isChanged) { %><span class="ms-1 small fst-italic">(was <%= curQty %>)</span><% } %>
+              </div>
+              <% }) %>
+              <% if (e.unallocatedQty > 0) { %>
+              <% const curUn = curMap['unallocated']; const unChanged = curUn !== undefined && curUn !== e.unallocatedQty; %>
+              <div class="<%= curUn === undefined ? 'text-success' : (unChanged ? 'text-warning' : '') %>">
+                Unallocated: <strong><%= e.unallocatedQty %></strong>
+                <% if (unChanged) { %><span class="ms-1 small fst-italic">(was <%= curUn %>)</span><% } %>
+              </div>
+              <% } %>
+            </td>
+            <td class="small text-muted">
+              <% if (Object.keys(curMap).length > 0) { %>
+                <% (e.currentStock || []).forEach(s => { %>
+                <% const label = s.LocationName || s.UserDisplayName || '—'; %>
+                <% const newQty = newMap[label.toLowerCase()]; %>
+                <% const isRemoved = newQty === undefined; %>
+                <div class="<%= isRemoved ? 'text-danger text-decoration-line-through' : '' %>">
+                  <%= label %>: <%= s.Quantity %>
+                </div>
+                <% }) %>
+                <% if (e.currentUnallocated > 0) { %>
+                <% const unRemoved = newMap['unallocated'] === undefined; %>
+                <div class="<%= unRemoved ? 'text-danger text-decoration-line-through' : '' %>">
+                  Unallocated: <%= e.currentUnallocated %>
+                </div>
+                <% } %>
+              <% } else { %>
+                <span class="fst-italic">None</span>
+              <% } %>
+            </td>
+          </tr>
+          <% if (e.stockWarnings && e.stockWarnings.length > 0) { %>
+          <tr>
+            <td></td>
+            <td colspan="2" class="small pb-2">
+              <% e.stockWarnings.forEach(w => { %>
+              <div class="text-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i><%= w %></div>
+              <% }) %>
+            </td>
+          </tr>
+          <% } %>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- ── Errors ─────────────────────────────────────────────────────────────── -->
+  <% if (errorEntries.length > 0) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-danger bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-exclamation-circle text-danger"></i>
+      <strong>Errors</strong>
+      <span class="badge bg-danger ms-1"><%= errorEntries.length %></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Row</th>
+            <th>Common Name</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% errorEntries.forEach(e => { %>
+          <tr>
+            <td class="small text-muted"><%= e.rowNum %></td>
+            <td class="small fw-semibold"><%= e.display.commonName || '—' %></td>
+            <td class="small text-danger"><%= e.message %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
+
+  <%
+    const totalChanges = summary.created + summary.updated + (summary.stockReplaced || 0);
+  %>
   <div class="d-flex gap-2">
-    <button type="submit" class="btn btn-primary" <%= (summary.created + summary.updated) === 0 ? 'disabled' : '' %>>
+    <button type="submit" class="btn btn-primary" <%= totalChanges === 0 ? 'disabled' : '' %>>
       <i class="bi bi-check-circle me-1"></i>Confirm Import
-      <% if (summary.created + summary.updated > 0) { %>
-        (<%= summary.created + summary.updated %> change<%= (summary.created + summary.updated) !== 1 ? 's' : '' %>)
+      <% if (totalChanges > 0) { %>
+        (<%= totalChanges %> change<%= totalChanges !== 1 ? 's' : '' %>)
       <% } %>
     </button>
     <a href="/inventory/import" class="btn btn-outline-secondary">Cancel</a>

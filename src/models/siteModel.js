@@ -13,10 +13,11 @@ const SORT_COLUMNS = {
   nextPM:     'NextPMDate',
 };
 
-async function getAll({ typeID, statusID, search, pmDue, page = 1, pageSize = 25, sort = 'siteName', dir = 'asc' } = {}) {
+async function getAll({ typeID, statusID, search, pmDue, page = 1, pageSize = 25, sort = 'siteName', dir = 'asc', includeSubsites = false } = {}) {
   const pool = await getPool();
   const request = pool.request();
-  const conditions = ['s.IsActive = 1', 's.ParentSiteID IS NULL'];
+  const conditions = ['s.IsActive = 1'];
+  if (!includeSubsites) conditions.push('s.ParentSiteID IS NULL');
 
   if (typeID) {
     conditions.push('s.SiteTypeID = @TypeID');
@@ -64,16 +65,21 @@ async function getAll({ typeID, statusID, search, pmDue, page = 1, pageSize = 25
     SELECT
       s.SiteID, s.SiteName, s.SiteNumber, s.Address, s.City, s.State, s.ZipCode,
       s.Latitude, s.Longitude, s.Description, s.WarrantyExpires,
-      s.IsActive, s.CreatedAt,
+      s.IsActive, s.CreatedAt, s.ParentSiteID,
+      p.SiteNumber  AS ParentSiteNumber,
+      p.SiteName    AS ParentSiteName,
       t.TypeName    AS SiteTypeName,
       ss.StatusName AS SiteStatusName,
+      mlt.TypeName  AS MonitoringLocationTypeName,
       (SELECT MIN(DATEADD(DAY, pm.FrequencyDays, pm.LastPerformedAt))
        FROM PMSchedules pm
        WHERE pm.SiteID = s.SiteID AND pm.IsActive = 1 AND pm.LastPerformedAt IS NOT NULL
       ) AS NextPMDate
     FROM Sites s
-    LEFT JOIN SiteTypes    t  ON t.SiteTypeID   = s.SiteTypeID
-    LEFT JOIN SiteStatuses ss ON ss.SiteStatusID = s.SiteStatusID
+    LEFT JOIN Sites                   p   ON p.SiteID          = s.ParentSiteID
+    LEFT JOIN SiteTypes               t   ON t.SiteTypeID      = s.SiteTypeID
+    LEFT JOIN SiteStatuses            ss  ON ss.SiteStatusID   = s.SiteStatusID
+    LEFT JOIN MonitoringLocationTypes mlt ON mlt.LocationTypeID = s.MonitoringLocationTypeID
     WHERE ${where}
     ORDER BY ${orderCol} ${orderDir}
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
@@ -260,18 +266,47 @@ async function getSimpleList() {
   return result.recordset;
 }
 
-async function findByImportKey(siteNumber, siteName) {
+async function findByImportKey(siteNumber, siteName, parentSiteNumber) {
   const pool = await getPool();
-  if (siteNumber) {
-    const r = await pool.request()
+  // parentSiteNumber = '' or null → top-level site; non-empty → sub-site under that parent number
+  const isSubsite = parentSiteNumber != null && String(parentSiteNumber).trim() !== '';
+  const parentNum = isSubsite ? String(parentSiteNumber).trim() : null;
+
+  const parentJoin   = isSubsite ? `LEFT JOIN Sites p ON p.SiteID = s.ParentSiteID` : '';
+  const parentFilter = isSubsite ? `AND ISNULL(p.SiteNumber,'') = @ParentNum` : `AND s.ParentSiteID IS NULL`;
+
+  // 1. SiteNumber + SiteName together (most specific — handles rename detection correctly)
+  if (siteNumber && siteName) {
+    const req = pool.request()
       .input('SiteNumber', sql.NVarChar(100), siteNumber)
-      .query('SELECT SiteID FROM Sites WHERE SiteNumber = @SiteNumber AND IsActive = 1');
+      .input('SiteName',   sql.NVarChar(200), siteName);
+    if (isSubsite) req.input('ParentNum', sql.NVarChar(100), parentNum);
+    const r = await req.query(
+      `SELECT s.SiteID FROM Sites s ${parentJoin}
+       WHERE s.SiteNumber = @SiteNumber AND s.SiteName = @SiteName AND s.IsActive = 1 ${parentFilter}`
+    );
     if (r.recordset.length) return r.recordset[0].SiteID;
   }
-  const r = await pool.request()
-    .input('SiteName', sql.NVarChar(200), siteName)
-    .query('SELECT SiteID FROM Sites WHERE SiteName = @SiteName AND IsActive = 1');
-  return r.recordset.length ? r.recordset[0].SiteID : null;
+
+  // 2. SiteNumber only — but only if it uniquely resolves (avoids wrong match on shared numbers)
+  if (siteNumber) {
+    const req = pool.request().input('SiteNumber', sql.NVarChar(100), siteNumber);
+    if (isSubsite) req.input('ParentNum', sql.NVarChar(100), parentNum);
+    const r = await req.query(
+      `SELECT s.SiteID FROM Sites s ${parentJoin}
+       WHERE s.SiteNumber = @SiteNumber AND s.IsActive = 1 ${parentFilter}`
+    );
+    if (r.recordset.length === 1) return r.recordset[0].SiteID;
+  }
+
+  // 3. SiteName only
+  const req2 = pool.request().input('SiteName', sql.NVarChar(200), siteName);
+  if (isSubsite) req2.input('ParentNum', sql.NVarChar(100), parentNum);
+  const r2 = await req2.query(
+    `SELECT s.SiteID FROM Sites s ${parentJoin}
+     WHERE s.SiteName = @SiteName AND s.IsActive = 1 ${parentFilter}`
+  );
+  return r2.recordset.length ? r2.recordset[0].SiteID : null;
 }
 
 // Recomputes and sets SiteStatusID based on open MaintenanceItems.
@@ -310,4 +345,21 @@ async function updateSiteStatus(siteID) {
     `);
 }
 
-module.exports = { getAll, getByID, getSubsites, getSimpleList, create, update, softDelete, findByImportKey, updateSiteStatus };
+async function getAllForImportDiff() {
+  const pool = await getPool();
+  const result = await pool.request().query(`
+    SELECT s.SiteID,
+           ISNULL(s.SiteNumber,'')  AS SiteNumber,
+           s.SiteName,
+           ISNULL(p.SiteNumber,'')  AS ParentSiteNumber,
+           p.SiteName               AS ParentSiteName,
+           t.TypeName               AS SiteTypeName
+    FROM Sites s
+    LEFT JOIN Sites      p ON p.SiteID      = s.ParentSiteID
+    LEFT JOIN SiteTypes  t ON t.SiteTypeID  = s.SiteTypeID
+    WHERE s.IsActive = 1
+  `);
+  return result.recordset;
+}
+
+module.exports = { getAll, getByID, getSubsites, getSimpleList, getAllForImportDiff, create, update, softDelete, findByImportKey, updateSiteStatus };

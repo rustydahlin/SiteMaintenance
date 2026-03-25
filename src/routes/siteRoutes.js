@@ -72,14 +72,18 @@ router.get('/', async (req, res, next) => {
 router.get('/export', canImportExport, async (req, res, next) => {
   try {
     const { typeID, statusID, search, pmDue, sort = 'siteName', dir = 'asc' } = req.query;
-    const { rows } = await siteModel.getAll({ typeID, statusID, search, pmDue, page: 1, pageSize: 100000, sort, dir });
+    const { rows } = await siteModel.getAll({ typeID, statusID, search, pmDue, page: 1, pageSize: 100000, sort, dir, includeSubsites: true });
 
     const sheetData = rows.map(s => ({
-      SiteNumber:      s.SiteNumber      || '',
-      SiteName:        s.SiteName        || '',
-      SiteType:        s.SiteTypeName    || '',
-      Status:          s.SiteStatusName  || '',
-      Address:         s.Address         || '',
+      SiteID:        s.SiteID,
+      ParentSiteID:  s.ParentSiteID   || '',
+      ParentSiteName: s.ParentSiteName || '',
+      SiteNumber:             s.SiteNumber                  || '',
+      SiteName:               s.SiteName                    || '',
+      SiteType:               s.SiteTypeName                || '',
+      MonitoringLocationType: s.MonitoringLocationTypeName  || '',
+      ContractNumber:         s.ContractNumber              || '',
+      Address:                s.Address                     || '',
       City:            s.City            || '',
       State:           s.State           || '',
       ZipCode:         s.ZipCode         || '',
@@ -106,7 +110,7 @@ router.get('/export', canImportExport, async (req, res, next) => {
 // ── GET /import/template — download blank CSV template ───────────────────────
 router.get('/import/template', canImportExport, (_req, res) => {
   const headers = [
-    'SiteName', 'SiteNumber', 'ContractNumber', 'SiteType',
+    'SiteName', 'SiteNumber', 'ContractNumber', 'SiteType', 'MonitoringLocationType',
     'Address', 'City', 'State', 'ZipCode',
     'Latitude', 'Longitude', 'WarrantyExpires', 'Description',
   ];
@@ -140,11 +144,15 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
       return res.redirect('/sites/import');
     }
 
-    const siteTypes = await lookupModel.getSiteTypes();
-    const typeMap   = Object.fromEntries(siteTypes.map(t => [t.TypeName.toLowerCase(), t.SiteTypeID]));
+    const [siteTypes, monitoringLocationTypes] = await Promise.all([
+      lookupModel.getSiteTypes(),
+      lookupModel.getMonitoringLocationTypes(),
+    ]);
+    const typeMap = Object.fromEntries(siteTypes.map(t => [t.TypeName.toLowerCase(), t.SiteTypeID]));
+    const mltMap  = Object.fromEntries(monitoringLocationTypes.map(t => [t.TypeName.toLowerCase(), t.LocationTypeID]));
 
     const plan    = [];
-    const summary = { total: rows.length, created: 0, updated: 0, skipped: 0, errors: 0 };
+    const summary = { total: rows.length, created: 0, updated: 0, skipped: 0, removed: 0, errors: 0 };
     const norm    = v => (v == null || v === '') ? null : String(v).trim();
     const fmtDate = v => {
       if (!v && v !== 0) return null;
@@ -157,8 +165,11 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
     for (let i = 0; i < rows.length; i++) {
       const row        = rows[i];
       const rowNum     = i + 2;
-      const siteName   = (row['SiteName']   || '').toString().trim();
-      const siteNumber = (row['SiteNumber'] || '').toString().trim() || null;
+      const siteName         = (row['SiteName']        || '').toString().trim();
+      const siteNumber       = (row['SiteNumber']      || '').toString().trim() || null;
+      const parentSiteNumber = (row['ParentSiteNumber'] || '').toString().trim();
+      const csvSiteID        = parseInt(row['SiteID']       || '', 10) || null;
+      const csvParentSiteID  = parseInt(row['ParentSiteID'] || '', 10) || null;
 
       if (!siteName) {
         summary.skipped++;
@@ -175,6 +186,9 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
         continue;
       }
 
+      const mltName                = (row['MonitoringLocationType'] || '').toString().trim();
+      const monitoringLocationTypeID = mltName ? (mltMap[mltName.toLowerCase()] || null) : null;
+
       const latRaw = row['Latitude']  !== '' ? parseFloat(row['Latitude'])  : null;
       const lonRaw = row['Longitude'] !== '' ? parseFloat(row['Longitude']) : null;
 
@@ -189,11 +203,14 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
         zipCode:         norm(row['ZipCode']),
         latitude:        isNaN(latRaw)  ? null : latRaw,
         longitude:       isNaN(lonRaw) ? null : lonRaw,
-        warrantyExpires: fmtDate(row['WarrantyExpires']),
-        description:     norm(row['Description']),
+        warrantyExpires:            fmtDate(row['WarrantyExpires']),
+        description:                norm(row['Description']),
+        parentSiteID:               csvParentSiteID,
+        monitoringLocationTypeID,
       };
 
-      const existingID = await siteModel.findByImportKey(siteNumber, siteName);
+      // Match by SiteID (from export) first; fall back to name/number matching for new rows
+      const existingID = csvSiteID || await siteModel.findByImportKey(siteNumber, siteName, parentSiteNumber);
       if (existingID) {
         const existing = await siteModel.getByID(existingID);
         const diff = [
@@ -207,16 +224,41 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
           ['Zip',          norm(existing.ZipCode),          norm(siteData.zipCode)],
           ['Latitude',     existing.Latitude  != null ? String(existing.Latitude)  : null, siteData.latitude  != null ? String(siteData.latitude)  : null],
           ['Longitude',    existing.Longitude != null ? String(existing.Longitude) : null, siteData.longitude != null ? String(siteData.longitude) : null],
-          ['Warranty',     fmtDate(existing.WarrantyExpires), siteData.warrantyExpires],
-          ['Description',  norm(existing.Description),     norm(siteData.description)],
+          ['Warranty',              fmtDate(existing.WarrantyExpires),            siteData.warrantyExpires],
+          ['Monitoring Loc Type',   norm(existing.MonitoringLocationTypeName),    norm(mltName) || null],
+          ['Description',           norm(existing.Description),                  norm(siteData.description)],
         ].filter(([, from, to]) => from !== to)
          .map(([field, from, to]) => ({ field, from, to }));
 
-        summary.updated++;
-        plan.push({ action: 'update', rowNum, display: { siteName, siteNumber, siteType: siteTypeName }, existingID, data: siteData, diff });
+        if (diff.length === 0) {
+          summary.skipped++;
+          plan.push({ action: 'skip', rowNum, display: { siteName, siteNumber, siteType: siteTypeName }, existingID: existingID, message: 'No changes' });
+        } else {
+          summary.updated++;
+          plan.push({ action: 'update', rowNum, display: { siteName, siteNumber, siteType: siteTypeName }, existingID, data: siteData, diff });
+        }
       } else {
         summary.created++;
         plan.push({ action: 'create', rowNum, display: { siteName, siteNumber, siteType: siteTypeName }, data: siteData });
+      }
+    }
+
+    // Detect removed sites: active DB sites not matched by any CSV row
+    const seenIDs  = new Set(plan.filter(e => e.existingID).map(e => e.existingID));
+    const allSites = await siteModel.getAllForImportDiff();
+    for (const site of allSites) {
+      if (!seenIDs.has(site.SiteID)) {
+        summary.removed++;
+        plan.push({
+          action: 'remove',
+          display: {
+            siteName:         site.SiteName,
+            siteNumber:       site.SiteNumber,
+            siteType:         site.SiteTypeName,
+            parentSiteNumber: site.ParentSiteNumber,
+            parentSiteName:   site.ParentSiteName,
+          },
+        });
       }
     }
 
@@ -233,9 +275,8 @@ router.post('/import/confirm', canImportExport, async (req, res, next) => {
     const results = { total: plan.length, created: 0, updated: 0, skipped: 0, errors: 0, rows: [] };
 
     for (const entry of plan) {
-      if (entry.action === 'skip') {
+      if (entry.action === 'skip' || entry.action === 'remove') {
         results.skipped++;
-        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'skipped', message: entry.message });
         continue;
       }
       if (entry.action === 'error') {
@@ -354,12 +395,17 @@ router.get('/:id', async (req, res, next) => {
       ? await siteModel.getSubsites(siteID)
       : [];
 
-    // For parent sites, also fetch each subsite's installed equipment
-    const subsiteInventory = subsites.length
-      ? await Promise.all(subsites.map(sub =>
-          siteInventoryModel.getCurrentItems(sub.SiteID).then(items => ({ sub, items }))
-        ))
-      : [];
+    // For parent sites, also fetch each subsite's installed equipment and network resources
+    const [subsiteInventory, subsiteNetworkResources] = subsites.length
+      ? await Promise.all([
+          Promise.all(subsites.map(sub =>
+            siteInventoryModel.getCurrentItems(sub.SiteID).then(items => ({ sub, items }))
+          )),
+          Promise.all(subsites.map(sub =>
+            networkResourceModel.getBySite(sub.SiteID).then(resources => ({ sub, resources }))
+          )),
+        ])
+      : [[], []];
 
     // Load stock distribution for each bulk item so the install modal can show pull-from options
     const bulkItemIDs = inStockItems.filter(i => i.TrackingType === 'bulk').map(i => i.ItemID);
@@ -395,6 +441,7 @@ router.get('/:id', async (req, res, next) => {
       allUsers,
       pmVendors,
       networkResources,
+      subsiteNetworkResources,
       networkDeviceTypes,
       circuitTypes,
       isAdminUser:          isAdmin,

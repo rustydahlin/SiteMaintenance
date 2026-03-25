@@ -8,10 +8,10 @@ const inventoryModel     = require('../models/inventoryModel');
 
 const importUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (/\.csv$/i.test(file.originalname)) cb(null, true);
-    else cb(new Error('Only .csv files are accepted'));
+    if (/\.(csv|xlsx)$/i.test(file.originalname)) cb(null, true);
+    else cb(new Error('Only .csv and .xlsx files are accepted'));
   },
 });
 const lookupModel        = require('../models/lookupModel');
@@ -117,6 +117,7 @@ router.get('/export', canImportExport, async (req, res, next) => {
     const { rows } = await inventoryModel.getAll({ categoryID, statusID, search, locationID, page: 1, pageSize: 100000, sort, dir });
 
     const sheetData = rows.map(i => ({
+      ItemID:          i.ItemID,
       TrackingType:    i.TrackingType    || '',
       CommonName:      i.CommonName      || '',
       SerialNumber:    i.SerialNumber    || '',
@@ -126,42 +127,71 @@ router.get('/export', canImportExport, async (req, res, next) => {
       Manufacturer:    i.Manufacturer    || '',
       Category:        i.CategoryName    || '',
       Status:          i.StatusName      || '',
-      StockLocation:   i.TrackingType === 'bulk' ? (i.BulkPrimaryLocation || '') : (i.StockLocationName || ''),
-      QuantityTotal:   i.TrackingType === 'bulk' ? (i.QuantityTotal   ?? '') : '',
-      QuantityAvailable: i.TrackingType === 'bulk' ? (i.QuantityAvailable ?? '') : '',
-      CurrentSite:     i.CurrentSiteName || '',
-      AssignedTo:      i.AssignedToUserName || '',
+      StockLocation:   i.TrackingType === 'bulk' ? '' : (i.StockLocationName || ''),
+      QuantityTotal:   i.TrackingType === 'bulk' ? (i.QuantityTotal ?? '') : '',
+      RelatedSystem:   i.RelatedSystemName || '',
       PurchaseDate:    i.PurchaseDate    ? new Date(i.PurchaseDate).toISOString().split('T')[0]    : '',
       WarrantyExpires: i.WarrantyExpires ? new Date(i.WarrantyExpires).toISOString().split('T')[0] : '',
       Description:     i.Description    || '',
       Notes:           i.Notes          || '',
     }));
 
+    // StockDistribution sheet — one row per stock entry for each bulk item
+    const distRows = [];
+    for (const item of rows.filter(i => i.TrackingType === 'bulk')) {
+      const stock    = await inventoryModel.getStock(item.ItemID);
+      const stockSum = stock.reduce((sum, s) => sum + (s.Quantity || 0), 0);
+      const unalloc  = Math.max(0, (item.QuantityAvailable || 0) - stockSum);
+      for (const s of stock) {
+        distRows.push({
+          ItemID:         item.ItemID,
+          CommonName:     item.CommonName  || '',
+          ModelNumber:    item.ModelNumber || '',
+          LocationOrUser: s.LocationName || s.UserDisplayName || '',
+          Type:           s.LocationID ? 'location' : 'user',
+          Quantity:       s.Quantity,
+        });
+      }
+      if (unalloc > 0) {
+        distRows.push({
+          ItemID:         item.ItemID,
+          CommonName:     item.CommonName  || '',
+          ModelNumber:    item.ModelNumber || '',
+          LocationOrUser: 'Unallocated',
+          Type:           '',
+          Quantity:       unalloc,
+        });
+      }
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheetData), 'Inventory');
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'csv' });
+    if (distRows.length > 0) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(distRows), 'StockDistribution');
+    }
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
     const date = new Date().toISOString().split('T')[0];
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="inventory-export-${date}.csv"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="inventory-export-${date}.xlsx"`);
     res.send(buf);
   } catch (err) {
     next(err);
   }
 });
 
-// ── GET /import/template — download blank CSV template ───────────────────────
+// ── GET /import/template — download blank XLSX template ──────────────────────
 router.get('/import/template', canImportExport, (_req, res) => {
-  const headers = [
-    'TrackingType', 'CommonName', 'SerialNumber', 'AssetTag', 'PartNumber',
+  const invHeaders  = ['TrackingType', 'CommonName', 'SerialNumber', 'AssetTag', 'PartNumber',
     'ModelNumber', 'Manufacturer', 'Category', 'Status', 'StockLocation',
-    'QuantityTotal', 'PurchaseDate', 'WarrantyExpires', 'Description', 'Notes',
-  ];
+    'QuantityTotal', 'RelatedSystem', 'PurchaseDate', 'WarrantyExpires', 'Description', 'Notes'];
+  const distHeaders = ['ItemID', 'CommonName', 'ModelNumber', 'LocationOrUser', 'Type', 'Quantity'];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers]), 'Inventory');
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'csv' });
-  res.setHeader('Content-Disposition', 'attachment; filename="inventory_import_template.csv"');
-  res.setHeader('Content-Type', 'text/csv');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([invHeaders]),  'Inventory');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([distHeaders]), 'StockDistribution');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Disposition', 'attachment; filename="inventory_import_template.xlsx"');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.send(buf);
 });
 
@@ -187,18 +217,20 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
       return res.redirect('/inventory/import');
     }
 
-    const [categories, statuses, locations] = await Promise.all([
+    const [categories, statuses, locations, allUsers] = await Promise.all([
       lookupModel.getInventoryCategories(),
       lookupModel.getInventoryStatuses(),
       lookupModel.getStockLocations(),
+      userModel.getAll({ includeInactive: false }),
     ]);
     const categoryMap     = Object.fromEntries(categories.map(c => [c.CategoryName.toLowerCase(), c.CategoryID]));
     const statusMap       = Object.fromEntries(statuses.map(s => [s.StatusName.toLowerCase(), s.StatusID]));
     const locationMap     = Object.fromEntries(locations.map(l => [l.LocationName.toLowerCase(), l.LocationID]));
+    const userMap         = Object.fromEntries(allUsers.map(u => [u.DisplayName.toLowerCase(), u.UserID]));
     const inStockStatusID = statuses.find(s => s.StatusName === 'In-Stock')?.StatusID || null;
 
     const plan    = [];
-    const summary = { total: rows.length, created: 0, updated: 0, skipped: 0, errors: 0 };
+    const summary = { total: rows.length, created: 0, updated: 0, skipped: 0, errors: 0, stockReplaced: 0 };
     const norm    = v => (v == null || v === '') ? null : String(v).trim();
     const fmtDate = v => {
       if (!v && v !== 0) return null;
@@ -211,6 +243,7 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
     for (let i = 0; i < rows.length; i++) {
       const row         = rows[i];
       const rowNum      = i + 2;
+      const csvItemID   = parseInt(row['ItemID'] || '', 10) || null;
       const commonName  = (row['CommonName']   || '').toString().trim();
       const trackingRaw = (row['TrackingType'] || '').toString().trim().toLowerCase();
 
@@ -250,6 +283,13 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
 
       const quantityTotal = trackingType === 'bulk' ? (parseInt(row['QuantityTotal'], 10) || 1) : 1;
 
+      const relatedSystemName = norm(row['RelatedSystem']);
+      let relatedSystemID = null;
+      if (relatedSystemName) {
+        const rsMatch = await inventoryModel.getByCommonName(relatedSystemName);
+        relatedSystemID = rsMatch?.ItemID || null;
+      }
+
       const itemData = {
         commonName,
         serialNumber,
@@ -261,13 +301,14 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
         statusID,
         stockLocationID: trackingType === 'serialized' ? locationID : null,
         quantityTotal,
+        relatedSystemID,
         description:     norm(row['Description']),
         notes:           norm(row['Notes']),
         purchaseDate:    fmtDate(row['PurchaseDate']),
         warrantyExpires: fmtDate(row['WarrantyExpires']),
       };
 
-      const existingID = await inventoryModel.findByImportKey(trackingType, serialNumber, commonName, modelNumber);
+      const existingID = csvItemID || await inventoryModel.findByImportKey(trackingType, serialNumber, commonName, modelNumber);
       if (existingID) {
         const existing = await inventoryModel.getByID(existingID);
         const diff = [
@@ -279,20 +320,90 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
           ['Manufacturer',   norm(existing.Manufacturer),     norm(itemData.manufacturer)],
           ['Category',       norm(existing.CategoryName),     norm(categoryName) || null],
           ['Status',         norm(existing.StatusName),       norm(statusName)   || null],
-          ['Stock Location', norm(existing.StockLocationName), norm(locationName) || null],
-          ['Qty Total',      existing.QuantityTotal != null ? String(existing.QuantityTotal) : null, String(itemData.quantityTotal)],
+          // StockLocation only diffed for serialized items — bulk items use StockDistribution sheet
+          ...(trackingType === 'serialized' ? [['Stock Location', norm(existing.StockLocationName), norm(locationName) || null]] : []),
+          ['Qty Total',      trackingType === 'bulk' && existing.QuantityTotal != null ? String(existing.QuantityTotal) : null, trackingType === 'bulk' ? String(itemData.quantityTotal) : null],
           ['Purchase Date',  fmtDate(existing.PurchaseDate),  itemData.purchaseDate],
           ['Warranty',       fmtDate(existing.WarrantyExpires), itemData.warrantyExpires],
+          ['Related System',  norm(existing.RelatedSystemName), norm(relatedSystemName) || null],
           ['Description',    norm(existing.Description),      norm(itemData.description)],
           ['Notes',          norm(existing.Notes),            norm(itemData.notes)],
         ].filter(([, from, to]) => from !== to)
          .map(([field, from, to]) => ({ field, from, to }));
 
-        summary.updated++;
-        plan.push({ action: 'update', rowNum, display: { commonName, serialNumber, trackingType, category: categoryName }, existingID, data: itemData, diff });
+        if (diff.length === 0) {
+          summary.skipped++;
+          plan.push({ action: 'skip', rowNum, display: { commonName, serialNumber, trackingType, category: categoryName }, existingID, message: 'No changes' });
+        } else {
+          summary.updated++;
+          plan.push({ action: 'update', rowNum, display: { commonName, serialNumber, trackingType, category: categoryName }, existingID, data: itemData, diff });
+        }
       } else {
         summary.created++;
         plan.push({ action: 'create', rowNum, display: { commonName, serialNumber, trackingType, category: categoryName }, data: { trackingType, ...itemData } });
+      }
+    }
+
+    // ── Process StockDistribution sheet ──────────────────────────────────────
+    const wsDist = wb.Sheets['StockDistribution'];
+    if (wsDist) {
+      const distRows = XLSX.utils.sheet_to_json(wsDist, { defval: '' });
+
+      // Group by ItemID (or CommonName+ModelNumber as fallback)
+      const distByItem = new Map();
+      for (const dr of distRows) {
+        const itemID = parseInt(dr['ItemID'] || '', 10) || null;
+        const key    = itemID ? `id:${itemID}` : `name:${(dr['CommonName']||'').toLowerCase()}|${(dr['ModelNumber']||'').toLowerCase()}`;
+        if (!distByItem.has(key)) distByItem.set(key, { itemID, commonName: dr['CommonName'], modelNumber: dr['ModelNumber'], rows: [] });
+        distByItem.get(key).rows.push(dr);
+      }
+
+      for (const [, group] of distByItem) {
+        // Resolve itemID if not directly provided
+        let resolvedID = group.itemID;
+        if (!resolvedID) {
+          resolvedID = await inventoryModel.findByImportKey('bulk', null, group.commonName, group.modelNumber);
+        }
+        if (!resolvedID) continue; // item not found, skip silently
+
+        const allocations    = [];
+        const stockWarnings  = [];
+        let   unallocatedQty = 0;
+
+        for (const dr of group.rows) {
+          const locOrUser = (dr['LocationOrUser'] || '').toString().trim();
+          const type      = (dr['Type'] || '').toString().trim().toLowerCase();
+          const qty       = parseInt(dr['Quantity'] || '0', 10) || 0;
+          if (qty <= 0) continue;
+
+          if (locOrUser.toLowerCase() === 'unallocated') {
+            unallocatedQty += qty;
+          } else if (type === 'user') {
+            const userID = userMap[locOrUser.toLowerCase()] || null;
+            if (userID) allocations.push({ userID, userName: locOrUser, quantity: qty });
+            else stockWarnings.push(`User not found: "${locOrUser}" (row skipped)`);
+          } else {
+            const locationID = locationMap[locOrUser.toLowerCase()] || null;
+            if (locationID) allocations.push({ locationID, locationName: locOrUser, quantity: qty });
+            else stockWarnings.push(`Location not found: "${locOrUser}" (row skipped)`);
+          }
+        }
+
+        const currentStock       = await inventoryModel.getStock(resolvedID);
+        const currentItem        = await inventoryModel.getByID(resolvedID);
+        const stockSum           = currentStock.reduce((sum, s) => sum + (s.Quantity || 0), 0);
+        const currentUnallocated = Math.max(0, (currentItem?.QuantityAvailable || 0) - stockSum);
+        summary.stockReplaced++;
+        plan.push({
+          entity: 'stock', action: 'replace',
+          display: { commonName: group.commonName, modelNumber: group.modelNumber },
+          itemID: resolvedID,
+          allocations,
+          unallocatedQty,
+          currentStock,
+          currentUnallocated,
+          stockWarnings,
+        });
       }
     }
 
@@ -320,7 +431,10 @@ router.post('/import/confirm', canImportExport, async (req, res, next) => {
         continue;
       }
       try {
-        if (entry.action === 'update') {
+        if (entry.entity === 'stock') {
+          await inventoryModel.replaceStock(entry.itemID, entry.allocations, entry.unallocatedQty, req.auditContext);
+          results.updated++;
+        } else if (entry.action === 'update') {
           await inventoryModel.update(entry.existingID, entry.data, req.auditContext);
           results.updated++;
           results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'updated', itemID: entry.existingID });

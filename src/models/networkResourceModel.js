@@ -215,7 +215,11 @@ async function getTowerMapData() {
   const result = await pool.request().query(`
     SELECT
       s.SiteID,
-      ISNULL(s.SiteNumber + ' ', '') + s.SiteName  AS name,
+      CASE
+        WHEN s.ParentSiteID IS NOT NULL
+          THEN ISNULL(parent.SiteNumber + '-', '') + ISNULL(s.SiteNumber + ' ', '') + s.SiteName
+        ELSE ISNULL(s.SiteNumber + ' ', '') + s.SiteName
+      END                                          AS name,
       CAST(s.Latitude  AS FLOAT)                   AS lat,
       CAST(s.Longitude AS FLOAT)                   AS lng,
       mlt.TypeName                                  AS locType,
@@ -227,9 +231,10 @@ async function getTowerMapData() {
       r.SolarwindsNodeId,
       r.SortOrder
     FROM   Sites s
-    JOIN   MonitoringLocationTypes mlt ON mlt.LocationTypeID = s.MonitoringLocationTypeID
-    JOIN   NetworkResources        r   ON r.SiteID  = s.SiteID  AND r.IsActive = 1
-    JOIN   NetworkDeviceTypes      dt  ON dt.DeviceTypeID = r.DeviceTypeID
+    LEFT JOIN Sites                parent ON parent.SiteID      = s.ParentSiteID
+    JOIN   MonitoringLocationTypes mlt    ON mlt.LocationTypeID = s.MonitoringLocationTypeID
+    JOIN   NetworkResources        r      ON r.SiteID           = s.SiteID AND r.IsActive = 1
+    JOIN   NetworkDeviceTypes      dt     ON dt.DeviceTypeID    = r.DeviceTypeID
     WHERE  s.IsActive   = 1
       AND  s.Latitude   IS NOT NULL
       AND  s.Longitude  IS NOT NULL
@@ -264,6 +269,9 @@ async function getAllForCsvExport() {
   const pool   = await getPool();
   const result = await pool.request().query(`
     SELECT
+      s.SiteID,
+      ISNULL(parent.SiteNumber, '') AS ParentSiteNumber,
+      ISNULL(parent.SiteName,   '') AS ParentSiteName,
       s.SiteNumber,
       s.SiteName,
       r.Hostname,
@@ -276,11 +284,12 @@ async function getAllForCsvExport() {
       r.Notes,
       r.SortOrder
     FROM   NetworkResources    r
-    JOIN   Sites               s  ON s.SiteID        = r.SiteID
-    JOIN   NetworkDeviceTypes  dt ON dt.DeviceTypeID  = r.DeviceTypeID
-    LEFT JOIN CircuitTypes     ct ON ct.CircuitTypeID = r.CircuitTypeID
+    JOIN   Sites               s      ON s.SiteID        = r.SiteID
+    LEFT JOIN Sites            parent ON parent.SiteID   = s.ParentSiteID
+    JOIN   NetworkDeviceTypes  dt     ON dt.DeviceTypeID  = r.DeviceTypeID
+    LEFT JOIN CircuitTypes     ct     ON ct.CircuitTypeID = r.CircuitTypeID
     WHERE  r.IsActive = 1
-    ORDER  BY s.SiteNumber, s.SiteName, r.SortOrder, r.Hostname
+    ORDER  BY parent.SiteNumber, s.SiteNumber, s.SiteName, r.SortOrder, r.Hostname
   `);
   return result.recordset;
 }

@@ -16,7 +16,7 @@ async function getAll({ includeInactive = false, search = '' } = {}) {
       : 'WHERE v.VendorName LIKE @Search';
   }
   const result = await req.query(`
-    SELECT v.VendorID, v.VendorName, v.Phone, v.Email, v.City, v.State,
+    SELECT v.VendorID, v.VendorName, v.Phone, v.Email, v.Address, v.City, v.State, v.Zip,
            v.Website, v.DoesPMWork, v.IsActive, v.CreatedAt, v.UpdatedAt,
            (SELECT COUNT(*) FROM VendorContacts vc WHERE vc.VendorID = v.VendorID AND vc.IsActive = 1) AS ContactCount
     FROM Vendors v
@@ -153,6 +153,22 @@ async function findByName(vendorName) {
   return result.recordset[0]?.VendorID || null;
 }
 
+async function findContact(vendorID, firstName, lastName) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('VendorID',  sql.Int,           vendorID)
+    .input('FirstName', sql.NVarChar(100), firstName)
+    .input('LastName',  sql.NVarChar(100), lastName || null)
+    .query(`
+      SELECT ContactID FROM VendorContacts
+      WHERE VendorID = @VendorID
+        AND LOWER(FirstName) = LOWER(@FirstName)
+        AND LOWER(ISNULL(LastName, '')) = LOWER(ISNULL(@LastName, ''))
+        AND IsActive = 1
+    `);
+  return r.recordset[0]?.ContactID || null;
+}
+
 // ── Contact CRUD ──────────────────────────────────────────────────────────────
 
 async function getContactByID(contactID) {
@@ -280,6 +296,6 @@ async function getAllContacts() {
 
 module.exports = {
   getAll, getByID, create, update, softDelete, togglePMWork, getPMEnabled, findByName,
-  getContactByID, createContact, updateContact, deleteContact, toggleContactEmail,
+  findContact, getContactByID, createContact, updateContact, deleteContact, toggleContactEmail,
   getVendorEmailRecipients, getAllContacts,
 };

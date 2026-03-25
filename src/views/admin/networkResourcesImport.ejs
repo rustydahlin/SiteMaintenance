@@ -51,10 +51,10 @@
       </div>
       <div class="card-body d-flex flex-column">
         <p class="small text-muted mb-3">
-          Import or export <strong>all fields</strong> including Circuit Type, Circuit ID, Notes, Sort Order, and IsActive.
+          Import or export <strong>all fields</strong> including Circuit Type, Circuit ID, Notes, and Sort Order.
           Use this for comprehensive backups and restores.<br>
-          <strong>Import:</strong> matches by <em>Site Number + Site Name + Hostname</em>. Existing records are <strong>updated</strong>; new records are inserted.
-          Columns: <code>SiteNumber, SiteName, Hostname, IPAddress, DeviceType, AlertStatus, SolarwindsNodeId, CircuitType, CircuitID, Notes, SortOrder, IsActive</code>
+          <strong>Import:</strong> matches by <em>SiteID + Hostname</em> (or Site Number + Site Name + Hostname for manually-created rows). Existing records are <strong>updated</strong>; new records are inserted.
+          Columns: <code>SiteID, ParentSiteNumber, ParentSiteName, SiteNumber, SiteName, Hostname, IPAddress, DeviceType, AlertStatus, SolarwindsNodeId, CircuitType, CircuitID, Notes, SortOrder</code>
         </p>
         <form action="/admin/network-resources-csv-import" method="POST" enctype="multipart/form-data" class="mb-3">
           <div class="mb-2">

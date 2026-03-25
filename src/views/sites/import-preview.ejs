@@ -9,7 +9,7 @@
 <div class="d-flex gap-3 mb-4 flex-wrap">
   <div class="card text-center px-4 py-3 border-success">
     <div class="fs-2 fw-bold text-success"><%= summary.created %></div>
-    <div class="small text-muted">Will Create</div>
+    <div class="small text-muted">New Sites</div>
   </div>
   <div class="card text-center px-4 py-3 border-primary">
     <div class="fs-2 fw-bold text-primary"><%= summary.updated %></div>
@@ -23,70 +23,90 @@
     <div class="fs-2 fw-bold text-danger"><%= summary.errors %></div>
     <div class="small text-muted">Errors</div>
   </div>
-  <div class="card text-center px-4 py-3">
-    <div class="fs-2 fw-bold"><%= summary.total %></div>
-    <div class="small text-muted">Total Rows</div>
-  </div>
 </div>
 
 <% if (summary.errors > 0) { %>
 <div class="alert alert-warning d-flex align-items-center gap-2 mb-4">
   <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
-  <span><%= summary.errors %> row<%= summary.errors !== 1 ? 's' : '' %> have errors and will be skipped. Review below before confirming.</span>
+  <span><%= summary.errors %> row<%= summary.errors !== 1 ? 's' : '' %> have errors and will be skipped.</span>
 </div>
 <% } %>
 
 <form method="POST" action="/sites/import/confirm">
   <input type="hidden" name="importPlan" value="<%= importPlan %>" />
 
+  <%
+    const newEntries     = plan.filter(e => e.action === 'create');
+    const updatedEntries = plan.filter(e => e.action === 'update');
+    const removedEntries = plan.filter(e => e.action === 'remove');
+    const errorEntries   = plan.filter(e => e.action === 'error');
+  %>
+
+  <!-- ── New Sites ─────────────────────────────────────────────────────────── -->
+  <% if (newEntries.length > 0) { %>
   <div class="card shadow-sm mb-4">
-    <div class="card-header"><strong>Row-by-Row Preview</strong></div>
+    <div class="card-header bg-success bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-plus-circle text-success"></i>
+      <strong>New Sites</strong>
+      <span class="badge bg-success ms-1"><%= newEntries.length %></span>
+    </div>
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0">
         <thead>
           <tr>
-            <th style="width:3rem">Row</th>
-            <th>Site Name</th>
             <th>Site #</th>
+            <th>Site Name</th>
             <th>Type</th>
-            <th style="width:6rem">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% newEntries.forEach(e => { %>
+          <tr>
+            <td class="small text-muted"><%= e.display.siteNumber || '—' %></td>
+            <td class="small fw-semibold"><%= e.display.siteName %></td>
+            <td class="small text-muted"><%= e.display.siteType || '—' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- ── Updated Sites ──────────────────────────────────────────────────────── -->
+  <% if (updatedEntries.length > 0) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-pencil text-primary"></i>
+      <strong>Updated Sites</strong>
+      <span class="badge bg-primary ms-1"><%= updatedEntries.length %></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Site #</th>
+            <th>Site Name</th>
+            <th>Type</th>
             <th>Changes</th>
           </tr>
         </thead>
         <tbody>
-          <% plan.forEach(entry => { %>
+          <% updatedEntries.forEach(e => { %>
           <tr>
-            <td class="text-muted small"><%= entry.rowNum %></td>
-            <td class="small fw-semibold"><%= entry.display.siteName || '—' %></td>
-            <td class="small text-muted"><%= entry.display.siteNumber || '—' %></td>
-            <td class="small text-muted"><%= entry.display.siteType || '—' %></td>
-            <td>
-              <% if (entry.action === 'create') { %>
-                <span class="badge bg-success">New</span>
-              <% } else if (entry.action === 'update') { %>
-                <span class="badge bg-primary">Update</span>
-              <% } else if (entry.action === 'skip') { %>
-                <span class="badge bg-warning text-dark">Skip</span>
-              <% } else { %>
-                <span class="badge bg-danger">Error</span>
-              <% } %>
-            </td>
+            <td class="small text-muted"><%= e.display.siteNumber || '—' %></td>
+            <td class="small fw-semibold"><%= e.display.siteName %></td>
+            <td class="small text-muted"><%= e.display.siteType || '—' %></td>
             <td class="small">
-              <% if (entry.action === 'update' && entry.diff && entry.diff.length > 0) { %>
-                <% entry.diff.forEach(d => { %>
-                  <div>
-                    <span class="text-muted"><%= d.field %>:</span>
-                    <span class="text-danger text-decoration-line-through"><%= d.from ?? '—' %></span>
-                    <i class="bi bi-arrow-right mx-1 text-muted"></i>
-                    <span class="text-success"><%= d.to ?? '—' %></span>
-                  </div>
+              <% if (e.diff && e.diff.length > 0) { %>
+                <% e.diff.forEach(d => { %>
+                <div>
+                  <span class="text-muted"><%= d.field %>:</span>
+                  <span class="text-danger text-decoration-line-through"><%= d.from ?? '—' %></span>
+                  <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                  <span class="text-success"><%= d.to ?? '—' %></span>
+                </div>
                 <% }) %>
-              <% } else if (entry.action === 'update') { %>
-                <span class="text-muted fst-italic">No changes</span>
-              <% } else if (entry.action === 'create') { %>
-                <span class="text-muted fst-italic">New record</span>
-              <% } else if (entry.message) { %>
-                <span class="text-danger"><%= entry.message %></span>
               <% } %>
             </td>
           </tr>
@@ -95,6 +115,72 @@
       </table>
     </div>
   </div>
+  <% } %>
+
+  <!-- ── Removed Sites (informational) ─────────────────────────────────────── -->
+  <% if (removedEntries.length > 0) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-danger bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-dash-circle text-danger"></i>
+      <strong>Not in Import File</strong>
+      <span class="badge bg-danger ms-1"><%= removedEntries.length %></span>
+      <span class="ms-2 small text-muted fw-normal">These sites exist in the database but are missing from this file. They will not be affected by this import.</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Parent Site</th>
+            <th>Site #</th>
+            <th>Site Name</th>
+            <th>Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% removedEntries.forEach(e => { %>
+          <tr class="text-muted">
+            <td class="small"><%= e.display.parentSiteName || '—' %></td>
+            <td class="small"><%= e.display.siteNumber || '—' %></td>
+            <td class="small"><%= e.display.siteName %></td>
+            <td class="small"><%= e.display.siteType || '—' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- ── Errors ─────────────────────────────────────────────────────────────── -->
+  <% if (errorEntries.length > 0) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-danger bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-exclamation-circle text-danger"></i>
+      <strong>Errors</strong>
+      <span class="badge bg-danger ms-1"><%= errorEntries.length %></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Row</th>
+            <th>Site Name</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% errorEntries.forEach(e => { %>
+          <tr>
+            <td class="small text-muted"><%= e.rowNum %></td>
+            <td class="small fw-semibold"><%= e.display.siteName || '—' %></td>
+            <td class="small text-danger"><%= e.message %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
 
   <div class="d-flex gap-2">
     <button type="submit" class="btn btn-primary" <%= (summary.created + summary.updated) === 0 ? 'disabled' : '' %>>

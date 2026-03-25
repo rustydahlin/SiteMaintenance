@@ -598,6 +598,53 @@
       </div>
       <% } %>
     </div>
+
+    <!-- ── Sub-Site Network Resources ──────────────────────────────────────── -->
+    <% if (subsiteNetworkResources && subsiteNetworkResources.some(s => s.resources.length > 0)) { %>
+    <hr class="my-3">
+    <% subsiteNetworkResources.forEach(({ sub, resources }) => { %>
+      <% if (resources.length > 0) { %>
+      <h6 class="mt-3 mb-2 d-flex align-items-center gap-2">
+        <i class="bi bi-diagram-2 text-muted"></i>
+        <a href="/sites/<%= sub.SiteID %>" class="text-decoration-none"><%= sub.SiteName %></a>
+        <% if (sub.SiteTypeName) { %>
+          <span class="badge bg-body-secondary text-body fw-normal" style="font-size:.7rem"><%= sub.SiteTypeName %></span>
+        <% } %>
+      </h6>
+      <table class="table table-sm table-hover align-middle mb-3">
+        <thead>
+          <tr>
+            <th class="text-muted" style="width:3rem">Order</th>
+            <th>Hostname</th>
+            <th>IP Address</th>
+            <th>Type</th>
+            <th>Alert Status</th>
+            <th>SolarWinds ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% resources.forEach(r => { %>
+          <tr>
+            <td class="text-muted small text-center"><%= r.SortOrder %></td>
+            <td class="fw-semibold"><%= r.Hostname %></td>
+            <td class="font-monospace small"><%= r.IPAddress || '—' %></td>
+            <td><span class="badge bg-body-secondary text-body border"><%= r.DeviceTypeName %></span></td>
+            <td>
+              <% if (r.AlertStatus) { %>
+                <span class="badge bg-success">Yes</span>
+              <% } else { %>
+                <span class="badge bg-warning text-dark">No</span>
+              <% } %>
+            </td>
+            <td class="small"><%= r.SolarwindsNodeId || '—' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+    <% }) %>
+    <% } %>
+  </div>
   </div>
 
 </div><!-- /.tab-content -->

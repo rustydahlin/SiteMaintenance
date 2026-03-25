@@ -1,89 +1,181 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h1 class="h3 mb-0"><i class="bi bi-eye me-2"></i>Import Preview — System Keys</h1>
+  <h1 class="h3 mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Import System Keys — Preview</h1>
   <a href="/system-keys/import" class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-arrow-left me-1"></i>Back
   </a>
 </div>
 
-<%
-  const creates = plan.filter(p => p.action === 'create');
-  const updates = plan.filter(p => p.action === 'update');
-  const skips   = plan.filter(p => p.action === 'skip');
-%>
-
-<div class="alert alert-info mb-4">
-  <strong><%= creates.length %></strong> to create &nbsp;|&nbsp;
-  <strong><%= updates.length %></strong> to update &nbsp;|&nbsp;
-  <strong><%= skips.length   %></strong> skipped
+<!-- Summary cards -->
+<div class="d-flex gap-3 mb-4 flex-wrap">
+  <div class="card text-center px-4 py-3 border-success">
+    <div class="fs-2 fw-bold text-success"><%= summary.created %></div>
+    <div class="small text-muted">New Keys</div>
+  </div>
+  <div class="card text-center px-4 py-3 border-primary">
+    <div class="fs-2 fw-bold text-primary"><%= summary.updated %></div>
+    <div class="small text-muted">Will Update</div>
+  </div>
+  <div class="card text-center px-4 py-3 border-warning">
+    <div class="fs-2 fw-bold text-warning"><%= summary.skipped %></div>
+    <div class="small text-muted">Skipped</div>
+  </div>
+  <div class="card text-center px-4 py-3 border-danger">
+    <div class="fs-2 fw-bold text-danger"><%= summary.errors %></div>
+    <div class="small text-muted">Errors</div>
+  </div>
 </div>
 
-<% if (creates.length > 0) { %>
-<h5 class="mb-2 text-success"><i class="bi bi-plus-circle me-1"></i>New Keys (<%= creates.length %>)</h5>
-<div class="table-responsive mb-4">
-  <table class="table table-sm table-bordered">
-    <thead class="table-light"><tr><th>Serial #</th><th>Key Code</th><th>Key Type</th><th>Expiration</th></tr></thead>
-    <tbody>
-    <% for (const item of creates) { %>
-      <tr>
-        <td><%= item.data.serialNumber || '—' %></td>
-        <td><%= item.data.keyCode      || '—' %></td>
-        <td><%= item.data.keyType      || '—' %></td>
-        <td><%= item.data.expirationDate || '—' %></td>
-      </tr>
-    <% } %>
-    </tbody>
-  </table>
-</div>
-<% } %>
+<form method="POST" action="/system-keys/import/confirm">
+  <input type="hidden" name="importPlan" value="<%= importPlan %>" />
 
-<% if (updates.length > 0) { %>
-<h5 class="mb-2 text-primary"><i class="bi bi-pencil-square me-1"></i>Updates (<%= updates.length %>)</h5>
-<div class="table-responsive mb-4">
-  <table class="table table-sm table-bordered">
-    <thead class="table-light"><tr><th>Serial #</th><th>Changes</th></tr></thead>
-    <tbody>
-    <% for (const item of updates) { %>
-      <tr>
-        <td><%= item.serial %></td>
-        <td>
-          <% if (item.diffs && item.diffs.length > 0) { %>
-            <ul class="mb-0 ps-3">
-              <% for (const d of item.diffs) { %><li><%= d %></li><% } %>
-            </ul>
-          <% } else { %>
-            <span class="text-muted">No field changes</span>
-          <% } %>
-        </td>
-      </tr>
-    <% } %>
-    </tbody>
-  </table>
-</div>
-<% } %>
+  <%
+    const newEntries     = plan.filter(e => e.action === 'create');
+    const updatedEntries = plan.filter(e => e.action === 'update');
+    const removedEntries = plan.filter(e => e.action === 'remove');
+    const errorEntries   = plan.filter(e => e.action === 'error');
+  %>
 
-<% if (skips.length > 0) { %>
-<h5 class="mb-2 text-secondary"><i class="bi bi-slash-circle me-1"></i>Skipped (<%= skips.length %>)</h5>
-<div class="table-responsive mb-4">
-  <table class="table table-sm table-bordered">
-    <thead class="table-light"><tr><th>Row</th><th>Reason</th></tr></thead>
-    <tbody>
-    <% for (const item of skips) { %>
-      <tr>
-        <td><%= JSON.stringify(item.row) %></td>
-        <td class="text-danger"><%= item.reason %></td>
-      </tr>
-    <% } %>
-    </tbody>
-  </table>
-</div>
-<% } %>
+  <!-- ── New Keys ───────────────────────────────────────────────────────────── -->
+  <% if (newEntries.length > 0) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-success bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-plus-circle text-success"></i>
+      <strong>New Keys</strong>
+      <span class="badge bg-success ms-1"><%= newEntries.length %></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Serial #</th>
+            <th>Key Code</th>
+            <th>Key Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% newEntries.forEach(e => { %>
+          <tr>
+            <td class="small fw-semibold"><%= e.display.serialNumber %></td>
+            <td class="small text-muted"><%= e.display.keyCode || '—' %></td>
+            <td class="small text-muted"><%= e.display.keyType || '—' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
 
-<div class="d-flex gap-2 mt-3">
-  <form method="POST" action="/system-keys/import/confirm">
-    <button type="submit" class="btn btn-primary"
-            <% if (creates.length === 0 && updates.length === 0) { %>disabled<% } %>>
-      <i class="bi bi-check-lg me-1"></i>Confirm Import
+  <!-- ── Updated Keys ──────────────────────────────────────────────────────── -->
+  <% if (updatedEntries.length > 0) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-pencil text-primary"></i>
+      <strong>Updated Keys</strong>
+      <span class="badge bg-primary ms-1"><%= updatedEntries.length %></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Serial #</th>
+            <th>Key Type</th>
+            <th>Changes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% updatedEntries.forEach(e => { %>
+          <tr>
+            <td class="small fw-semibold"><%= e.display.serialNumber %></td>
+            <td class="small text-muted"><%= e.display.keyType || '—' %></td>
+            <td class="small">
+              <% e.diff.forEach(d => { %>
+              <div>
+                <span class="text-muted"><%= d.field %>:</span>
+                <span class="text-danger text-decoration-line-through"><%= d.from ?? '—' %></span>
+                <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                <span class="text-success"><%= d.to ?? '—' %></span>
+              </div>
+              <% }) %>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- ── Not in Import File (informational) ───────────────────────────────── -->
+  <% if (removedEntries.length > 0) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-danger bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-dash-circle text-danger"></i>
+      <strong>Not in Import File</strong>
+      <span class="badge bg-danger ms-1"><%= removedEntries.length %></span>
+      <span class="ms-2 small text-muted fw-normal">These keys exist in the database but are missing from this file. They will not be affected by this import.</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Serial #</th>
+            <th>Key Code</th>
+            <th>Key Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% removedEntries.forEach(e => { %>
+          <tr class="text-muted">
+            <td class="small"><%= e.display.serialNumber %></td>
+            <td class="small"><%= e.display.keyCode || '—' %></td>
+            <td class="small"><%= e.display.keyType || '—' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- ── Errors ─────────────────────────────────────────────────────────────── -->
+  <% if (errorEntries.length > 0) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-danger bg-opacity-10 d-flex align-items-center gap-2">
+      <i class="bi bi-exclamation-circle text-danger"></i>
+      <strong>Errors</strong>
+      <span class="badge bg-danger ms-1"><%= errorEntries.length %></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Row</th>
+            <th>Serial #</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% errorEntries.forEach(e => { %>
+          <tr>
+            <td class="small text-muted"><%= e.rowNum %></td>
+            <td class="small fw-semibold"><%= e.display.serialNumber || '—' %></td>
+            <td class="small text-danger"><%= e.message %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary" <%= (summary.created + summary.updated) === 0 ? 'disabled' : '' %>>
+      <i class="bi bi-check-circle me-1"></i>Confirm Import
+      <% if (summary.created + summary.updated > 0) { %>
+        (<%= summary.created + summary.updated %> change<%= (summary.created + summary.updated) !== 1 ? 's' : '' %>)
+      <% } %>
     </button>
-  </form>
-  <a href="/system-keys/import" class="btn btn-outline-secondary">Cancel</a>
-</div>
+    <a href="/system-keys/import" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>

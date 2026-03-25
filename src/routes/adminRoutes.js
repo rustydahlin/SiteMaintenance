@@ -62,7 +62,7 @@ function csvEscape(val) {
     : str;
 }
 
-const CSV_HEADERS = ['SiteNumber','SiteName','Hostname','IPAddress','DeviceType',
+const CSV_HEADERS = ['SiteID','ParentSiteNumber','ParentSiteName','SiteNumber','SiteName','Hostname','IPAddress','DeviceType',
   'AlertStatus','SolarwindsNodeId','CircuitType','CircuitID','Notes','SortOrder'];
 
 const logDir = process.env.LOG_DIR
@@ -764,6 +764,9 @@ router.get('/network-resources-csv-export', async (_req, res, next) => {
     const lines = [CSV_HEADERS.join(',')];
     for (const r of rows) {
       lines.push([
+        csvEscape(r.SiteID),
+        csvEscape(r.ParentSiteNumber),
+        csvEscape(r.ParentSiteName),
         csvEscape(r.SiteNumber),
         csvEscape(r.SiteName),
         csvEscape(r.Hostname),
@@ -810,13 +813,18 @@ router.post('/network-resources-csv-import', csvUpload.single('networkResourcesC
     const { getPool } = require('../config/database');
     const pool = await getPool();
     const [sitesResult, deviceTypesResult, circuitTypesResult] = await Promise.all([
-      pool.request().query(`SELECT SiteID, ISNULL(SiteNumber,'') AS SiteNumber, SiteName FROM Sites WHERE IsActive = 1`),
+      pool.request().query(`
+        SELECT s.SiteID, ISNULL(s.SiteNumber,'') AS SiteNumber, s.SiteName,
+               ISNULL(parent.SiteNumber,'') AS ParentSiteNumber
+        FROM Sites s
+        LEFT JOIN Sites parent ON parent.SiteID = s.ParentSiteID
+        WHERE s.IsActive = 1`),
       pool.request().query(`SELECT DeviceTypeID, TypeName FROM NetworkDeviceTypes`),
       pool.request().query(`SELECT CircuitTypeID, TypeName FROM CircuitTypes`),
     ]);
 
     const siteMap      = new Map(sitesResult.recordset.map(r =>
-      [`${(r.SiteNumber||'').trim().toLowerCase()}|${r.SiteName.trim().toLowerCase()}`, r.SiteID]));
+      [`${r.ParentSiteNumber.trim().toLowerCase()}|${(r.SiteNumber||'').trim().toLowerCase()}|${r.SiteName.trim().toLowerCase()}`, r.SiteID]));
     const siteByID     = new Map(sitesResult.recordset.map(r => [r.SiteID, r]));
     const devTypeMap   = new Map(deviceTypesResult.recordset.map(r => [r.TypeName.toLowerCase(), r.DeviceTypeID]));
     const devTypeByID  = new Map(deviceTypesResult.recordset.map(r => [r.DeviceTypeID, r.TypeName]));
@@ -843,8 +851,9 @@ router.post('/network-resources-csv-import', csvUpload.single('networkResourcesC
       if (cols.every(c => !c.trim())) continue; // blank row
       const get = key => (idx[key] !== undefined ? (cols[idx[key]] || '').trim() : '');
 
-      const siteKey   = `${get('SiteNumber').toLowerCase()}|${get('SiteName').toLowerCase()}`;
-      const siteID    = siteMap.get(siteKey);
+      const csvSiteID = parseInt(get('SiteID'), 10) || null;
+      const siteKey   = `${get('ParentSiteNumber').toLowerCase()}|${get('SiteNumber').toLowerCase()}|${get('SiteName').toLowerCase()}`;
+      const siteID    = (csvSiteID && siteByID.has(csvSiteID)) ? csvSiteID : siteMap.get(siteKey);
       const hostname  = get('Hostname');
       const devTypeID = devTypeMap.get(get('DeviceType').toLowerCase());
 
@@ -1007,9 +1016,16 @@ router.post('/network-resources-import', jsonUpload.single('devicesJson'), async
     // Load all sites for matching
     const { getPool } = require('../config/database');
     const pool = await getPool();
-    const sitesResult = await pool.request().query(
-      `SELECT SiteID, LOWER(ISNULL(SiteNumber + ' ', '') + SiteName) AS MatchKey FROM Sites WHERE IsActive = 1`
-    );
+    const sitesResult = await pool.request().query(`
+      SELECT s.SiteID,
+        LOWER(CASE
+          WHEN s.ParentSiteID IS NOT NULL
+            THEN ISNULL(parent.SiteNumber + '-', '') + ISNULL(s.SiteNumber + ' ', '') + s.SiteName
+          ELSE ISNULL(s.SiteNumber + ' ', '') + s.SiteName
+        END) AS MatchKey
+      FROM Sites s
+      LEFT JOIN Sites parent ON parent.SiteID = s.ParentSiteID
+      WHERE s.IsActive = 1`);
     const siteMap = new Map(sitesResult.recordset.map(r => [r.MatchKey.trim(), r.SiteID]));
 
     const matched   = [];
