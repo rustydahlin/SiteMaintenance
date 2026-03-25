@@ -1,6 +1,7 @@
 <h1 class="h3 mb-4"><i class="bi bi-sliders me-2"></i>Administration</h1>
 
 <div class="row g-3">
+  <% if (!isNetworkMapUpdater) { %>
   <div class="col-sm-6 col-xl-4">
     <a href="/admin/users" class="card shadow-sm text-decoration-none text-body h-100">
       <div class="card-body">
@@ -74,6 +75,7 @@
       </div>
     </a>
   </div>
+  <% } %>
 
   <div class="col-12 mt-2"><h6 class="text-muted text-uppercase small fw-semibold mb-0">Network / Tower Map</h6></div>
 

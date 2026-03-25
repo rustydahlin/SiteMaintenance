@@ -49,17 +49,19 @@
       <% } %>
     </div>
   </div>
-  <% if (isAdminUser) { %>
+  <% if (isAdminUser || isNetworkMapUpdater) { %>
   <div class="d-flex gap-2 flex-wrap">
     <a href="/sites/<%= site.SiteID %>/edit" class="btn btn-sm btn-outline-primary">
       <i class="bi bi-pencil me-1"></i>Edit
     </a>
+    <% if (isAdminUser) { %>
     <form method="POST" action="/sites/<%= site.SiteID %>/delete"
           data-confirm="Delete this site? This action cannot be undone.">
       <button type="submit" class="btn btn-sm btn-outline-danger">
         <i class="bi bi-trash me-1"></i>Delete
       </button>
     </form>
+    <% } %>
   </div>
   <% } %>
 </div>
@@ -77,14 +79,22 @@
 <!-- Tabs -->
 <ul class="nav nav-tabs mt-3" id="siteTab" role="tablist">
   <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#overview">Overview</a></li>
+  <% if (!isNetworkMapUpdater) { %>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#logs" id="logs-tab">Log Entries</a></li>
+  <% } %>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#network-resources">Network Resources</a></li>
+  <% if (!isNetworkMapUpdater) { %>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#equipment">Installed Equipment</a></li>
+  <% } %>
   <% if (!site.ParentSiteID) { %>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#subsites">Sub-Sites</a></li>
+  <% if (!isNetworkMapUpdater) { %>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#pm">PM Schedules</a></li>
   <% } %>
+  <% } %>
+  <% if (!isNetworkMapUpdater) { %>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#docs">Documents & Photos</a></li>
+  <% } %>
 </ul>
 
 <div class="tab-content border border-top-0 rounded-bottom p-3 bg-body shadow-sm">
@@ -372,7 +382,7 @@
   <div class="tab-pane fade" id="subsites">
     <div class="d-flex justify-content-between align-items-center mt-2 mb-3">
       <h6 class="mb-0">Sub-Sites</h6>
-      <% if (isAdminUser) { %>
+      <% if (isAdminUser || isNetworkMapUpdater) { %>
         <a href="/sites/new?parentSiteID=<%= site.SiteID %>" class="btn btn-sm btn-primary">
           <i class="bi bi-plus-lg me-1"></i>Add Sub-Site
         </a>
@@ -513,7 +523,7 @@
           <span class="badge bg-warning text-dark ms-1" title="Set Monitoring Location Type on the Edit page to include this site on the tower map">Not on Tower Map</span>
         <% } %>
       </h6>
-      <% if (isAdminUser) { %>
+      <% if (isAdminUser || isNetworkMapUpdater) { %>
       <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addResourceModal">
         <i class="bi bi-plus-lg me-1"></i>Add Resource
       </button>
@@ -593,7 +603,7 @@
 </div><!-- /.tab-content -->
 
 <!-- ── Add/Edit Network Resource Modal ────────────────────────────────────── -->
-<% if (isAdminUser) { %>
+<% if (isAdminUser || isNetworkMapUpdater) { %>
 <div class="modal fade" id="addResourceModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">

@@ -255,6 +255,7 @@ When new database migrations are released:
 | `018_vendor_documents.sql` | Adds document attachment support for Vendors; adds `VendorID` foreign key option to `Documents` table |
 | `019_user_deleted.sql` | Adds `DeletedAt` column to `Users` for soft-delete with name preservation |
 | `020_network_resources.sql` | Adds `MonitoringLocationTypes`, `NetworkDeviceTypes`, `CircuitTypes` lookup tables; adds `MonitoringLocationTypeID` to `Sites`; creates `NetworkResources` table for tower map integration; seeds `towerMap.apiKey` AppSetting |
+| `021_network_map_updater_role.sql` | Adds `NetworkMapUpdater` role — can view/edit sites and manage network resources; cannot delete sites or access other admin areas |
 
 > **Note:** After running migration 020, set the `towerMap.apiKey` value in **Admin → Settings** before connecting SIRNnetworkmap. Generate a key with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 

@@ -15,7 +15,7 @@ const pmModel            = require('../models/pmModel');
 const repairModel        = require('../models/repairModel');
 const userModel          = require('../models/userModel');
 const vendorModel        = require('../models/vendorModel');
-const { isAuthenticated, isAdmin, canWrite, canImportExport } = require('../middleware/auth');
+const { isAuthenticated, isAdmin, canWrite, canImportExport, canManageNetworkMap } = require('../middleware/auth');
 
 const importUpload = multer({
   storage: multer.memoryStorage(),
@@ -267,7 +267,7 @@ router.post('/import/confirm', canImportExport, async (req, res, next) => {
 });
 
 // ── GET /new — create form ────────────────────────────────────────────────────
-router.get('/new', isAdmin, async (req, res, next) => {
+router.get('/new', canManageNetworkMap, async (req, res, next) => {
   try {
     const parentSiteID = req.query.parentSiteID ? parseInt(req.query.parentSiteID, 10) : null;
 
@@ -296,7 +296,7 @@ router.get('/new', isAdmin, async (req, res, next) => {
 });
 
 // ── POST / — create site ──────────────────────────────────────────────────────
-router.post('/', isAdmin, async (req, res, next) => {
+router.post('/', canManageNetworkMap, async (req, res, next) => {
   try {
     const { siteName } = req.body;
     if (!siteName || !siteName.trim()) {
@@ -374,9 +374,10 @@ router.get('/:id', async (req, res, next) => {
       return res.redirect('/sites');
     }
 
-    const isAdmin = req.user && req.user.roles && req.user.roles.includes('Admin');
-    const canWriteFlag = req.user && req.user.roles &&
-      (req.user.roles.includes('Admin') || req.user.roles.includes('Technician') || req.user.roles.includes('Contractor'));
+    const roles = req.user?.roles || [];
+    const isAdmin = roles.includes('Admin');
+    const isNetworkMapUpdater = !isAdmin && roles.includes('NetworkMapUpdater');
+    const canWriteFlag = isAdmin || roles.includes('Technician') || roles.includes('Contractor') || isNetworkMapUpdater;
 
     res.render('sites/detail', {
       title:      site.SiteName,
@@ -396,8 +397,9 @@ router.get('/:id', async (req, res, next) => {
       networkResources,
       networkDeviceTypes,
       circuitTypes,
-      isAdminUser: isAdmin,
-      canWrite:    canWriteFlag,
+      isAdminUser:          isAdmin,
+      isNetworkMapUpdater:  isNetworkMapUpdater,
+      canWrite:             canWriteFlag,
       uploadUrl:   `/documents/upload`,
       canUpload:   canWriteFlag,
     });
@@ -407,7 +409,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // ── GET /:id/edit — edit form ─────────────────────────────────────────────────
-router.get('/:id/edit', isAdmin, async (req, res, next) => {
+router.get('/:id/edit', canManageNetworkMap, async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
     const [site, siteTypes, monitoringLocationTypes] = await Promise.all([
@@ -436,7 +438,7 @@ router.get('/:id/edit', isAdmin, async (req, res, next) => {
 });
 
 // ── POST /:id — update site ───────────────────────────────────────────────────
-router.post('/:id', isAdmin, async (req, res, next) => {
+router.post('/:id', canManageNetworkMap, async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
     const { siteName } = req.body;
@@ -735,7 +737,7 @@ router.get('/:id/network-resources', async (req, res, next) => {
 });
 
 // POST /:id/network-resources — create
-router.post('/:id/network-resources', isAdmin, async (req, res, next) => {
+router.post('/:id/network-resources', canManageNetworkMap, async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
     const { hostname, ipAddress, deviceTypeID, alertStatus,
@@ -765,7 +767,7 @@ router.post('/:id/network-resources', isAdmin, async (req, res, next) => {
 });
 
 // POST /:id/network-resources/:resID — update
-router.post('/:id/network-resources/:resID', isAdmin, async (req, res, next) => {
+router.post('/:id/network-resources/:resID', canManageNetworkMap, async (req, res, next) => {
   try {
     const siteID  = parseInt(req.params.id,    10);
     const resID   = parseInt(req.params.resID, 10);
@@ -800,7 +802,7 @@ router.post('/:id/network-resources/:resID', isAdmin, async (req, res, next) => 
 });
 
 // POST /:id/network-resources/:resID/delete — soft delete
-router.post('/:id/network-resources/:resID/delete', isAdmin, async (req, res, next) => {
+router.post('/:id/network-resources/:resID/delete', canManageNetworkMap, async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id,    10);
     const resID  = parseInt(req.params.resID, 10);

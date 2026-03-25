@@ -69,6 +69,8 @@
     <a href="/sites/import" class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-file-earmark-spreadsheet me-1"></i>Import
     </a>
+    <% } %>
+    <% if (user && user.roles && (user.roles.includes('Admin') || user.roles.includes('NetworkMapUpdater'))) { %>
     <a href="/sites/new" class="btn btn-primary btn-sm">
       <i class="bi bi-plus-lg me-1"></i>New Site
     </a>

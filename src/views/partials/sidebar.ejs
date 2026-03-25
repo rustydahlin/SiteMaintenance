@@ -7,13 +7,16 @@
       <i class="bi bi-chevron-double-left" id="sidebarToggleIcon"></i>
     </button>
 
+    <% const isNMUpdater = user.roles && user.roles.includes('NetworkMapUpdater') && !user.roles.includes('Admin'); %>
     <ul class="nav flex-column">
+      <% if (!isNMUpdater) { %>
       <li class="nav-item">
         <a class="nav-link <%= currentPath === '/' ? 'active' : '' %>" href="/" title="Dashboard">
           <i class="bi bi-speedometer2"></i>
           <span class="nav-label">Dashboard</span>
         </a>
       </li>
+      <% } %>
 
       <li class="nav-item mt-2">
         <span class="sidebar-section-label">Field</span>
@@ -25,6 +28,8 @@
           <span class="nav-label">Sites</span>
         </a>
       </li>
+
+      <% if (!isNMUpdater) { %>
       <li class="nav-item">
         <a class="nav-link <%= currentPath.startsWith('/inventory') ? 'active' : '' %>" href="/inventory" title="Inventory">
           <i class="bi bi-box-seam"></i>
@@ -51,8 +56,9 @@
           <span class="nav-label">Logs</span>
         </a>
       </li>
+      <% } %>
 
-      <% if (vendorsEnabled) { %>
+      <% if (!isNMUpdater && vendorsEnabled) { %>
       <li class="nav-item mt-2">
         <span class="sidebar-section-label">Vendors</span>
         <span class="sidebar-section-divider"></span>
@@ -65,14 +71,14 @@
       </li>
       <% } %>
 
-      <% if (user.roles && (user.roles.includes('Admin') || user.roles.includes('Technician') || (systemKeysEnabled && user.roles.includes('SystemKeys')))) { %>
+      <% if (user.roles && (user.roles.includes('Admin') || user.roles.includes('Technician') || isNMUpdater || (systemKeysEnabled && user.roles.includes('SystemKeys')))) { %>
       <li class="nav-item mt-2">
         <span class="sidebar-section-label">Admin</span>
         <span class="sidebar-section-divider"></span>
       </li>
       <% } %>
 
-      <% if (systemKeysEnabled && user.roles && (user.roles.includes('Admin') || user.roles.includes('SystemKeys'))) { %>
+      <% if (!isNMUpdater && systemKeysEnabled && user.roles && (user.roles.includes('Admin') || user.roles.includes('SystemKeys'))) { %>
       <li class="nav-item">
         <a class="nav-link <%= currentPath.startsWith('/system-keys') ? 'active' : '' %>" href="/system-keys" title="System Keys">
           <i class="bi bi-key"></i>
@@ -81,7 +87,7 @@
       </li>
       <% } %>
 
-      <% if (user.roles && user.roles.includes('Admin')) { %>
+      <% if (user.roles && (user.roles.includes('Admin') || isNMUpdater)) { %>
       <li class="nav-item">
         <a class="nav-link <%= currentPath.startsWith('/admin') ? 'active' : '' %>" href="/admin" title="Administration">
           <i class="bi bi-sliders"></i>

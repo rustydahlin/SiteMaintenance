@@ -16,7 +16,8 @@ INSERT INTO Roles (RoleName, Description) VALUES
     ('Maintenance-Close',  'Close maintenance items assigned to them; view only their own items'),
     ('SystemKeys',         'Can create and manage system keys'),
     ('Notifications',      'Can manage personal email notification preferences'),
-    ('ImportExport',       'Can import and export data for Sites, Inventory, System Keys, and Vendors');
+    ('ImportExport',       'Can import and export data for Sites, Inventory, System Keys, and Vendors'),
+    ('NetworkMapUpdater',  'Can view sites and manage Network Resources (add/edit/delete devices and import/export network resources). Cannot delete sites or access other admin areas.');
 
 -- ============================================================
 -- SITE STATUSES

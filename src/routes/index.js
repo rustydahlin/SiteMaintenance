@@ -8,9 +8,14 @@ const router = express.Router();
 
 router.get('/', isAuthenticated, async (req, res, next) => {
   try {
-    const pool = await getPool();
-
     const userRoles = req.user?.roles || [];
+
+    // NetworkMapUpdater has no dashboard — send them straight to Sites
+    if (!userRoles.includes('Admin') && userRoles.includes('NetworkMapUpdater')) {
+      return res.redirect('/sites');
+    }
+
+    const pool = await getPool();
     const systemKeysEnabled = (await settingsModel.getSetting('systemKeys.enabled', null)) === '1';
     const canSeeKeys = systemKeysEnabled && (userRoles.includes('Admin') || userRoles.includes('SystemKeys'));
 

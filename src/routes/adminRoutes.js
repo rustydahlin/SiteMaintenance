@@ -4,7 +4,6 @@ const express    = require('express');
 const path       = require('path');
 const fs         = require('fs');
 const multer     = require('multer');
-const { isAdmin } = require('../middleware/auth');
 const lookupModel            = require('../models/lookupModel');
 const userModel              = require('../models/userModel');
 const settingsModel          = require('../models/settingsModel');
@@ -70,12 +69,36 @@ const logDir = process.env.LOG_DIR
   ? path.resolve(process.env.LOG_DIR)
   : path.join(__dirname, '..', 'logs');
 
-// All admin routes require Admin role
-router.use(isAdmin);
+// Paths that NetworkMapUpdater may access (in addition to Admin)
+const NM_UPDATER_PATHS = [
+  '/',
+  '/network-resources-import',
+  '/network-resources-export',
+  '/network-resources-csv-import',
+  '/network-resources-csv-export',
+  '/monitoring-location-types',
+  '/network-device-types',
+  '/circuit-types',
+];
+
+// Admin gate — NetworkMapUpdater is allowed through for NM-specific paths
+router.use((req, res, next) => {
+  if (!req.isAuthenticated()) {
+    req.flash('error', 'Please log in to access that page.');
+    return res.redirect('/auth/login');
+  }
+  const roles = req.user.roles || [];
+  if (roles.includes('Admin')) return next();
+  const basePath = req.path === '/' ? '/' : '/' + req.path.split('/').filter(Boolean)[0];
+  if (roles.includes('NetworkMapUpdater') && NM_UPDATER_PATHS.includes(basePath)) return next();
+  res.status(403).render('errors/403', { title: 'Access Denied' });
+});
 
 // ── Admin Index ───────────────────────────────────────────────────────────────
-router.get('/', (_req, res) => {
-  res.render('admin/index', { title: 'Administration' });
+router.get('/', (req, res) => {
+  const roles = req.user?.roles || [];
+  const isNetworkMapUpdater = !roles.includes('Admin') && roles.includes('NetworkMapUpdater');
+  res.render('admin/index', { title: 'Administration', isNetworkMapUpdater });
 });
 
 // ── Site Types ────────────────────────────────────────────────────────────────
