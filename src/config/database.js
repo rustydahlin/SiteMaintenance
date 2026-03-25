@@ -3,16 +3,22 @@
 const sql = require('mssql');
 const logger = require('../utils/logger');
 
+// Select DB vars by environment: NODE_ENV=production uses PROD_DB_* prefix, everything else uses DEV_DB_*.
+// Falls back to unprefixed DB_* if the prefixed var is absent (backwards-compatible with existing .env).
+const isProd = (process.env.NODE_ENV || '').trim() === 'production';
+const dbPrefix = isProd ? 'PROD_DB_' : 'DEV_DB_';
+const dbVar = (name) => process.env[dbPrefix + name] ?? process.env['DB_' + name];
+
 const config = {
-  server:   process.env.DB_SERVER   || 'localhost',
-  database: process.env.DB_DATABASE || 'SiteMaintenance',
-  user:     process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  port:     parseInt(process.env.DB_PORT || '1433', 10),
+  server:   dbVar('SERVER')   || 'localhost',
+  database: dbVar('DATABASE') || 'SiteMaintenance',
+  user:     dbVar('USER'),
+  password: dbVar('PASSWORD'),
+  port:     parseInt(dbVar('PORT') || '1433', 10),
   options: {
-    encrypt:              process.env.DB_ENCRYPT === 'true',
-    trustServerCertificate: process.env.DB_TRUST_SERVER_CERT === 'true',
-    enableArithAbort:     true,
+    encrypt:                dbVar('ENCRYPT') === 'true',
+    trustServerCertificate: dbVar('TRUST_SERVER_CERT') === 'true',
+    enableArithAbort:       true,
   },
   pool: {
     max: 10,
@@ -68,4 +74,4 @@ async function closePool() {
   }
 }
 
-module.exports = { getPool, closePool, sql };
+module.exports = { getPool, closePool, sql, dbVar };

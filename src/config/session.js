@@ -2,18 +2,19 @@
 
 const session    = require('express-session');
 const MSSQLStore = require('connect-mssql-v2');
+const { dbVar }  = require('./database');
 
 async function buildSessionMiddleware() {
   const store = new MSSQLStore(
     {
-      server:   process.env.DB_SERVER,
-      database: process.env.DB_DATABASE,
-      user:     process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      port:     parseInt(process.env.DB_PORT || '1433', 10),
+      server:   dbVar('SERVER'),
+      database: dbVar('DATABASE'),
+      user:     dbVar('USER'),
+      password: dbVar('PASSWORD'),
+      port:     parseInt(dbVar('PORT') || '1433', 10),
       options: {
-        encrypt:              process.env.DB_ENCRYPT === 'true',
-        trustServerCertificate: process.env.DB_TRUST_SERVER_CERT === 'true',
+        encrypt:              dbVar('ENCRYPT') === 'true',
+        trustServerCertificate: dbVar('TRUST_SERVER_CERT') === 'true',
       },
     },
     {

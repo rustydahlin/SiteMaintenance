@@ -76,14 +76,26 @@ cd SiteMaintenance
 3. Open `src/.env` in a text editor and fill in the required values:
 
    **Required — Database:**
+
+   The app selects database credentials based on `NODE_ENV`. Use separate prefixes for dev and prod:
    ```
-   DB_SERVER=localhost          # Your SQL Server hostname or IP
-   DB_DATABASE=SiteMaintenance  # Database name created in Step 2
-   DB_USER=sa                   # SQL Server login username
-   DB_PASSWORD=your-password    # SQL Server login password
-   DB_PORT=1433                 # Default SQL Server port
-   DB_ENCRYPT=false             # Set to true for Azure SQL or TLS connections
-   DB_TRUST_SERVER_CERT=true    # Set to false in production with valid certs
+   # Development (used when NODE_ENV=development — i.e. npm run dev)
+   DEV_DB_SERVER=localhost
+   DEV_DB_DATABASE=SiteMaintenance_Dev
+   DEV_DB_USER=sa
+   DEV_DB_PASSWORD=your-dev-password
+   DEV_DB_PORT=1433
+   DEV_DB_ENCRYPT=false
+   DEV_DB_TRUST_SERVER_CERT=true
+
+   # Production (used when NODE_ENV=production — i.e. npm start on the server)
+   PROD_DB_SERVER=prod-sql-server
+   PROD_DB_DATABASE=SiteMaintenance
+   PROD_DB_USER=appuser
+   PROD_DB_PASSWORD=your-prod-password
+   PROD_DB_PORT=1433
+   PROD_DB_ENCRYPT=true
+   PROD_DB_TRUST_SERVER_CERT=false
    ```
 
    **Required — Session & Encryption:**
@@ -159,13 +171,19 @@ md src\logs        # Windows
 
 ### Step 6 — Start the application
 
-**Development** (auto-restarts on file changes):
+**Development** (auto-restarts on file changes, uses `DEV_DB_*`):
 ```bash
 cd src
 npm run dev
 ```
 
-**Production:**
+**Production on Windows** (uses `PROD_DB_*` — for local testing against prod DB):
+```bash
+cd src
+npm run start:prod
+```
+
+**Production on Linux/RHEL** (`NODE_ENV=production` is set by systemd — see [Running in Production](#running-in-production)):
 ```bash
 cd src
 npm start
@@ -210,16 +228,23 @@ Open your browser to: **http://localhost:3000**
 For production deployments:
 
 1. **Reverse proxy** — Place Nginx or IIS in front of Node.js
-2. **Process manager** — Use PM2 to manage the Node.js process:
+2. **Process manager** — Use PM2 or systemd to manage the Node.js process:
    ```bash
    npm install -g pm2
    cd src
-   pm2 start server.js --name sitemaintenance
+   pm2 start server.js --name sitemaintenance --env production
    pm2 save
    pm2 startup
    ```
-3. **Environment** — Set `NODE_ENV=production` in `.env`
-4. **HTTPS** — Configure TLS on your reverse proxy and set `DB_ENCRYPT=true`
+   Or with systemd, set `NODE_ENV` in the unit file:
+   ```ini
+   [Service]
+   Environment=NODE_ENV=production
+   WorkingDirectory=/opt/sitemaintenance/src
+   ExecStart=/usr/bin/node server.js
+   ```
+3. **Environment** — `NODE_ENV=production` must be set in the process environment (systemd unit, PM2, etc.) — **not** in `.env`. This tells the app to use `PROD_DB_*` credentials.
+4. **HTTPS** — Configure TLS on your reverse proxy and set `PROD_DB_ENCRYPT=true`
 5. **Session cookie** — Set `COOKIE_SECURE=true` in `.env` once HTTPS is in place. Do not set this over plain HTTP or login will silently break.
 
 ---
@@ -357,7 +382,7 @@ SiteMaintenance/
 ## Troubleshooting
 
 **Cannot connect to SQL Server**
-- Verify `DB_SERVER`, `DB_USER`, `DB_PASSWORD` in `.env`
+- Verify the correct `DEV_DB_*` or `PROD_DB_*` credentials in `.env` (depends on how you started the app)
 - Ensure SQL Server is running and TCP/IP is enabled in SQL Server Configuration Manager
 - Check that port 1433 is not blocked by a firewall
 
