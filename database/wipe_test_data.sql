@@ -66,17 +66,17 @@ PRINT 'SiteInventory:            ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows delet
 DELETE FROM PMSchedules;
 PRINT 'PMSchedules:              ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
 
--- ── 7a. Vendor contacts ────────────────────────────────────────────────────────
+-- ── 7a. System Keys (must precede VendorContacts — FK_SK_Contact) ─────────────
+DELETE FROM SystemKeys;
+PRINT 'SystemKeys:               ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
+
+-- ── 7b. Vendor contacts ────────────────────────────────────────────────────────
 DELETE FROM VendorContacts;
 PRINT 'VendorContacts:           ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
 
--- ── 7b. Vendors ────────────────────────────────────────────────────────────────
+-- ── 7c. Vendors ────────────────────────────────────────────────────────────────
 DELETE FROM Vendors;
 PRINT 'Vendors:                  ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
-
--- ── 7c. System Keys ────────────────────────────────────────────────────────────
-DELETE FROM SystemKeys;
-PRINT 'SystemKeys:               ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
 
 -- KeyManufacturers is a lookup/settings table — not wiped.
 -- MaintenanceTypes is a lookup/settings table — not wiped.
@@ -105,11 +105,11 @@ UPDATE Sites SET ParentSiteID = NULL WHERE ParentSiteID IS NOT NULL;
 DELETE FROM Sites;
 PRINT 'Sites:                    ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
 
--- ── 11. Audit log ─────────────────────────────────────────────────────────────
+-- ── 12. Audit log ─────────────────────────────────────────────────────────────
 DELETE FROM AuditLog;
 PRINT 'AuditLog:                 ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
 
--- ── 12. Sessions ──────────────────────────────────────────────────────────────
+-- ── 13. Sessions ──────────────────────────────────────────────────────────────
 DELETE FROM Sessions;
 PRINT 'Sessions:                 ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
 
@@ -117,7 +117,7 @@ PRINT 'Sessions:                 ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows delet
 PRINT '';
 PRINT 'Resetting identity counters...';
 
-DBCC CHECKIDENT ('DocumentData',           RESEED, 0) WITH NO_INFOMSGS;
+-- DocumentData PK is a FK (not identity) — no RESEED needed
 DBCC CHECKIDENT ('Documents',              RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('RepairTracking',         RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('InventoryStock',         RESEED, 0) WITH NO_INFOMSGS;
