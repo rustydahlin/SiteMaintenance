@@ -1,41 +1,83 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1 class="h3 mb-0"><i class="bi bi-cloud-upload me-2"></i>Network Resources Import / Export</h1>
-  <div class="d-flex gap-2">
-    <a href="/admin/network-resources-export" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-download me-1"></i>Export devices.json
-    </a>
-    <a href="/admin" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
-  </div>
+  <a href="/admin" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
 </div>
 
 <% if (error) { %>
 <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i><%= error %></div>
 <% } %>
 
-<% if (!preview) { %>
-<!-- ── Step 1: Upload ──────────────────────────────────────────────────────── -->
-<div class="card shadow-sm" style="max-width:520px">
-  <div class="card-header">Step 1 — Upload devices.json</div>
-  <div class="card-body">
-    <p class="small text-muted mb-3">
-      Upload a <code>devices.json</code> file in the standard SIRNnetworkmap format.
-      Each entry will be matched to a site by <strong>Site Number + Site Name</strong>
-      (e.g. <code>"86 Amidon"</code>). Unmatched entries are skipped.
-    </p>
-    <form action="/admin/network-resources-import" method="POST" enctype="multipart/form-data">
-      <div class="mb-3">
-        <label for="devicesJson" class="form-label">devices.json file</label>
-        <input type="file" id="devicesJson" name="devicesJson" class="form-control" accept=".json" required />
+<% if (!preview && !csvPreview) { %>
+<!-- ── Idle: show both upload sections ─────────────────────────────────────── -->
+<div class="row g-4">
+
+  <!-- Tower Map format (devices.json) -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <i class="bi bi-geo-alt"></i>Tower Map Format
+        <span class="badge bg-body-secondary text-body border ms-auto">devices.json</span>
       </div>
-      <button type="submit" class="btn btn-primary btn-sm">
-        <i class="bi bi-search me-1"></i>Preview Import
-      </button>
-    </form>
+      <div class="card-body d-flex flex-column">
+        <p class="small text-muted mb-3">
+          Import or export the SIRNnetworkmap <code>devices.json</code> format.
+          Fields: site name, lat/lng, loc type, hostname, IP, device type, alert status, SolarWinds ID.<br>
+          <strong>Import:</strong> matches by <em>Site Number + Site Name</em>. Existing hostname records are skipped; new ones are inserted.
+        </p>
+        <form action="/admin/network-resources-import" method="POST" enctype="multipart/form-data" class="mb-3">
+          <div class="mb-2">
+            <label for="devicesJson" class="form-label small fw-semibold">devices.json file</label>
+            <input type="file" id="devicesJson" name="devicesJson" class="form-control form-control-sm" accept=".json" required />
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-search me-1"></i>Preview Import
+          </button>
+        </form>
+        <div class="mt-auto">
+          <a href="/admin/network-resources-export" class="btn btn-outline-secondary btn-sm w-100">
+            <i class="bi bi-download me-1"></i>Export devices.json
+          </a>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- Full backup (CSV) -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <i class="bi bi-table"></i>Full Backup Format
+        <span class="badge bg-body-secondary text-body border ms-auto">CSV</span>
+      </div>
+      <div class="card-body d-flex flex-column">
+        <p class="small text-muted mb-3">
+          Import or export <strong>all fields</strong> including Circuit Type, Circuit ID, Notes, Sort Order, and IsActive.
+          Use this for comprehensive backups and restores.<br>
+          <strong>Import:</strong> matches by <em>Site Number + Site Name + Hostname</em>. Existing records are <strong>updated</strong>; new records are inserted.
+          Columns: <code>SiteNumber, SiteName, Hostname, IPAddress, DeviceType, AlertStatus, SolarwindsNodeId, CircuitType, CircuitID, Notes, SortOrder, IsActive</code>
+        </p>
+        <form action="/admin/network-resources-csv-import" method="POST" enctype="multipart/form-data" class="mb-3">
+          <div class="mb-2">
+            <label for="networkResourcesCsv" class="form-label small fw-semibold">network-resources.csv file</label>
+            <input type="file" id="networkResourcesCsv" name="networkResourcesCsv" class="form-control form-control-sm" accept=".csv" required />
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-search me-1"></i>Preview Import
+          </button>
+        </form>
+        <div class="mt-auto">
+          <a href="/admin/network-resources-csv-export" class="btn btn-outline-secondary btn-sm w-100">
+            <i class="bi bi-download me-1"></i>Export network-resources.csv
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<% } else { %>
-<!-- ── Step 2: Preview ────────────────────────────────────────────────────── -->
+<% } else if (preview) { %>
+<!-- ── devices.json preview ────────────────────────────────────────────────── -->
 <div class="row g-4">
   <div class="col-12">
     <div class="alert alert-info py-2 small mb-0">
@@ -95,7 +137,106 @@
     </form>
     <% } %>
     <a href="/admin/network-resources-import" class="btn btn-outline-secondary">
-      <i class="bi bi-arrow-left me-1"></i>Upload Different File
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<% } else if (csvPreview) { %>
+<!-- ── CSV preview ─────────────────────────────────────────────────────────── -->
+<div class="row g-4">
+  <div class="col-12">
+    <div class="alert alert-info py-2 small mb-0">
+      <strong><%= csvPreview.toInsert.length %></strong> to insert &mdash;
+      <strong><%= csvPreview.toUpdate.length %></strong> changed (will update) &mdash;
+      <strong><%= csvPreview.unchanged.length %></strong> unchanged (skipped) &mdash;
+      <strong><%= csvPreview.skipped.length %></strong> unresolvable (skipped).
+    </div>
+  </div>
+
+  <% if (csvPreview.toInsert.length > 0) { %>
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold text-success-emphasis bg-success-subtle">New Records — Will Insert (<%= csvPreview.toInsert.length %>)</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Site ID</th><th>Site #</th><th>Site Name</th><th>Hostname</th><th>IP</th><th>Type</th><th>Alert</th><th>SolarWinds</th></tr></thead>
+          <tbody>
+            <% csvPreview.toInsert.forEach(function(r) { %>
+            <tr>
+              <td class="small text-muted">#<%= r.siteID %></td>
+              <td class="small"><%= r.siteNumber || '—' %></td>
+              <td class="small"><%= r.siteName || '—' %></td>
+              <td class="fw-semibold"><%= r.hostname %></td>
+              <td class="small font-monospace"><%= r.ipAddress || '—' %></td>
+              <td class="small"><%= r.devTypeName %></td>
+              <td><span class="badge <%= r.alertStatus ? 'bg-success' : 'bg-warning text-dark' %>"><%= r.alertStatus ? 'Yes' : 'No' %></span></td>
+              <td class="small"><%= r.solarwindsNodeId || '—' %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (csvPreview.toUpdate.length > 0) { %>
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold text-primary-emphasis bg-primary-subtle">Existing Records — Will Update (<%= csvPreview.toUpdate.length %>)</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Resource ID</th><th>Site #</th><th>Site Name</th><th>Hostname</th><th>IP</th><th>Type</th><th>Alert</th><th>Active</th></tr></thead>
+          <tbody>
+            <% csvPreview.toUpdate.forEach(function(r) { %>
+            <tr>
+              <td class="small text-muted">#<%= r.resourceID %></td>
+              <td class="small"><%= r.siteNumber || '—' %></td>
+              <td class="small"><%= r.siteName || '—' %></td>
+              <td class="fw-semibold"><%= r.hostname %></td>
+              <td class="small font-monospace"><%= r.ipAddress || '—' %></td>
+              <td class="small"><%= r.devTypeName %></td>
+              <td><span class="badge <%= r.alertStatus ? 'bg-success' : 'bg-warning text-dark' %>"><%= r.alertStatus ? 'Yes' : 'No' %></span></td>
+              <td><span class="badge <%= r.isActive ? 'bg-success' : 'bg-secondary' %>"><%= r.isActive ? 'Active' : 'Inactive' %></span></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (csvPreview.skipped.length > 0) { %>
+  <div class="col-12">
+    <div class="card shadow-sm border-warning">
+      <div class="card-header fw-semibold text-warning-emphasis bg-warning-subtle">Skipped Rows (<%= csvPreview.skipped.length %>)</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Row</th><th>Name</th><th>Reason</th></tr></thead>
+          <tbody>
+            <% csvPreview.skipped.forEach(function(s) { %>
+            <tr><td class="small text-muted"><%= s.row %></td><td class="small"><%= s.name %></td><td class="small text-danger"><%= s.reason %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="col-12 d-flex gap-2">
+    <% if (csvPreview.toInsert.length > 0 || csvPreview.toUpdate.length > 0) { %>
+    <form action="/admin/network-resources-csv-import/confirm" method="POST">
+      <input type="hidden" name="payload" value="<%= csvPreview.payloadJson %>" />
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check2-circle me-1"></i>Confirm Import
+      </button>
+    </form>
+    <% } %>
+    <a href="/admin/network-resources-import" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Back
     </a>
   </div>
 </div>

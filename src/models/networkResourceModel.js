@@ -200,6 +200,32 @@ async function getTowerMapData() {
   return Array.from(siteMap.values());
 }
 
+// Returns all NetworkResources (active + inactive) with all fields, for CSV export.
+async function getAllForCsvExport() {
+  const pool   = await getPool();
+  const result = await pool.request().query(`
+    SELECT
+      s.SiteNumber,
+      s.SiteName,
+      r.Hostname,
+      r.IPAddress,
+      dt.TypeName   AS DeviceType,
+      r.AlertStatus,
+      r.SolarwindsNodeId,
+      ct.TypeName   AS CircuitType,
+      r.CircuitID,
+      r.Notes,
+      r.SortOrder,
+      r.IsActive
+    FROM   NetworkResources    r
+    JOIN   Sites               s  ON s.SiteID        = r.SiteID
+    JOIN   NetworkDeviceTypes  dt ON dt.DeviceTypeID  = r.DeviceTypeID
+    LEFT JOIN CircuitTypes     ct ON ct.CircuitTypeID = r.CircuitTypeID
+    ORDER  BY s.SiteNumber, s.SiteName, r.SortOrder, r.Hostname
+  `);
+  return result.recordset;
+}
+
 module.exports = {
   getBySite,
   getByID,
@@ -207,4 +233,5 @@ module.exports = {
   update,
   softDelete,
   getTowerMapData,
+  getAllForCsvExport,
 };

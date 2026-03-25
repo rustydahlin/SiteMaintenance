@@ -24,6 +24,48 @@ const jsonUpload = multer({
   },
 });
 
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (/\.csv$/i.test(file.originalname)) cb(null, true);
+    else cb(new Error('Only .csv files are accepted'));
+  },
+});
+
+// RFC 4180 CSV parser (handles quoted fields with commas, newlines, escaped quotes)
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { field += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { row.push(field); field = ''; }
+      else if (ch === '\n') { row.push(field); field = ''; rows.push(row); row = []; }
+      else { field += ch; }
+    }
+  }
+  if (field || row.length > 0) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function csvEscape(val) {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  return (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r'))
+    ? '"' + str.replace(/"/g, '""') + '"'
+    : str;
+}
+
+const CSV_HEADERS = ['SiteNumber','SiteName','Hostname','IPAddress','DeviceType',
+  'AlertStatus','SolarwindsNodeId','CircuitType','CircuitID','Notes','SortOrder','IsActive'];
+
 const logDir = process.env.LOG_DIR
   ? path.resolve(process.env.LOG_DIR)
   : path.join(__dirname, '..', 'logs');
@@ -692,9 +734,209 @@ router.get('/network-resources-export', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Network Resources CSV Export ──────────────────────────────────────────────
+router.get('/network-resources-csv-export', async (_req, res, next) => {
+  try {
+    const rows  = await networkResourceModel.getAllForCsvExport();
+    const lines = [CSV_HEADERS.join(',')];
+    for (const r of rows) {
+      lines.push([
+        csvEscape(r.SiteNumber),
+        csvEscape(r.SiteName),
+        csvEscape(r.Hostname),
+        csvEscape(r.IPAddress),
+        csvEscape(r.DeviceType),
+        csvEscape(r.AlertStatus ? 1 : 0),
+        csvEscape(r.SolarwindsNodeId),
+        csvEscape(r.CircuitType),
+        csvEscape(r.CircuitID),
+        csvEscape(r.Notes),
+        csvEscape(r.SortOrder),
+        csvEscape(r.IsActive ? 1 : 0),
+      ].join(','));
+    }
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="network-resources.csv"');
+    res.send(lines.join('\r\n'));
+  } catch (err) { next(err); }
+});
+
+// ── Network Resources CSV Import — preview ────────────────────────────────────
+router.post('/network-resources-csv-import', csvUpload.single('networkResourcesCsv'), async (req, res, next) => {
+  const render = (preview, error) =>
+    res.render('admin/networkResourcesImport', { title: 'Network Resources Import / Export', preview, csvPreview: null, error });
+
+  try {
+    if (!req.file) return render(null, 'Please select a CSV file.');
+
+    let csvRows;
+    try {
+      csvRows = parseCsv(req.file.buffer.toString('utf-8'));
+    } catch (e) {
+      return render(null, `Could not parse CSV: ${e.message}`);
+    }
+
+    if (csvRows.length < 2) return render(null, 'CSV has no data rows.');
+    const headers = csvRows[0].map(h => h.trim());
+    const required = ['SiteNumber','SiteName','Hostname','DeviceType'];
+    for (const h of required) {
+      if (!headers.includes(h)) return render(null, `Missing required column: ${h}`);
+    }
+    const idx = Object.fromEntries(headers.map((h, i) => [h, i]));
+
+    // Load lookups
+    const { getPool, sql } = require('../config/database');
+    const pool = await getPool();
+    const [sitesResult, deviceTypesResult, circuitTypesResult] = await Promise.all([
+      pool.request().query(`SELECT SiteID, ISNULL(SiteNumber,'') AS SiteNumber, SiteName FROM Sites WHERE IsActive = 1`),
+      pool.request().query(`SELECT DeviceTypeID, TypeName FROM NetworkDeviceTypes`),
+      pool.request().query(`SELECT CircuitTypeID, TypeName FROM CircuitTypes`),
+    ]);
+
+    const siteMap    = new Map(sitesResult.recordset.map(r =>
+      [`${(r.SiteNumber||'').trim().toLowerCase()}|${r.SiteName.trim().toLowerCase()}`, r.SiteID]));
+    const devTypeMap = new Map(deviceTypesResult.recordset.map(r => [r.TypeName.toLowerCase(), r.DeviceTypeID]));
+    const circTypeMap= new Map(circuitTypesResult.recordset.map(r => [r.TypeName.toLowerCase(), r.CircuitTypeID]));
+
+    // Load existing resources with full field set for diff comparison
+    const existingResult = await pool.request().query(`
+      SELECT r.ResourceID, r.SiteID, r.Hostname, r.IPAddress,
+             r.DeviceTypeID, r.AlertStatus, r.SolarwindsNodeId,
+             r.CircuitTypeID, r.CircuitID, r.Notes, r.SortOrder, r.IsActive
+      FROM NetworkResources r
+    `);
+    const existingMap = new Map(existingResult.recordset.map(r =>
+      [`${r.SiteID}|${r.Hostname.toLowerCase()}`, r]));
+
+    const toInsert = [], toUpdate = [], unchanged = [], skipped = [];
+
+    // Helper: normalise a value for comparison (null/''/undefined → null, numbers as numbers)
+    const norm = v => (v === null || v === undefined || v === '') ? null : v;
+
+    for (let i = 1; i < csvRows.length; i++) {
+      const cols = csvRows[i];
+      if (cols.every(c => !c.trim())) continue; // blank row
+      const get = key => (idx[key] !== undefined ? (cols[idx[key]] || '').trim() : '');
+
+      const siteKey   = `${get('SiteNumber').toLowerCase()}|${get('SiteName').toLowerCase()}`;
+      const siteID    = siteMap.get(siteKey);
+      const hostname  = get('Hostname');
+      const devTypeID = devTypeMap.get(get('DeviceType').toLowerCase());
+
+      if (!siteID)    { skipped.push({ row: i + 1, name: `${get('SiteNumber')} ${get('SiteName')}`, reason: 'Site not found' }); continue; }
+      if (!hostname)  { skipped.push({ row: i + 1, name: `${get('SiteNumber')} ${get('SiteName')}`, reason: 'Hostname blank' }); continue; }
+      if (!devTypeID) { skipped.push({ row: i + 1, name: hostname, reason: `Device type "${get('DeviceType')}" not found` }); continue; }
+
+      const circTypeID     = circTypeMap.get(get('CircuitType').toLowerCase()) || null;
+      const alertStatus    = get('AlertStatus') === '0' ? 0 : 1;
+      const solarwindsNodeId = get('SolarwindsNodeId') ? parseInt(get('SolarwindsNodeId'), 10) : null;
+      const sortOrder      = get('SortOrder') ? parseInt(get('SortOrder'), 10) : 0;
+      const isActive       = get('IsActive') === '0' ? 0 : 1;
+      const ipAddress      = get('IPAddress') || null;
+      const circuitID      = get('CircuitID') || null;
+      const notes          = get('Notes') || null;
+
+      const siteNumber = get('SiteNumber');
+      const siteName   = get('SiteName');
+      const devTypeName = get('DeviceType');
+      const resourceData = {
+        siteID, siteNumber, siteName, hostname, devTypeID, devTypeName, circTypeID,
+        ipAddress, alertStatus, solarwindsNodeId, circuitID, notes, sortOrder, isActive,
+      };
+
+      const existing = existingMap.get(`${siteID}|${hostname.toLowerCase()}`);
+      if (!existing) {
+        toInsert.push(resourceData);
+      } else {
+        // Compare every updatable field — only flag as update if something changed
+        const changed =
+          norm(existing.IPAddress)         !== norm(ipAddress)       ||
+          existing.DeviceTypeID            !== devTypeID             ||
+          (existing.AlertStatus ? 1 : 0)  !== alertStatus           ||
+          norm(existing.SolarwindsNodeId)  !== norm(solarwindsNodeId)||
+          norm(existing.CircuitTypeID)     !== norm(circTypeID)      ||
+          norm(existing.CircuitID)         !== norm(circuitID)       ||
+          norm(existing.Notes)             !== norm(notes)           ||
+          existing.SortOrder               !== sortOrder             ||
+          (existing.IsActive ? 1 : 0)      !== isActive;
+
+        if (changed) {
+          toUpdate.push({ resourceID: existing.ResourceID, ...resourceData });
+        } else {
+          unchanged.push(hostname);
+        }
+      }
+    }
+
+    const payloadJson = JSON.stringify({ toInsert, toUpdate });
+    res.render('admin/networkResourcesImport', {
+      title: 'Network Resources Import / Export',
+      preview: null,
+      csvPreview: { toInsert, toUpdate, unchanged, skipped, payloadJson },
+      error: null,
+    });
+  } catch (err) {
+    if (err instanceof multer.MulterError || err.message?.includes('Only .csv')) {
+      return res.render('admin/networkResourcesImport', {
+        title: 'Network Resources Import / Export', preview: null, csvPreview: null, error: err.message,
+      });
+    }
+    next(err);
+  }
+});
+
+// ── Network Resources CSV Import — confirm ────────────────────────────────────
+router.post('/network-resources-csv-import/confirm', express.urlencoded({ extended: true, limit: '20mb' }), async (req, res, next) => {
+  try {
+    const { toInsert, toUpdate } = JSON.parse(req.body.payload || '{"toInsert":[],"toUpdate":[]}');
+    const { getPool, sql } = require('../config/database');
+    const pool = await getPool();
+
+    let inserted = 0, updated = 0;
+
+    for (const r of toInsert) {
+      await networkResourceModel.create(r.siteID, {
+        hostname: r.hostname, ipAddress: r.ipAddress,
+        deviceTypeID: r.devTypeID, alertStatus: r.alertStatus,
+        solarwindsNodeId: r.solarwindsNodeId, circuitTypeID: r.circTypeID,
+        circuitID: r.circuitID, notes: r.notes, sortOrder: r.sortOrder,
+      }, req.auditContext);
+      inserted++;
+    }
+
+    for (const r of toUpdate) {
+      await pool.request()
+        .input('ResourceID',       sql.Int,               r.resourceID)
+        .input('IPAddress',        sql.NVarChar(45),       r.ipAddress)
+        .input('DeviceTypeID',     sql.Int,                r.devTypeID)
+        .input('AlertStatus',      sql.Bit,                r.alertStatus)
+        .input('SolarwindsNodeId', sql.Int,                r.solarwindsNodeId)
+        .input('CircuitTypeID',    sql.Int,                r.circTypeID)
+        .input('CircuitID',        sql.NVarChar(150),      r.circuitID)
+        .input('Notes',            sql.NVarChar(sql.MAX),  r.notes)
+        .input('SortOrder',        sql.Int,                r.sortOrder)
+        .input('IsActive',         sql.Bit,                r.isActive)
+        .input('UserID',           sql.Int,                req.auditContext?.userID || null)
+        .query(`
+          UPDATE NetworkResources SET
+            IPAddress = @IPAddress, DeviceTypeID = @DeviceTypeID,
+            AlertStatus = @AlertStatus, SolarwindsNodeId = @SolarwindsNodeId,
+            CircuitTypeID = @CircuitTypeID, CircuitID = @CircuitID,
+            Notes = @Notes, SortOrder = @SortOrder, IsActive = @IsActive,
+            UpdatedAt = GETUTCDATE(), UpdatedByUserID = @UserID
+          WHERE ResourceID = @ResourceID
+        `);
+      updated++;
+    }
+
+    req.flash('success', `CSV import complete: ${inserted} added, ${updated} updated.`);
+    res.redirect('/admin/network-resources-import');
+  } catch (err) { next(err); }
+});
+
 // ── Network Resources Import ──────────────────────────────────────────────────
 router.get('/network-resources-import', (_req, res) => {
-  res.render('admin/networkResourcesImport', { title: 'Network Resources Import', preview: null, error: null });
+  res.render('admin/networkResourcesImport', { title: 'Network Resources Import / Export', preview: null, csvPreview: null, error: null });
 });
 
 router.post('/network-resources-import', jsonUpload.single('devicesJson'), async (req, res, next) => {
@@ -708,7 +950,7 @@ router.post('/network-resources-import', jsonUpload.single('devicesJson'), async
       entries = JSON.parse(req.file.buffer.toString('utf-8'));
       if (!Array.isArray(entries)) throw new Error('Root element must be an array.');
     } catch (parseErr) {
-      return res.render('admin/networkResourcesImport', { title: 'Network Resources Import', preview: null, error: `Invalid JSON: ${parseErr.message}` });
+      return res.render('admin/networkResourcesImport', { title: 'Network Resources Import / Export', preview: null, csvPreview: null, error: `Invalid JSON: ${parseErr.message}` });
     }
 
     // Load all sites for matching
@@ -737,13 +979,14 @@ router.post('/network-resources-import', jsonUpload.single('devicesJson'), async
     const payloadJson = JSON.stringify(matched.map(m => ({ siteID: m.siteID, entry: m.entry })));
 
     res.render('admin/networkResourcesImport', {
-      title:   'Network Resources Import',
-      preview: { matched, unmatched, payloadJson },
-      error:   null,
+      title:      'Network Resources Import / Export',
+      preview:    { matched, unmatched, payloadJson },
+      csvPreview: null,
+      error:      null,
     });
   } catch (err) {
     if (err instanceof multer.MulterError || err.message?.includes('Only .json')) {
-      return res.render('admin/networkResourcesImport', { title: 'Network Resources Import', preview: null, error: err.message });
+      return res.render('admin/networkResourcesImport', { title: 'Network Resources Import / Export', preview: null, csvPreview: null, error: err.message });
     }
     next(err);
   }

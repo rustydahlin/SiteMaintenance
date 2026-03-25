@@ -262,6 +262,69 @@ When new database migrations are released:
 
 ---
 
+## SIRNnetworkmap API Integration
+
+SIRNnetworkmap can pull live site/device data from this app instead of a static `devices.json` file.
+
+### 1. Generate and set the API key (SiteMaintenance)
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Copy the output, then go to **Admin → Settings → Tower Map / SIRNnetworkmap** and paste it into the **API Key** field. Save.
+
+### 2. Configure SIRNnetworkmap
+
+In `SIRNnetworkmap/src/backend/.env`, add:
+
+```env
+SITEMAINT_API_URL=http://<host>:<port>/api/tower-map
+SITEMAINT_API_KEY=<the key you generated above>
+```
+
+Replace `<host>` and `<port>` with the address where SiteMaintenance is running (e.g. `http://localhost:3000` during development, or your production hostname).
+
+### 3. Verify the fallback chain
+
+SIRNnetworkmap loads location data in this order:
+
+| Tier | Source | When used |
+|------|--------|-----------|
+| 1 | SiteMaintenance API (`/api/tower-map`) | Normal operation |
+| 2 | `devices.cache.json` | API unreachable; written after every successful API call |
+| 3 | `devices.json` | Cache missing (first run before API ever succeeded) |
+| 4 | Stale in-memory data | All files unavailable |
+
+After the first successful API call, `devices.cache.json` is written and tier 3 is effectively never reached again.
+
+### 4. Populate data in SiteMaintenance
+
+For a site to appear on the tower map it needs both:
+- **Monitoring Location Type** set on the site (Admin → Monitoring Location Types to manage options)
+- At least one active **Network Resource** on the site's Network Resources tab
+
+Use **Admin → Network Resources Import / Export** to bulk-import an existing `devices.json` or export the current database state back to that format.
+
+### 5. Reverting to static devices.json (no API)
+
+If you have trouble connecting to the API and need to add/remove locations and network devices:
+
+1. Locate devices.cache.json in the src/frontend/overlays folder for SIRNnetworkmap
+2. Delete the devices.cache.json file, and ensure a valid devices.json file is in that directory.
+
+To stop using the API and return to a fully static setup:
+
+1. In `SIRNnetworkmap/src/backend/.env`, remove (or comment out) both lines:
+   ```env
+   # SITEMAINT_API_URL=...
+   # SITEMAINT_API_KEY=...
+   ```
+2. Ensure an up-to-date `devices.json` is in `SIRNnetworkmap/src/frontend/overlays/`. Use **Admin → Network Resources Import / Export → Export devices.json** to get a current copy from the database.
+3. Restart SIRNnetworkmap. With both env vars absent, the API tier is skipped entirely and the static file is loaded directly.
+
+---
+
 ## Directory Structure
 
 ```
