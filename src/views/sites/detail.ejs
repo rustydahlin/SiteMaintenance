@@ -525,6 +525,7 @@
       <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
+            <th class="text-muted" style="width:3rem">Order</th>
             <th>Hostname</th>
             <th>IP Address</th>
             <th>Type</th>
@@ -538,6 +539,7 @@
         <tbody id="networkResourceTbody">
           <% networkResources.forEach(r => { %>
           <tr data-res-id="<%= r.ResourceID %>">
+            <td class="text-muted small text-center"><%= r.SortOrder %></td>
             <td class="fw-semibold"><%= r.Hostname %></td>
             <td class="font-monospace small"><%= r.IPAddress || '—' %></td>
             <td><span class="badge bg-body-secondary text-body border"><%= r.DeviceTypeName %></span></td>
@@ -689,7 +691,7 @@ function clearResourceModal() {
   document.getElementById('res_deviceTypeID').value    = '';
   document.getElementById('res_alertStatus').checked   = true;
   document.getElementById('res_solarwindsNodeId').value = '';
-  document.getElementById('res_sortOrder').value       = '0';
+  document.getElementById('res_sortOrder').value       = '<%= networkResources.length %>';
   document.getElementById('res_circuitTypeID').value   = '';
   document.getElementById('res_circuitID').value       = '';
   document.getElementById('res_notes').value           = '';

@@ -64,7 +64,7 @@ function csvEscape(val) {
 }
 
 const CSV_HEADERS = ['SiteNumber','SiteName','Hostname','IPAddress','DeviceType',
-  'AlertStatus','SolarwindsNodeId','CircuitType','CircuitID','Notes','SortOrder','IsActive'];
+  'AlertStatus','SolarwindsNodeId','CircuitType','CircuitID','Notes','SortOrder'];
 
 const logDir = process.env.LOG_DIR
   ? path.resolve(process.env.LOG_DIR)
@@ -752,7 +752,6 @@ router.get('/network-resources-csv-export', async (_req, res, next) => {
         csvEscape(r.CircuitID),
         csvEscape(r.Notes),
         csvEscape(r.SortOrder),
-        csvEscape(r.IsActive ? 1 : 0),
       ].join(','));
     }
     res.setHeader('Content-Type', 'text/csv');
@@ -785,7 +784,7 @@ router.post('/network-resources-csv-import', csvUpload.single('networkResourcesC
     const idx = Object.fromEntries(headers.map((h, i) => [h, i]));
 
     // Load lookups
-    const { getPool, sql } = require('../config/database');
+    const { getPool } = require('../config/database');
     const pool = await getPool();
     const [sitesResult, deviceTypesResult, circuitTypesResult] = await Promise.all([
       pool.request().query(`SELECT SiteID, ISNULL(SiteNumber,'') AS SiteNumber, SiteName FROM Sites WHERE IsActive = 1`),
@@ -793,10 +792,12 @@ router.post('/network-resources-csv-import', csvUpload.single('networkResourcesC
       pool.request().query(`SELECT CircuitTypeID, TypeName FROM CircuitTypes`),
     ]);
 
-    const siteMap    = new Map(sitesResult.recordset.map(r =>
+    const siteMap      = new Map(sitesResult.recordset.map(r =>
       [`${(r.SiteNumber||'').trim().toLowerCase()}|${r.SiteName.trim().toLowerCase()}`, r.SiteID]));
-    const devTypeMap = new Map(deviceTypesResult.recordset.map(r => [r.TypeName.toLowerCase(), r.DeviceTypeID]));
-    const circTypeMap= new Map(circuitTypesResult.recordset.map(r => [r.TypeName.toLowerCase(), r.CircuitTypeID]));
+    const siteByID     = new Map(sitesResult.recordset.map(r => [r.SiteID, r]));
+    const devTypeMap   = new Map(deviceTypesResult.recordset.map(r => [r.TypeName.toLowerCase(), r.DeviceTypeID]));
+    const devTypeByID  = new Map(deviceTypesResult.recordset.map(r => [r.DeviceTypeID, r.TypeName]));
+    const circTypeMap  = new Map(circuitTypesResult.recordset.map(r => [r.TypeName.toLowerCase(), r.CircuitTypeID]));
 
     // Load existing resources with full field set for diff comparison
     const existingResult = await pool.request().query(`
@@ -809,6 +810,7 @@ router.post('/network-resources-csv-import', csvUpload.single('networkResourcesC
       [`${r.SiteID}|${r.Hostname.toLowerCase()}`, r]));
 
     const toInsert = [], toUpdate = [], unchanged = [], skipped = [];
+    const seenHostnames = new Map(); // siteID → Set of lowercase hostnames seen in CSV
 
     // Helper: normalise a value for comparison (null/''/undefined → null, numbers as numbers)
     const norm = v => (v === null || v === undefined || v === '') ? null : v;
@@ -831,7 +833,6 @@ router.post('/network-resources-csv-import', csvUpload.single('networkResourcesC
       const alertStatus    = get('AlertStatus') === '0' ? 0 : 1;
       const solarwindsNodeId = get('SolarwindsNodeId') ? parseInt(get('SolarwindsNodeId'), 10) : null;
       const sortOrder      = get('SortOrder') ? parseInt(get('SortOrder'), 10) : 0;
-      const isActive       = get('IsActive') === '0' ? 0 : 1;
       const ipAddress      = get('IPAddress') || null;
       const circuitID      = get('CircuitID') || null;
       const notes          = get('Notes') || null;
@@ -841,8 +842,12 @@ router.post('/network-resources-csv-import', csvUpload.single('networkResourcesC
       const devTypeName = get('DeviceType');
       const resourceData = {
         siteID, siteNumber, siteName, hostname, devTypeID, devTypeName, circTypeID,
-        ipAddress, alertStatus, solarwindsNodeId, circuitID, notes, sortOrder, isActive,
+        ipAddress, alertStatus, solarwindsNodeId, circuitID, notes, sortOrder,
       };
+
+      // Track which hostnames were seen per site (for deletion detection)
+      if (!seenHostnames.has(siteID)) seenHostnames.set(siteID, new Set());
+      seenHostnames.get(siteID).add(hostname.toLowerCase());
 
       const existing = existingMap.get(`${siteID}|${hostname.toLowerCase()}`);
       if (!existing) {
@@ -857,8 +862,7 @@ router.post('/network-resources-csv-import', csvUpload.single('networkResourcesC
           norm(existing.CircuitTypeID)     !== norm(circTypeID)      ||
           norm(existing.CircuitID)         !== norm(circuitID)       ||
           norm(existing.Notes)             !== norm(notes)           ||
-          existing.SortOrder               !== sortOrder             ||
-          (existing.IsActive ? 1 : 0)      !== isActive;
+          existing.SortOrder               !== sortOrder;
 
         if (changed) {
           toUpdate.push({ resourceID: existing.ResourceID, ...resourceData });
@@ -868,11 +872,31 @@ router.post('/network-resources-csv-import', csvUpload.single('networkResourcesC
       }
     }
 
-    const payloadJson = JSON.stringify({ toInsert, toUpdate });
+    // Detect deletions: existing resources for CSV-mentioned sites not present in CSV
+    const toDelete = [];
+    for (const [siteID, hostnamesInCsv] of seenHostnames) {
+      for (const existing of existingResult.recordset.filter(r => r.SiteID === siteID)) {
+        if (!hostnamesInCsv.has(existing.Hostname.toLowerCase())) {
+          const site = siteByID.get(existing.SiteID);
+          toDelete.push({
+            resourceID:  existing.ResourceID,
+            siteID:      existing.SiteID,
+            siteNumber:  site?.SiteNumber || '',
+            siteName:    site?.SiteName   || '',
+            hostname:    existing.Hostname,
+            ipAddress:   existing.IPAddress,
+            devTypeName: devTypeByID.get(existing.DeviceTypeID) || '',
+            alertStatus: existing.AlertStatus ? 1 : 0,
+          });
+        }
+      }
+    }
+
+    const payloadJson = JSON.stringify({ toInsert, toUpdate, toDelete });
     res.render('admin/networkResourcesImport', {
       title: 'Network Resources Import / Export',
       preview: null,
-      csvPreview: { toInsert, toUpdate, unchanged, skipped, payloadJson },
+      csvPreview: { toInsert, toUpdate, toDelete, unchanged, skipped, payloadJson },
       error: null,
     });
   } catch (err) {
@@ -888,11 +912,11 @@ router.post('/network-resources-csv-import', csvUpload.single('networkResourcesC
 // ── Network Resources CSV Import — confirm ────────────────────────────────────
 router.post('/network-resources-csv-import/confirm', express.urlencoded({ extended: true, limit: '20mb' }), async (req, res, next) => {
   try {
-    const { toInsert, toUpdate } = JSON.parse(req.body.payload || '{"toInsert":[],"toUpdate":[]}');
+    const { toInsert, toUpdate, toDelete = [] } = JSON.parse(req.body.payload || '{"toInsert":[],"toUpdate":[],"toDelete":[]}');
     const { getPool, sql } = require('../config/database');
     const pool = await getPool();
 
-    let inserted = 0, updated = 0;
+    let inserted = 0, updated = 0, deleted = 0;
 
     for (const r of toInsert) {
       await networkResourceModel.create(r.siteID, {
@@ -915,21 +939,25 @@ router.post('/network-resources-csv-import/confirm', express.urlencoded({ extend
         .input('CircuitID',        sql.NVarChar(150),      r.circuitID)
         .input('Notes',            sql.NVarChar(sql.MAX),  r.notes)
         .input('SortOrder',        sql.Int,                r.sortOrder)
-        .input('IsActive',         sql.Bit,                r.isActive)
         .input('UserID',           sql.Int,                req.auditContext?.userID || null)
         .query(`
           UPDATE NetworkResources SET
             IPAddress = @IPAddress, DeviceTypeID = @DeviceTypeID,
             AlertStatus = @AlertStatus, SolarwindsNodeId = @SolarwindsNodeId,
             CircuitTypeID = @CircuitTypeID, CircuitID = @CircuitID,
-            Notes = @Notes, SortOrder = @SortOrder, IsActive = @IsActive,
+            Notes = @Notes, SortOrder = @SortOrder,
             UpdatedAt = GETUTCDATE(), UpdatedByUserID = @UserID
           WHERE ResourceID = @ResourceID
         `);
       updated++;
     }
 
-    req.flash('success', `CSV import complete: ${inserted} added, ${updated} updated.`);
+    for (const r of toDelete) {
+      await networkResourceModel.softDelete(r.resourceID, req.auditContext);
+      deleted++;
+    }
+
+    req.flash('success', `CSV import complete: ${inserted} added, ${updated} updated, ${deleted} deleted.`);
     res.redirect('/admin/network-resources-import');
   } catch (err) { next(err); }
 });
@@ -954,7 +982,7 @@ router.post('/network-resources-import', jsonUpload.single('devicesJson'), async
     }
 
     // Load all sites for matching
-    const { getPool, sql } = require('../config/database');
+    const { getPool } = require('../config/database');
     const pool = await getPool();
     const sitesResult = await pool.request().query(
       `SELECT SiteID, LOWER(ISNULL(SiteNumber + ' ', '') + SiteName) AS MatchKey FROM Sites WHERE IsActive = 1`

@@ -46,6 +46,18 @@ async function getByID(resourceID) {
   return result.recordset[0] || null;
 }
 
+// Shifts all active resources for a site with SortOrder >= position up by 1
+async function shiftSortOrderUp(pool, siteID, fromPosition) {
+  await pool.request()
+    .input('SiteID',    sql.Int, siteID)
+    .input('FromPos',   sql.Int, fromPosition)
+    .query(`
+      UPDATE NetworkResources
+      SET SortOrder = SortOrder + 1
+      WHERE SiteID = @SiteID AND IsActive = 1 AND SortOrder >= @FromPos
+    `);
+}
+
 async function create(siteID, data, auditContext = {}) {
   const {
     hostname, ipAddress, deviceTypeID, alertStatus,
@@ -53,6 +65,10 @@ async function create(siteID, data, auditContext = {}) {
   } = data;
 
   const pool   = await getPool();
+
+  // Shift existing records at >= sortOrder down to make room
+  await shiftSortOrderUp(pool, siteID, sortOrder ?? 0);
+
   const result = await pool.request()
     .input('SiteID',           sql.Int,           siteID)
     .input('Hostname',         sql.NVarChar(150),  hostname)
@@ -95,6 +111,39 @@ async function update(resourceID, data, auditContext = {}) {
   const pool = await getPool();
   const old  = await getByID(resourceID);
 
+  // Shift surrounding records if sort order changed
+  const newPos = sortOrder ?? 0;
+  const oldPos = old?.SortOrder ?? 0;
+  if (newPos !== oldPos) {
+    if (newPos < oldPos) {
+      // Moving up: shift items in [newPos, oldPos-1] down by 1
+      await pool.request()
+        .input('SiteID',  sql.Int, old.SiteID)
+        .input('FromPos', sql.Int, newPos)
+        .input('ToPos',   sql.Int, oldPos - 1)
+        .query(`
+          UPDATE NetworkResources
+          SET SortOrder = SortOrder + 1
+          WHERE SiteID = @SiteID AND IsActive = 1
+            AND SortOrder >= @FromPos AND SortOrder <= @ToPos
+            AND ResourceID <> ${resourceID}
+        `);
+    } else {
+      // Moving down: shift items in [oldPos+1, newPos] up by 1
+      await pool.request()
+        .input('SiteID',  sql.Int, old.SiteID)
+        .input('FromPos', sql.Int, oldPos + 1)
+        .input('ToPos',   sql.Int, newPos)
+        .query(`
+          UPDATE NetworkResources
+          SET SortOrder = SortOrder - 1
+          WHERE SiteID = @SiteID AND IsActive = 1
+            AND SortOrder >= @FromPos AND SortOrder <= @ToPos
+            AND ResourceID <> ${resourceID}
+        `);
+    }
+  }
+
   await pool.request()
     .input('ResourceID',       sql.Int,           resourceID)
     .input('Hostname',         sql.NVarChar(150),  hostname)
@@ -133,14 +182,24 @@ async function update(resourceID, data, auditContext = {}) {
 
 async function softDelete(resourceID, auditContext = {}) {
   const pool = await getPool();
+  const old  = await getByID(resourceID);
+
+  // Hard delete — no reason to retain network resource records
   await pool.request()
     .input('ResourceID', sql.Int, resourceID)
-    .input('UserID',     sql.Int, auditContext.userID || null)
-    .query(`
-      UPDATE NetworkResources
-      SET IsActive = 0, UpdatedAt = GETUTCDATE(), UpdatedByUserID = @UserID
-      WHERE ResourceID = @ResourceID
-    `);
+    .query(`DELETE FROM NetworkResources WHERE ResourceID = @ResourceID`);
+
+  // Close the gap: shift all active records above the deleted position down by 1
+  if (old) {
+    await pool.request()
+      .input('SiteID',  sql.Int, old.SiteID)
+      .input('FromPos', sql.Int, old.SortOrder + 1)
+      .query(`
+        UPDATE NetworkResources
+        SET SortOrder = SortOrder - 1
+        WHERE SiteID = @SiteID AND IsActive = 1 AND SortOrder >= @FromPos
+      `);
+  }
 
   await writeAudit({
     tableName: 'NetworkResources', recordID: resourceID, action: 'DELETE',
@@ -200,7 +259,7 @@ async function getTowerMapData() {
   return Array.from(siteMap.values());
 }
 
-// Returns all NetworkResources (active + inactive) with all fields, for CSV export.
+// Returns all active NetworkResources with all fields, for CSV export.
 async function getAllForCsvExport() {
   const pool   = await getPool();
   const result = await pool.request().query(`
@@ -215,12 +274,12 @@ async function getAllForCsvExport() {
       ct.TypeName   AS CircuitType,
       r.CircuitID,
       r.Notes,
-      r.SortOrder,
-      r.IsActive
+      r.SortOrder
     FROM   NetworkResources    r
     JOIN   Sites               s  ON s.SiteID        = r.SiteID
     JOIN   NetworkDeviceTypes  dt ON dt.DeviceTypeID  = r.DeviceTypeID
     LEFT JOIN CircuitTypes     ct ON ct.CircuitTypeID = r.CircuitTypeID
+    WHERE  r.IsActive = 1
     ORDER  BY s.SiteNumber, s.SiteName, r.SortOrder, r.Hostname
   `);
   return result.recordset;

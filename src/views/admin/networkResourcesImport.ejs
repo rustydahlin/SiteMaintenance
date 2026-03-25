@@ -149,6 +149,7 @@
     <div class="alert alert-info py-2 small mb-0">
       <strong><%= csvPreview.toInsert.length %></strong> to insert &mdash;
       <strong><%= csvPreview.toUpdate.length %></strong> changed (will update) &mdash;
+      <strong><%= csvPreview.toDelete.length %></strong> missing from CSV (will delete) &mdash;
       <strong><%= csvPreview.unchanged.length %></strong> unchanged (skipped) &mdash;
       <strong><%= csvPreview.skipped.length %></strong> unresolvable (skipped).
     </div>
@@ -187,7 +188,7 @@
       <div class="card-header fw-semibold text-primary-emphasis bg-primary-subtle">Existing Records — Will Update (<%= csvPreview.toUpdate.length %>)</div>
       <div class="table-responsive">
         <table class="table table-sm table-hover mb-0">
-          <thead><tr><th>Resource ID</th><th>Site #</th><th>Site Name</th><th>Hostname</th><th>IP</th><th>Type</th><th>Alert</th><th>Active</th></tr></thead>
+          <thead><tr><th>Resource ID</th><th>Site #</th><th>Site Name</th><th>Hostname</th><th>IP</th><th>Type</th><th>Alert</th></tr></thead>
           <tbody>
             <% csvPreview.toUpdate.forEach(function(r) { %>
             <tr>
@@ -198,7 +199,32 @@
               <td class="small font-monospace"><%= r.ipAddress || '—' %></td>
               <td class="small"><%= r.devTypeName %></td>
               <td><span class="badge <%= r.alertStatus ? 'bg-success' : 'bg-warning text-dark' %>"><%= r.alertStatus ? 'Yes' : 'No' %></span></td>
-              <td><span class="badge <%= r.isActive ? 'bg-success' : 'bg-secondary' %>"><%= r.isActive ? 'Active' : 'Inactive' %></span></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (csvPreview.toDelete.length > 0) { %>
+  <div class="col-12">
+    <div class="card shadow-sm border-danger">
+      <div class="card-header fw-semibold text-danger-emphasis bg-danger-subtle">Missing from CSV — Will Delete (<%= csvPreview.toDelete.length %>)</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Resource ID</th><th>Site #</th><th>Site Name</th><th>Hostname</th><th>IP</th><th>Type</th><th>Alert</th></tr></thead>
+          <tbody>
+            <% csvPreview.toDelete.forEach(function(r) { %>
+            <tr>
+              <td class="small text-muted">#<%= r.resourceID %></td>
+              <td class="small"><%= r.siteNumber || '—' %></td>
+              <td class="small"><%= r.siteName || '—' %></td>
+              <td class="fw-semibold"><%= r.hostname %></td>
+              <td class="small font-monospace"><%= r.ipAddress || '—' %></td>
+              <td class="small"><%= r.devTypeName %></td>
+              <td><span class="badge <%= r.alertStatus ? 'bg-success' : 'bg-warning text-dark' %>"><%= r.alertStatus ? 'Yes' : 'No' %></span></td>
             </tr>
             <% }) %>
           </tbody>
@@ -227,7 +253,7 @@
   <% } %>
 
   <div class="col-12 d-flex gap-2">
-    <% if (csvPreview.toInsert.length > 0 || csvPreview.toUpdate.length > 0) { %>
+    <% if (csvPreview.toInsert.length > 0 || csvPreview.toUpdate.length > 0 || csvPreview.toDelete.length > 0) { %>
     <form action="/admin/network-resources-csv-import/confirm" method="POST">
       <input type="hidden" name="payload" value="<%= csvPreview.payloadJson %>" />
       <button type="submit" class="btn btn-primary">

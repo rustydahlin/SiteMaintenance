@@ -9,9 +9,9 @@
 --          MaintenanceTypes, KeyManufacturers,
 --          UserNotifications (per-user preferences)
 --
--- WIPES:   Sites, MaintenanceItems, Inventory, SiteInventory, InventoryStock,
---          UserInventoryPossession, LogEntries, Documents, DocumentData,
---          RepairTracking, PMSchedules, Vendors, VendorContacts,
+-- WIPES:   Sites, NetworkResources, MaintenanceItems, Inventory, SiteInventory,
+--          InventoryStock, UserInventoryPossession, LogEntries, Documents,
+--          DocumentData, RepairTracking, PMSchedules, Vendors, VendorContacts,
 --          SystemKeys, AuditLog, Sessions
 --
 -- WARNING: THIS IS IRREVERSIBLE. Take a full database backup before running.
@@ -95,7 +95,11 @@ UPDATE Inventory SET RelatedSystemID = NULL WHERE RelatedSystemID IS NOT NULL;
 DELETE FROM Inventory;
 PRINT 'Inventory:                ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
 
--- ── 10. Sites ─────────────────────────────────────────────────────────────────
+-- ── 10. Network resources ─────────────────────────────────────────────────────
+DELETE FROM NetworkResources;
+PRINT 'NetworkResources:         ' + CAST(@@ROWCOUNT AS NVARCHAR) + ' rows deleted';
+
+-- ── 11. Sites ─────────────────────────────────────────────────────────────────
 -- Self-referencing FK (ParentSiteID) — clear it first, then delete all rows
 UPDATE Sites SET ParentSiteID = NULL WHERE ParentSiteID IS NOT NULL;
 DELETE FROM Sites;
@@ -126,6 +130,7 @@ DBCC CHECKIDENT ('SystemKeys',             RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('MaintenanceItems',       RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('LogEntries',             RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('Inventory',              RESEED, 0) WITH NO_INFOMSGS;
+DBCC CHECKIDENT ('NetworkResources',       RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('Sites',                  RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('AuditLog',               RESEED, 0) WITH NO_INFOMSGS;
 
