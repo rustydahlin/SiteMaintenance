@@ -281,6 +281,7 @@ When new database migrations are released:
 | `019_user_deleted.sql` | Adds `DeletedAt` column to `Users` for soft-delete with name preservation |
 | `020_network_resources.sql` | Adds `MonitoringLocationTypes`, `NetworkDeviceTypes`, `CircuitTypes` lookup tables; adds `MonitoringLocationTypeID` to `Sites`; creates `NetworkResources` table for network map integration; seeds `networkMap.apiKey` AppSetting |
 | `021_network_map_updater_role.sql` | Adds `NetworkMapUpdater` role — can view/edit sites and manage network resources; cannot delete sites or access other admin areas |
+| `022_session_timeout.sql` | Seeds `session.timeoutHours` AppSetting (default: 8) — controls how long user sessions remain active |
 
 > **Note:** After running migration 020, set the `networkMap.apiKey` value in **Admin → Settings** before connecting your network map app. Generate a key with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 

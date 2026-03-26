@@ -50,6 +50,12 @@
           </select>
           <div class="form-text">Show / hide the Maintenance section in the navigation.</div>
         </div>
+        <div class="col-md-3">
+          <label class="form-label">Session Timeout (hours)</label>
+          <input type="number" name="session.timeoutHours" class="form-control"
+                 value="<%= settings['session.timeoutHours'] || '8' %>" min="1" max="168" />
+          <div class="form-text">How long users stay logged in. Default: 8 hours. <strong>Requires restart to take effect.</strong></div>
+        </div>
       </div>
     </div>
   </div>

@@ -113,7 +113,11 @@ INSERT INTO AppSettings (SettingKey, SettingValue, Description) VALUES
     -- Notification thresholds
     ('email.pmReminderDays',       '14',  'Days before PM due date to send reminder'),
     ('email.warrantyReminderDays', '30',  'Days before warranty expiry to send reminder'),
-    ('email.checkoutReminderDays', '30',  'Days an item can be checked out before sending reminder');
+    ('email.checkoutReminderDays', '30',  'Days an item can be checked out before sending reminder'),
+    -- Session
+    ('session.timeoutHours',       '8',   'How long user sessions remain active (in hours). Requires server restart to take effect.'),
+    -- Network Map
+    ('networkMap.apiKey',          NULL,  'API key required by the network map app to call /api/network-map (X-API-Key header). Generate with: node -e "console.log(require(''crypto'').randomBytes(32).toString(''hex''))"');
 
 -- ============================================================
 -- INITIAL ADMIN USER
