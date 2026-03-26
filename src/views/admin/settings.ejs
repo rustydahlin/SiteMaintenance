@@ -366,22 +366,22 @@
     </div>
   </div>
 
-  <!-- Tower Map -->
+  <!-- Network Map -->
   <div class="card shadow-sm mb-3">
-    <div class="card-header fw-semibold d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#s-towermap">
-      <i class="bi bi-broadcast-pin me-2"></i>Tower Map / SIRNnetworkmap
+    <div class="card-header fw-semibold d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#s-networkmap">
+      <i class="bi bi-broadcast-pin me-2"></i>Network Map
       <i class="bi bi-chevron-down ms-auto settings-chevron"></i>
     </div>
-    <div class="collapse" id="s-towermap">
+    <div class="collapse" id="s-networkmap">
       <div class="card-body row g-3">
         <div class="col-md-6">
-          <label class="form-label">API Key <span class="text-muted small">(towerMap.apiKey)</span></label>
-          <input type="text" name="towerMap.apiKey" class="form-control font-monospace"
-                 value="<%= settings['towerMap.apiKey'] || '' %>"
+          <label class="form-label">API Key <span class="text-muted small">(networkMap.apiKey)</span></label>
+          <input type="text" name="networkMap.apiKey" class="form-control font-monospace"
+                 value="<%= settings['networkMap.apiKey'] || '' %>"
                  placeholder="Leave blank to keep existing — paste generated key here"
                  autocomplete="off" />
           <div class="form-text">
-            Used by SIRNnetworkmap to authenticate calls to <code>GET /api/tower-map</code> via the
+            Used by the network map app to authenticate calls to <code>GET /api/network-map</code> via the
             <code>X-API-Key</code> header. Generate a key with:<br />
             <code>node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</code>
           </div>
@@ -398,7 +398,7 @@
 
 <script>
 // Collapse state persistence
-const collapseIds = ['s-general','s-sidebar','s-login','s-oidc','s-ldap','s-email','s-reminders','s-logs','s-towermap'];
+const collapseIds = ['s-general','s-sidebar','s-login','s-oidc','s-ldap','s-email','s-reminders','s-logs','s-networkmap'];
 collapseIds.forEach(id => {
   const el = document.getElementById(id);
   if (!el) return;

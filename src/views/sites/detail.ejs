@@ -520,7 +520,7 @@
         <% if (site.MonitoringLocationTypeName) { %>
           <span class="badge bg-body-secondary text-body border ms-1"><%= site.MonitoringLocationTypeName %></span>
         <% } else { %>
-          <span class="badge bg-warning text-dark ms-1" title="Set Monitoring Location Type on the Edit page to include this site on the tower map">Not on Tower Map</span>
+          <span class="badge bg-warning text-dark ms-1" title="Set Monitoring Location Type on the Edit page to include this site on the network map">Not on Network Map</span>
         <% } %>
       </h6>
       <% if (isAdminUser || isNetworkMapUpdater) { %>
@@ -594,7 +594,7 @@
       <% } else { %>
       <div class="text-muted small py-3" id="networkResourceEmpty">
         <i class="bi bi-info-circle me-1"></i>No network resources assigned.
-        <% if (isAdminUser) { %>Add one to include this site on the tower map.<% } %>
+        <% if (isAdminUser) { %>Add one to include this site on the network map.<% } %>
       </div>
       <% } %>
     </div>

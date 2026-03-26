@@ -155,7 +155,7 @@
         <div class="col-md-4">
           <label for="monitoringLocationTypeID" class="form-label">Monitoring Location Type</label>
           <select id="monitoringLocationTypeID" name="monitoringLocationTypeID" class="form-select">
-            <option value="">— None (not on tower map) —</option>
+            <option value="">— None (not on network map) —</option>
             <% (typeof monitoringLocationTypes !== 'undefined' ? monitoringLocationTypes : []).forEach(t => { %>
               <option value="<%= t.LocationTypeID %>"
                 <%= (site && site.MonitoringLocationTypeID == t.LocationTypeID) ? 'selected' : '' %>>
@@ -163,7 +163,7 @@
               </option>
             <% }) %>
           </select>
-          <div class="form-text">Set to include this site on the SIRNnetworkmap. Requires Latitude &amp; Longitude and at least one Network Resource.</div>
+          <div class="form-text">Set to include this site on the network map. Requires Latitude &amp; Longitude and at least one Network Resource.</div>
         </div>
 
       </div><!-- /.row -->

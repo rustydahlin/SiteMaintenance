@@ -190,7 +190,7 @@ CREATE TABLE Sites (
     Description     NVARCHAR(MAX)   NULL,
     WarrantyExpires DATE            NULL,
     ParentSiteID              INT             NULL,       -- NULL = top-level site; set for sub-sites
-    MonitoringLocationTypeID  INT             NULL,       -- set to include site on SIRNnetworkmap
+    MonitoringLocationTypeID  INT             NULL,       -- set to include site on network map
     IsActive        BIT             NOT NULL DEFAULT 1,
     CreatedAt       DATETIME2(0)    NOT NULL DEFAULT GETUTCDATE(),
     UpdatedAt       DATETIME2(0)    NOT NULL DEFAULT GETUTCDATE(),
@@ -206,7 +206,7 @@ CREATE INDEX IX_Sites_SiteStatusID ON Sites(SiteStatusID);
 CREATE INDEX IX_Sites_IsActive     ON Sites(IsActive);
 
 -- ============================================================
--- NETWORK RESOURCES (Tower Map)
+-- NETWORK RESOURCES (Network Map)
 -- ============================================================
 CREATE TABLE NetworkResources (
     ResourceID        INT           IDENTITY(1,1) PRIMARY KEY,

@@ -113,12 +113,12 @@ BEGIN
   CREATE INDEX IX_NetworkResources_IsActive ON NetworkResources(IsActive);
 END;
 
--- ── AppSettings: tower map API key ────────────────────────────────────────────
-IF NOT EXISTS (SELECT 1 FROM AppSettings WHERE SettingKey = 'towerMap.apiKey')
+-- ── AppSettings: network map API key ──────────────────────────────────────────
+IF NOT EXISTS (SELECT 1 FROM AppSettings WHERE SettingKey = 'networkMap.apiKey')
   INSERT INTO AppSettings (SettingKey, SettingValue, IsEncrypted, Description)
   VALUES (
-    'towerMap.apiKey',
+    'networkMap.apiKey',
     NULL,
     1,
-    'API key required by SIRNnetworkmap to call /api/tower-map (X-API-Key header). Generate with: node -e "console.log(require(''crypto'').randomBytes(32).toString(''hex''))"'
+    'API key required by the network map app to call /api/network-map (X-API-Key header). Generate with: node -e "console.log(require(''crypto'').randomBytes(32).toString(''hex''))"'
   );

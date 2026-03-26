@@ -207,10 +207,10 @@ async function softDelete(resourceID, auditContext = {}) {
   });
 }
 
-// Returns data in the exact devices.json format consumed by SIRNnetworkmap.
+// Returns data in the exact devices.json format consumed by the network map app.
 // Only returns sites that have MonitoringLocationTypeID set AND have at least one
 // active NetworkResource (INNER JOIN ensures both conditions).
-async function getTowerMapData() {
+async function getNetworkMapData() {
   const pool   = await getPool();
   const result = await pool.request().query(`
     SELECT
@@ -300,6 +300,6 @@ module.exports = {
   create,
   update,
   softDelete,
-  getTowerMapData,
+  getNetworkMapData,
   getAllForCsvExport,
 };

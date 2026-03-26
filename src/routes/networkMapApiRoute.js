@@ -14,9 +14,9 @@ async function requireApiKey(req, res, next) {
       return res.status(401).json({ error: 'Missing X-API-Key header.' });
     }
 
-    const expected = await settingsModel.getSetting('towerMap.apiKey', null);
+    const expected = await settingsModel.getSetting('networkMap.apiKey', null);
     if (!expected || expected.trim() === '') {
-      return res.status(503).json({ error: 'Tower map API key is not configured on this server.' });
+      return res.status(503).json({ error: 'Network map API key is not configured on this server.' });
     }
 
     // Constant-time comparison to prevent timing attacks
@@ -32,12 +32,12 @@ async function requireApiKey(req, res, next) {
   }
 }
 
-// ── GET /api/tower-map ────────────────────────────────────────────────────────
-// Returns location + device data in the exact devices.json format used by SIRNnetworkmap.
-// Auth: X-API-Key header (set in Admin → Settings → towerMap.apiKey).
-router.get('/tower-map', requireApiKey, async (req, res, next) => {
+// ── GET /api/network-map ──────────────────────────────────────────────────────
+// Returns location + device data in the exact devices.json format used by the network map app.
+// Auth: X-API-Key header (set in Admin → Settings → networkMap.apiKey).
+router.get('/network-map', requireApiKey, async (req, res, next) => {
   try {
-    const data = await networkResourceModel.getTowerMapData();
+    const data = await networkResourceModel.getNetworkMapData();
     res.json(data);
   } catch (err) {
     next(err);

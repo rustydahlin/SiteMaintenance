@@ -378,7 +378,7 @@ router.post('/settings', async (req, res, next) => {
     }
 
     // Password/secret fields: skip saving if left blank (preserve existing stored value)
-    const secretKeys = ['ldap.bindCredentials', 'oidc.clientSecret', 'email.password', 'towerMap.apiKey'];
+    const secretKeys = ['ldap.bindCredentials', 'oidc.clientSecret', 'email.password', 'networkMap.apiKey'];
     const keys = Object.keys(req.body).filter(k => k !== '_csrf');
     for (const key of keys) {
       if (secretKeys.includes(key) && !req.body[key]) continue;

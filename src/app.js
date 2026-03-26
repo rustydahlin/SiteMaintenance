@@ -116,7 +116,7 @@ async function createApp() {
 
   // ── Routes ────────────────────────────────────────────────────────────────
   // Public API (no session auth — uses X-API-Key header)
-  app.use('/api', require('./routes/towerMapApiRoute'));
+  app.use('/api', require('./routes/networkMapApiRoute'));
 
   app.use('/',           require('./routes/index'));
   app.use('/auth',       require('./routes/authRoutes'));

@@ -7,7 +7,7 @@ const crypto           = require('crypto');
 
 // ── Encryption ────────────────────────────────────────────────────────────────
 // Keys that are encrypted at rest in AppSettings (IsEncrypted = 1)
-const ENCRYPTED_KEYS = new Set(['ldap.bindCredentials', 'oidc.clientSecret', 'email.password', 'towerMap.apiKey']);
+const ENCRYPTED_KEYS = new Set(['ldap.bindCredentials', 'oidc.clientSecret', 'email.password', 'networkMap.apiKey']);
 
 // Derive a 32-byte key from SETTINGS_ENCRYPTION_KEY env var (or fall back to SESSION_SECRET).
 // Using SHA-256 so any-length passphrase becomes a valid AES-256 key.
