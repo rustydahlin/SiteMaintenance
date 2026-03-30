@@ -1,0 +1,65 @@
+<div class="mb-3">
+  <a href="/mobile/repairs/<%= repair.RepairID %>" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Repair #<%= repair.RepairID %>
+  </a>
+</div>
+
+<h6 class="text-secondary small text-uppercase fw-semibold mb-2">Edit Repair</h6>
+
+<div class="card mobile-card mb-3">
+  <div class="card-body py-2 px-3 small text-secondary">
+    <strong><%= repair.CommonName || repair.ModelNumber || repair.SerialNumber || 'Unknown Item' %></strong>
+    <% if (repair.SerialNumber && repair.CommonName) { %> · S/N: <%= repair.SerialNumber %><% } %>
+  </div>
+</div>
+
+<form method="POST" action="/mobile/repairs/<%= repair.RepairID %>/edit">
+  <div class="card mobile-card mb-3">
+    <div class="card-body">
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">RMA Number <span class="text-secondary fw-normal">(optional)</span></label>
+        <input type="text" name="rmaNumber" class="form-control form-control-sm"
+               value="<%= repair.RMANumber || '' %>" autocomplete="off" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Sent Date</label>
+        <input type="date" name="sentDate" class="form-control form-control-sm"
+               value="<%= repair.SentDate ? new Date(repair.SentDate).toISOString().split('T')[0] : '' %>" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Expected Return Date <span class="text-secondary fw-normal">(optional)</span></label>
+        <input type="date" name="expectedReturnDate" class="form-control form-control-sm"
+               value="<%= repair.ExpectedReturnDate ? new Date(repair.ExpectedReturnDate).toISOString().split('T')[0] : '' %>" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Manufacturer Contact <span class="text-secondary fw-normal">(optional)</span></label>
+        <input type="text" name="manufacturerContact" class="form-control form-control-sm"
+               value="<%= repair.ManufacturerContact || '' %>" autocomplete="off" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Assigned To</label>
+        <select name="assignedUserID" class="form-select form-select-sm">
+          <option value="">— Unassigned —</option>
+          <% for (const u of users) { %>
+            <option value="<%= u.UserID %>" <%= repair.AssignedUserID === u.UserID ? 'selected' : '' %>><%= u.DisplayName %></option>
+          <% } %>
+        </select>
+      </div>
+
+      <div class="mb-1">
+        <label class="form-label small fw-semibold">Reason / Notes <span class="text-secondary fw-normal">(optional)</span></label>
+        <textarea name="reason" class="form-control form-control-sm" rows="3"><%= repair.Reason || '' %></textarea>
+      </div>
+
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary w-100 fw-semibold">
+    <i class="bi bi-check-lg me-1"></i>Save Changes
+  </button>
+</form>

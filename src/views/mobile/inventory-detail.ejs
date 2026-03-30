@@ -1,0 +1,221 @@
+<div class="mb-3">
+  <a href="/mobile/inventory" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Inventory
+  </a>
+</div>
+
+<!-- Item info -->
+<div class="card mobile-card mb-3">
+  <div class="card-body">
+    <div class="d-flex align-items-start justify-content-between mb-2">
+      <h6 class="fw-semibold mb-0"><%= item.CommonName || item.ModelNumber || item.SerialNumber || 'Unknown Item' %></h6>
+      <% if (item.TrackingType === 'bulk') { %>
+        <span class="badge bg-secondary ms-2">Bulk</span>
+      <% } else { %>
+        <%
+          const sc = item.StatusName === 'In-Stock'  ? 'bg-success' :
+                     item.StatusName === 'In-Repair'  ? 'bg-warning text-dark' :
+                     item.StatusName === 'Deployed'   ? 'bg-primary' : 'bg-secondary';
+        %>
+        <span class="badge <%= sc %> ms-2"><%= item.StatusName || 'Unknown' %></span>
+      <% } %>
+    </div>
+
+    <% if (item.CategoryName) { %>
+      <div class="detail-row">
+        <span class="detail-label">Category</span>
+        <span class="detail-value"><%= item.CategoryName %></span>
+      </div>
+    <% } %>
+    <% if (item.Manufacturer) { %>
+      <div class="detail-row">
+        <span class="detail-label">Manufacturer</span>
+        <span class="detail-value"><%= item.Manufacturer %></span>
+      </div>
+    <% } %>
+    <% if (item.ModelNumber) { %>
+      <div class="detail-row">
+        <span class="detail-label">Model</span>
+        <span class="detail-value"><%= item.ModelNumber %></span>
+      </div>
+    <% } %>
+    <% if (item.PartNumber) { %>
+      <div class="detail-row">
+        <span class="detail-label">Part #</span>
+        <span class="detail-value"><%= item.PartNumber %></span>
+      </div>
+    <% } %>
+    <% if (item.SerialNumber) { %>
+      <div class="detail-row">
+        <span class="detail-label">Serial #</span>
+        <span class="detail-value"><%= item.SerialNumber %></span>
+      </div>
+    <% } %>
+    <% if (item.AssetTag) { %>
+      <div class="detail-row">
+        <span class="detail-label">Asset Tag</span>
+        <span class="detail-value"><%= item.AssetTag %></span>
+      </div>
+    <% } %>
+    <% if (item.TrackingType === 'bulk') { %>
+      <div class="detail-row">
+        <span class="detail-label">Qty Total</span>
+        <span class="detail-value"><%= item.QuantityTotal %></span>
+      </div>
+    <% } %>
+    <% if (item.StockLocationName && item.TrackingType !== 'bulk') { %>
+      <div class="detail-row">
+        <span class="detail-label">Location</span>
+        <span class="detail-value"><%= item.StockLocationName %></span>
+      </div>
+    <% } %>
+    <% if (item.AssignedToUserName && item.TrackingType !== 'bulk') { %>
+      <div class="detail-row">
+        <span class="detail-label">Assigned To</span>
+        <span class="detail-value"><%= item.AssignedToUserName %></span>
+      </div>
+    <% } %>
+    <% if (item.PurchaseDate) { %>
+      <div class="detail-row">
+        <span class="detail-label">Purchased</span>
+        <span class="detail-value"><%= new Date(item.PurchaseDate).toLocaleDateString() %></span>
+      </div>
+    <% } %>
+    <% if (item.WarrantyExpires) { %>
+      <div class="detail-row">
+        <span class="detail-label">Warranty</span>
+        <% const warrantyExpired = new Date(item.WarrantyExpires) < new Date(); %>
+        <span class="detail-value <%= warrantyExpired ? 'text-danger' : '' %>">
+          <%= new Date(item.WarrantyExpires).toLocaleDateString() %>
+          <% if (warrantyExpired) { %><span class="ms-1 text-danger small">Expired</span><% } %>
+        </span>
+      </div>
+    <% } %>
+    <% if (item.Description) { %>
+      <div class="detail-row align-items-start">
+        <span class="detail-label" style="padding-top:1px">Description</span>
+        <span class="detail-value" style="white-space:pre-wrap"><%= item.Description %></span>
+      </div>
+    <% } %>
+    <% if (item.Notes) { %>
+      <div class="detail-row align-items-start">
+        <span class="detail-label" style="padding-top:1px">Notes</span>
+        <span class="detail-value" style="white-space:pre-wrap"><%= item.Notes %></span>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<% if (item.TrackingType === 'bulk') { %>
+  <!-- Stock distribution -->
+  <h6 class="text-secondary small text-uppercase fw-semibold mb-2">Stock Distribution</h6>
+
+  <%
+    const totalDeployed  = deployed.reduce((sum, r) => sum + r.Quantity, 0);
+    const totalAllocated = stock.reduce((sum, r) => sum + r.Quantity, 0);
+  %>
+
+  <!-- Summary bar -->
+  <div class="card mobile-card mb-3">
+    <div class="card-body py-2 px-3">
+      <div class="d-flex justify-content-between small fw-semibold mb-1">
+        <span>Total: <%= item.QuantityTotal %></span>
+        <span class="text-secondary">Deployed: <%= totalDeployed %> · In-stock: <%= totalAllocated + unallocated %></span>
+      </div>
+      <% if (item.QuantityTotal > 0) { %>
+        <%
+          const pctDeployed    = Math.round(totalDeployed / item.QuantityTotal * 100);
+          const pctAllocated   = Math.round(totalAllocated / item.QuantityTotal * 100);
+          const pctUnallocated = 100 - pctDeployed - pctAllocated;
+        %>
+        <div class="progress" style="height:8px;border-radius:4px">
+          <div class="progress-bar bg-primary"   style="width:<%= pctDeployed %>%"    title="Deployed"></div>
+          <div class="progress-bar bg-success"   style="width:<%= pctAllocated %>%"   title="Allocated stock"></div>
+          <div class="progress-bar bg-secondary bg-opacity-25" style="width:<%= pctUnallocated %>%" title="Unallocated"></div>
+        </div>
+        <div class="d-flex gap-3 mt-1" style="font-size:0.68rem;color:var(--bs-secondary-color)">
+          <span><span style="color:#0d6efd">■</span> Deployed</span>
+          <span><span style="color:#198754">■</span> In storage</span>
+          <span><span style="color:#adb5bd">■</span> Unallocated</span>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (stock.length > 0 || unallocated > 0) { %>
+    <h6 class="text-secondary small text-uppercase fw-semibold mb-2">In Storage</h6>
+    <div class="card mobile-card mb-3">
+      <div class="card-body px-3 py-2">
+        <% for (const s of stock) { %>
+          <div class="list-item-row" style="cursor:default">
+            <div class="list-item-icon bg-success bg-opacity-10 text-success">
+              <i class="bi bi-<%= s.LocationID ? 'geo-alt' : 'person' %>"></i>
+            </div>
+            <div class="list-item-text">
+              <div class="item-title"><%= s.LocationName || s.UserDisplayName %></div>
+              <div class="item-sub">
+                Qty: <%= s.Quantity %>
+                <% if (s.Notes) { %> · <%= s.Notes %><% } %>
+              </div>
+            </div>
+          </div>
+        <% } %>
+        <% if (unallocated > 0) { %>
+          <div class="list-item-row" style="cursor:default">
+            <div class="list-item-icon bg-secondary bg-opacity-10 text-secondary">
+              <i class="bi bi-box"></i>
+            </div>
+            <div class="list-item-text">
+              <div class="item-title">Unallocated</div>
+              <div class="item-sub">Qty: <%= unallocated %></div>
+            </div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (deployed.length > 0) { %>
+    <h6 class="text-secondary small text-uppercase fw-semibold mb-2">Deployed at Sites</h6>
+    <div class="card mobile-card mb-3">
+      <div class="card-body px-3 py-2">
+        <% for (const d of deployed) { %>
+          <a href="/mobile/sites/<%= d.SiteID %>" class="list-item-row">
+            <div class="list-item-icon bg-primary bg-opacity-10 text-primary">
+              <i class="bi bi-building"></i>
+            </div>
+            <div class="list-item-text">
+              <div class="item-title"><%= d.SiteName %></div>
+              <div class="item-sub">Qty: <%= d.Quantity %></div>
+            </div>
+            <i class="bi bi-chevron-right list-item-arrow"></i>
+          </a>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
+<% } %>
+
+<div class="text-center mt-3">
+  <a href="/inventory/<%= item.ItemID %>" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-up-right-square me-1"></i>Full Item Details
+  </a>
+</div>
+
+<style>
+  .detail-row {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--bs-border-color);
+    font-size: 0.85rem;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label {
+    flex-shrink: 0;
+    width: 90px;
+    color: var(--bs-secondary-color);
+    font-size: 0.78rem;
+  }
+  .detail-value { flex: 1; word-break: break-word; }
+</style>

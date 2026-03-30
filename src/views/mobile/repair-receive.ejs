@@ -1,0 +1,49 @@
+<div class="mb-3">
+  <a href="/mobile/repairs/<%= repair.RepairID %>" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Repair #<%= repair.RepairID %>
+  </a>
+</div>
+
+<h6 class="text-secondary small text-uppercase fw-semibold mb-2">Mark as Received</h6>
+
+<div class="card mobile-card mb-3" style="border-color:var(--bs-warning-border-subtle);background:var(--bs-warning-bg-subtle)">
+  <div class="card-body py-2 px-3">
+    <div class="fw-semibold"><%= repair.CommonName || repair.ModelNumber || repair.SerialNumber || 'Unknown Item' %></div>
+    <% if (repair.RMANumber) { %>
+      <div class="small text-secondary">RMA: <%= repair.RMANumber %></div>
+    <% } %>
+    <% if (repair.ManufacturerContact) { %>
+      <div class="small text-secondary">Contact: <%= repair.ManufacturerContact %></div>
+    <% } %>
+  </div>
+</div>
+
+<form method="POST" action="/mobile/repairs/<%= repair.RepairID %>/receive">
+  <div class="card mobile-card mb-3">
+    <div class="card-body">
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Date Received</label>
+        <input type="date" name="receivedDate" class="form-control form-control-sm"
+               value="<%= new Date().toISOString().split('T')[0] %>" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Return Condition <span class="text-secondary fw-normal">(optional)</span></label>
+        <input type="text" name="returnCondition" class="form-control form-control-sm"
+               placeholder="e.g. Good, Repaired, Replaced" autocomplete="off" />
+      </div>
+
+      <div class="mb-1">
+        <label class="form-label small fw-semibold">Notes <span class="text-secondary fw-normal">(optional)</span></label>
+        <textarea name="returnNotes" class="form-control form-control-sm" rows="2"
+                  placeholder="Return notes..."></textarea>
+      </div>
+
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-success w-100 fw-semibold">
+    <i class="bi bi-box-arrow-in-down me-1"></i>Confirm Receipt
+  </button>
+</form>

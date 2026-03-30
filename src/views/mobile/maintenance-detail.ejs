@@ -1,0 +1,144 @@
+<div class="mb-3">
+  <a href="/mobile/maintenance" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Maintenance
+  </a>
+</div>
+
+<!-- Status banner -->
+<%
+  const isOpen    = !item.ClosedAt;
+  const isOverdue = isOpen && item.DueDate && new Date(item.DueDate) < new Date();
+%>
+<div class="d-flex align-items-center gap-2 mb-3">
+  <% if (item.ClosedAt) { %>
+    <span class="badge bg-success fs-6">Closed</span>
+  <% } else if (isOverdue) { %>
+    <span class="badge bg-danger fs-6"><i class="bi bi-exclamation-circle me-1"></i>Overdue</span>
+  <% } else { %>
+    <span class="badge bg-info text-dark fs-6">Open</span>
+  <% } %>
+  <% if (item.MaintenanceTypeName) { %>
+    <span class="badge bg-secondary bg-opacity-25 text-secondary"><%= item.MaintenanceTypeName %></span>
+  <% } %>
+</div>
+
+<!-- Detail card -->
+<div class="card mobile-card mb-3">
+  <div class="card-body">
+    <h6 class="fw-semibold mb-3"><%= item.SiteName %></h6>
+
+    <% if (item.DueDate) { %>
+      <div class="detail-row">
+        <span class="detail-label">Due Date</span>
+        <span class="detail-value <%= isOverdue ? 'text-danger fw-semibold' : '' %>">
+          <%= new Date(item.DueDate).toLocaleDateString() %>
+          <% if (isOverdue) { %> · <span class="text-danger"><%= item.DaysOverdue %> day<%= item.DaysOverdue !== 1 ? 's' : '' %> overdue</span><% } %>
+        </span>
+      </div>
+    <% } %>
+    <% if (item.AssignedToUserName) { %>
+      <div class="detail-row">
+        <span class="detail-label">Assigned To</span>
+        <span class="detail-value"><%= item.AssignedToUserName %></span>
+      </div>
+    <% } %>
+    <% if (item.ExternalReference) { %>
+      <div class="detail-row">
+        <span class="detail-label">Reference</span>
+        <span class="detail-value"><%= item.ExternalReference %></span>
+      </div>
+    <% } %>
+    <% if (item.CreatedAt) { %>
+      <div class="detail-row">
+        <span class="detail-label">Created</span>
+        <span class="detail-value">
+          <%= new Date(item.CreatedAt).toLocaleDateString() %>
+          <% if (item.CreatedByUserName) { %> by <%= item.CreatedByUserName %><% } %>
+        </span>
+      </div>
+    <% } %>
+    <% if (item.WorkToComplete) { %>
+      <div class="detail-row align-items-start">
+        <span class="detail-label" style="padding-top:1px">Work</span>
+        <span class="detail-value" style="white-space:pre-wrap"><%= item.WorkToComplete %></span>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<!-- Closure info (if closed) -->
+<% if (item.ClosedAt) { %>
+  <div class="card mobile-card mb-3" style="border-color:var(--bs-success-border-subtle)">
+    <div class="card-header py-2 px-3" style="background:var(--bs-success-bg-subtle);font-size:0.78rem;font-weight:600">
+      <i class="bi bi-check-circle me-1 text-success"></i>Closed
+    </div>
+    <div class="card-body">
+      <div class="detail-row">
+        <span class="detail-label">Closed</span>
+        <span class="detail-value">
+          <%= new Date(item.ClosedAt).toLocaleDateString() %>
+          <% if (item.ClosedByUserName) { %> by <%= item.ClosedByUserName %><% } %>
+        </span>
+      </div>
+      <% if (item.ClosureNotes) { %>
+        <div class="detail-row align-items-start">
+          <span class="detail-label" style="padding-top:1px">Notes</span>
+          <span class="detail-value" style="white-space:pre-wrap"><%= item.ClosureNotes %></span>
+        </div>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<!-- Actions -->
+<% if (isOpen) { %>
+  <div class="d-grid gap-2 mb-3">
+    <a href="/mobile/maintenance/<%= item.MaintenanceID %>/edit" class="btn btn-outline-primary">
+      <i class="bi bi-pencil me-1"></i>Edit Details
+    </a>
+  </div>
+
+  <!-- Close form inline -->
+  <div class="card mobile-card">
+    <div class="card-header py-2 px-3" style="font-size:0.78rem;font-weight:600">
+      <i class="bi bi-check-circle me-1"></i>Close this Item
+    </div>
+    <div class="card-body">
+      <form method="POST" action="/mobile/maintenance/<%= item.MaintenanceID %>/close">
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Closure Notes <span class="text-secondary fw-normal">(optional)</span></label>
+          <textarea name="closureNotes" class="form-control form-control-sm" rows="3"
+                    placeholder="Work performed, findings, etc."></textarea>
+        </div>
+        <button type="submit" class="btn btn-success w-100 fw-semibold"
+                onclick="return confirm('Close this maintenance item?')">
+          <i class="bi bi-check-lg me-1"></i>Mark Complete
+        </button>
+      </form>
+    </div>
+  </div>
+<% } else { %>
+  <div class="d-grid">
+    <a href="/mobile/maintenance/<%= item.MaintenanceID %>/edit" class="btn btn-outline-secondary">
+      <i class="bi bi-pencil me-1"></i>Edit Details
+    </a>
+  </div>
+<% } %>
+
+<style>
+  .detail-row {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--bs-border-color);
+    font-size: 0.85rem;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label {
+    flex-shrink: 0;
+    width: 90px;
+    color: var(--bs-secondary-color);
+    font-size: 0.78rem;
+  }
+  .detail-value { flex: 1; word-break: break-word; }
+</style>

@@ -1,0 +1,197 @@
+<div class="mb-3">
+  <a href="/mobile/sites/<%= siteID %>" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> <%= siteName %>
+  </a>
+</div>
+
+<h6 class="text-secondary small text-uppercase fw-semibold mb-2">Install Equipment</h6>
+
+<% if (items.length === 0) { %>
+  <div class="card mobile-card">
+    <div class="card-body text-center text-secondary py-4 small">
+      No available items in stock.
+    </div>
+  </div>
+<% } else { %>
+  <form method="POST" action="/mobile/sites/<%= siteID %>/inventory/install">
+
+    <div class="card mobile-card mb-3">
+      <div class="card-body">
+
+        <input type="hidden" name="itemID" id="itemID" value="" />
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Search & Select Item</label>
+          <input type="text" id="itemSearch" class="form-control form-control-sm mb-2"
+                 placeholder="Filter by name, serial, model..." autocomplete="off"
+                 onkeydown="return event.key !== 'Enter'" />
+
+          <div id="itemList" style="max-height:240px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:8px">
+            <div class="text-secondary small text-center py-3" id="itemListEmpty" style="display:none">No items match.</div>
+            <% for (const item of items) { %>
+              <%
+                const label = [
+                  item.CommonName || item.ModelNumber || item.SerialNumber,
+                  item.SerialNumber && item.CommonName ? 'S/N: ' + item.SerialNumber : null,
+                  item.TrackingType === 'bulk' ? 'qty: ' + item.QuantityAvailable : null,
+                  item.Manufacturer || null,
+                ].filter(Boolean).join(' · ');
+                const searchKey = [
+                  item.CommonName, item.ModelNumber, item.SerialNumber, item.Manufacturer
+                ].filter(Boolean).join(' ').toLowerCase();
+              %>
+              <div class="item-row px-3 py-2"
+                   style="cursor:pointer;border-bottom:1px solid var(--bs-border-color)"
+                   data-id="<%= item.ItemID %>"
+                   data-bulk="<%= item.TrackingType === 'bulk' ? '1' : '0' %>"
+                   data-search="<%= searchKey %>">
+                <div style="font-size:0.85rem;font-weight:500"><%= label %></div>
+                <% if (item.CategoryName) { %>
+                  <div style="font-size:0.72rem;color:var(--bs-secondary-color)"><%= item.CategoryName %></div>
+                <% } %>
+              </div>
+            <% } %>
+          </div>
+          <div id="selectedItemLabel" class="mt-2 small text-success fw-semibold" style="display:none">
+            <i class="bi bi-check-circle me-1"></i><span></span>
+          </div>
+        </div>
+
+        <div id="stockSourceRow" style="display:none" class="mb-3">
+          <label class="form-label small fw-semibold">Pull From</label>
+          <div id="stockSourceList" class="d-flex flex-column gap-2 mt-1"></div>
+          <input type="hidden" name="pulledFromLocationID" id="pulledFromLocationID" value="" />
+          <input type="hidden" name="pulledFromUserID"     id="pulledFromUserID"     value="" />
+        </div>
+
+        <div class="mb-3" id="quantityRow" style="display:none">
+          <label class="form-label small fw-semibold">Quantity</label>
+          <input type="number" name="quantity" id="quantityInput" class="form-control form-control-sm"
+                 min="1" value="1" />
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Install Date</label>
+          <input type="date" name="installedAt" class="form-control form-control-sm"
+                 value="<%= new Date().toISOString().split('T')[0] %>" />
+        </div>
+
+        <div class="mb-1">
+          <label class="form-label small fw-semibold">Notes <span class="text-secondary fw-normal">(optional)</span></label>
+          <textarea name="installNotes" class="form-control form-control-sm" rows="2" placeholder="Installation notes..."></textarea>
+        </div>
+
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100">
+      <i class="bi bi-box-arrow-in-down me-1"></i>Install Item
+    </button>
+  </form>
+
+  <script>
+    var itemIDInput          = document.getElementById('itemID');
+    var itemSearch           = document.getElementById('itemSearch');
+    var itemList             = document.getElementById('itemList');
+    var itemListEmpty        = document.getElementById('itemListEmpty');
+    var selectedItemLabel    = document.getElementById('selectedItemLabel');
+    var quantityRow          = document.getElementById('quantityRow');
+    var quantityInput        = document.getElementById('quantityInput');
+    var stockSourceRow       = document.getElementById('stockSourceRow');
+    var stockSourceList      = document.getElementById('stockSourceList');
+    var pulledFromLocationID = document.getElementById('pulledFromLocationID');
+    var pulledFromUserID     = document.getElementById('pulledFromUserID');
+
+    var bulkItems = {};
+    <% for (const item of items) { %>
+      <% if (item.TrackingType === 'bulk') { %>
+        bulkItems[<%= item.ItemID %>] = <%= item.QuantityAvailable %>;
+      <% } %>
+    <% } %>
+
+    // Filter list on search input
+    itemSearch.addEventListener('input', function () {
+      var q = this.value.toLowerCase();
+      var rows = itemList.querySelectorAll('.item-row');
+      var visible = 0;
+      rows.forEach(function(row) {
+        var match = !q || row.dataset.search.includes(q);
+        row.style.display = match ? '' : 'none';
+        if (match) visible++;
+      });
+      itemListEmpty.style.display = visible === 0 ? '' : 'none';
+    });
+
+    function selectSource(source) {
+      stockSourceList.querySelectorAll('.source-btn').forEach(function(b) {
+        b.classList.remove('btn-primary');
+        b.classList.add('btn-outline-secondary');
+      });
+      var btn = stockSourceList.querySelector('[data-idx="' + source.idx + '"]');
+      if (btn) { btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-primary'); }
+      pulledFromLocationID.value = source.locationID || '';
+      pulledFromUserID.value     = source.userID     || '';
+      quantityInput.max          = source.qty;
+      if (parseInt(quantityInput.value) > source.qty) quantityInput.value = source.qty;
+    }
+
+    function onItemSelected(id, isBulk, labelText) {
+      itemIDInput.value = id;
+      selectedItemLabel.style.display = '';
+      selectedItemLabel.querySelector('span').textContent = labelText;
+
+      // Highlight selected row
+      itemList.querySelectorAll('.item-row').forEach(function(r) {
+        r.style.background = r.dataset.id === id ? 'var(--bs-primary-bg-subtle)' : '';
+      });
+
+      if (isBulk) {
+        stockSourceList.innerHTML = '<div class="text-secondary small px-1">Loading...</div>';
+        stockSourceRow.style.display = '';
+        quantityRow.style.display    = '';
+        pulledFromLocationID.value   = '';
+        pulledFromUserID.value       = '';
+
+        fetch('/mobile/inventory/' + id + '/stock')
+          .then(function(r) { return r.json(); })
+          .then(function(sources) {
+            stockSourceList.innerHTML = '';
+            if (sources.length === 0) {
+              stockSourceList.innerHTML = '<div class="text-secondary small">Unallocated stock only.</div>';
+              quantityInput.max = bulkItems[id];
+              return;
+            }
+            sources.forEach(function(s, i) {
+              s.idx = i;
+              var icon = s.type === 'location' ? 'bi-geo-alt' : s.type === 'user' ? 'bi-person' : 'bi-box';
+              var btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'source-btn btn btn-outline-secondary text-start py-2 px-3 w-100';
+              btn.dataset.idx = i;
+              btn.innerHTML = '<i class="bi ' + icon + ' me-2"></i><strong>' + s.label + '</strong>'
+                + ' <span class="text-secondary ms-1 small">(' + s.qty + ' available)</span>';
+              btn.addEventListener('click', function() { selectSource(s); });
+              stockSourceList.appendChild(btn);
+            });
+            selectSource(sources[0]);
+          })
+          .catch(function() {
+            stockSourceList.innerHTML = '<div class="text-secondary small">Could not load stock info.</div>';
+          });
+      } else {
+        stockSourceRow.style.display = 'none';
+        quantityRow.style.display    = 'none';
+        quantityInput.value          = 1;
+        pulledFromLocationID.value   = '';
+        pulledFromUserID.value       = '';
+      }
+    }
+
+    // Wire up item rows
+    itemList.querySelectorAll('.item-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        onItemSelected(row.dataset.id, row.dataset.bulk === '1', row.querySelector('[style]') ? row.children[0].textContent.trim() : row.textContent.trim());
+      });
+    });
+  </script>
+<% } %>

@@ -1,0 +1,161 @@
+<div class="mb-3">
+  <a href="/mobile/repairs" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Repairs
+  </a>
+</div>
+
+<!-- Status banner -->
+<%
+  const statusLabel = { open: 'Open', 'in-progress': 'In Progress', closed: 'Closed', cancelled: 'Cancelled',
+                        'Sent': 'Sent', 'Returned-to-Inventory': 'Returned' };
+  const statusClass = repair.ReceivedDate ? 'bg-success' : (repair.RepairStatus === 'Cancelled' ? 'bg-secondary' : 'bg-warning text-dark');
+  const isOverdue   = repair.ExpectedReturnDate && !repair.ReceivedDate && new Date(repair.ExpectedReturnDate) < new Date();
+%>
+<div class="d-flex align-items-center gap-2 mb-3">
+  <span class="badge <%= statusClass %> fs-6">
+    <%= statusLabel[repair.RepairStatus] || repair.RepairStatus %>
+  </span>
+  <% if (isOverdue) { %>
+    <span class="badge bg-danger"><i class="bi bi-exclamation-circle me-1"></i>Overdue</span>
+  <% } %>
+</div>
+
+<!-- Item info -->
+<div class="card mobile-card mb-3">
+  <div class="card-body">
+    <h6 class="fw-semibold mb-3"><%= repair.CommonName || repair.ModelNumber || repair.SerialNumber || 'Unknown Item' %></h6>
+
+    <% if (repair.SerialNumber) { %>
+      <div class="detail-row">
+        <span class="detail-label">Serial #</span>
+        <span class="detail-value"><%= repair.SerialNumber %></span>
+      </div>
+    <% } %>
+    <% if (repair.Manufacturer) { %>
+      <div class="detail-row">
+        <span class="detail-label">Manufacturer</span>
+        <span class="detail-value"><%= repair.Manufacturer %></span>
+      </div>
+    <% } %>
+    <% if (repair.RMANumber) { %>
+      <div class="detail-row">
+        <span class="detail-label">RMA #</span>
+        <span class="detail-value"><%= repair.RMANumber %></span>
+      </div>
+    <% } %>
+    <% if (repair.SentDate) { %>
+      <div class="detail-row">
+        <span class="detail-label">Sent Date</span>
+        <span class="detail-value"><%= new Date(repair.SentDate).toLocaleDateString() %></span>
+      </div>
+    <% } %>
+    <% if (repair.ExpectedReturnDate) { %>
+      <div class="detail-row">
+        <span class="detail-label">Expected Return</span>
+        <span class="detail-value <%= isOverdue ? 'text-danger fw-semibold' : '' %>">
+          <%= new Date(repair.ExpectedReturnDate).toLocaleDateString() %>
+          <% if (isOverdue) { %><i class="bi bi-exclamation-circle ms-1"></i><% } %>
+        </span>
+      </div>
+    <% } %>
+    <% if (repair.ManufacturerContact) { %>
+      <div class="detail-row">
+        <span class="detail-label">Contact</span>
+        <span class="detail-value"><%= repair.ManufacturerContact %></span>
+      </div>
+    <% } %>
+    <% if (repair.AssignedUserName) { %>
+      <div class="detail-row">
+        <span class="detail-label">Assigned To</span>
+        <span class="detail-value"><%= repair.AssignedUserName %></span>
+      </div>
+    <% } %>
+    <% if (repair.SentByName) { %>
+      <div class="detail-row">
+        <span class="detail-label">Sent By</span>
+        <span class="detail-value"><%= repair.SentByName %></span>
+      </div>
+    <% } %>
+    <% if (repair.CreatedAt) { %>
+      <div class="detail-row">
+        <span class="detail-label">Created</span>
+        <span class="detail-value"><%= new Date(repair.CreatedAt).toLocaleDateString() %></span>
+      </div>
+    <% } %>
+    <% if (repair.Reason) { %>
+      <div class="detail-row align-items-start">
+        <span class="detail-label" style="padding-top:1px">Reason</span>
+        <span class="detail-value" style="white-space:pre-wrap"><%= repair.Reason %></span>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<!-- Received info (if closed) -->
+<% if (repair.ReceivedDate) { %>
+  <div class="card mobile-card mb-3" style="border-color:var(--bs-success-border-subtle)">
+    <div class="card-header py-2 px-3" style="background:var(--bs-success-bg-subtle);font-size:0.78rem;font-weight:600">
+      <i class="bi bi-check-circle me-1 text-success"></i>Received
+    </div>
+    <div class="card-body">
+      <div class="detail-row">
+        <span class="detail-label">Received</span>
+        <span class="detail-value"><%= new Date(repair.ReceivedDate).toLocaleDateString() %></span>
+      </div>
+      <% if (repair.ReturnCondition) { %>
+        <div class="detail-row">
+          <span class="detail-label">Condition</span>
+          <span class="detail-value"><%= repair.ReturnCondition %></span>
+        </div>
+      <% } %>
+      <% if (repair.ReceivedByName) { %>
+        <div class="detail-row">
+          <span class="detail-label">Received By</span>
+          <span class="detail-value"><%= repair.ReceivedByName %></span>
+        </div>
+      <% } %>
+      <% if (repair.ReturnNotes) { %>
+        <div class="detail-row align-items-start">
+          <span class="detail-label" style="padding-top:1px">Notes</span>
+          <span class="detail-value" style="white-space:pre-wrap"><%= repair.ReturnNotes %></span>
+        </div>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<!-- Actions -->
+<% if (!repair.ReceivedDate) { %>
+  <div class="d-grid gap-2">
+    <a href="/mobile/repairs/<%= repair.RepairID %>/edit" class="btn btn-outline-primary">
+      <i class="bi bi-pencil me-1"></i>Edit Details
+    </a>
+    <a href="/mobile/repairs/<%= repair.RepairID %>/receive" class="btn btn-success">
+      <i class="bi bi-box-arrow-in-down me-1"></i>Mark as Received
+    </a>
+  </div>
+<% } else { %>
+  <div class="d-grid">
+    <a href="/mobile/repairs/<%= repair.RepairID %>/edit" class="btn btn-outline-secondary">
+      <i class="bi bi-pencil me-1"></i>Edit Details
+    </a>
+  </div>
+<% } %>
+
+<style>
+  .detail-row {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--bs-border-color);
+    font-size: 0.85rem;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label {
+    flex-shrink: 0;
+    width: 100px;
+    color: var(--bs-secondary-color);
+    font-size: 0.78rem;
+  }
+  .detail-value { flex: 1; word-break: break-word; }
+</style>

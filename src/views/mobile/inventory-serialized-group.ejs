@@ -1,0 +1,113 @@
+<div class="mb-3">
+  <a href="/mobile/inventory" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Inventory
+  </a>
+</div>
+
+<% if (items.length === 0) { %>
+  <div class="text-center text-secondary py-5">
+    <i class="bi bi-box-seam" style="font-size:2rem"></i>
+    <p class="mt-2 small">No items found.</p>
+  </div>
+<% } else { %>
+  <%
+    const first = items[0];
+    const statusCounts = {};
+    for (const i of items) {
+      if (i.StatusName) statusCounts[i.StatusName] = (statusCounts[i.StatusName] || 0) + 1;
+    }
+  %>
+
+  <!-- Summary card -->
+  <div class="card mobile-card mb-3">
+    <div class="card-body py-2 px-3">
+      <% if (first.Manufacturer) { %>
+        <div class="detail-row">
+          <span class="detail-label">Manufacturer</span>
+          <span class="detail-value"><%= first.Manufacturer %></span>
+        </div>
+      <% } %>
+      <% if (first.ModelNumber && first.ModelNumber !== name) { %>
+        <div class="detail-row">
+          <span class="detail-label">Model</span>
+          <span class="detail-value"><%= first.ModelNumber %></span>
+        </div>
+      <% } %>
+      <% if (first.CategoryName) { %>
+        <div class="detail-row">
+          <span class="detail-label">Category</span>
+          <span class="detail-value"><%= first.CategoryName %></span>
+        </div>
+      <% } %>
+      <div class="detail-row">
+        <span class="detail-label">Total</span>
+        <span class="detail-value">
+          <%= items.length %> unit<%= items.length !== 1 ? 's' : '' %>
+          <% for (const [status, cnt] of Object.entries(statusCounts)) { %>
+            <%
+              const sc = status === 'In-Stock'  ? 'bg-success' :
+                         status === 'In-Repair'  ? 'bg-warning text-dark' :
+                         status === 'Deployed'   ? 'bg-primary' : 'bg-secondary';
+            %>
+            <span class="badge <%= sc %> bg-opacity-10 ms-1" style="font-size:0.65rem"><%= cnt %> <%= status %></span>
+          <% } %>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Individual units -->
+  <h6 class="text-secondary small text-uppercase fw-semibold mb-2">Units</h6>
+  <div class="card mobile-card">
+    <div class="card-body px-3 py-2">
+      <% for (const item of items) { %>
+        <a href="/mobile/inventory/<%= item.ItemID %>" class="list-item-row">
+          <%
+            const sc = item.StatusName === 'In-Stock'  ? 'bg-success' :
+                       item.StatusName === 'In-Repair'  ? 'bg-warning' :
+                       item.StatusName === 'Deployed'   ? 'bg-primary' : 'bg-secondary';
+          %>
+          <div class="list-item-icon <%= sc %> bg-opacity-10 text-<%= sc.replace('bg-','') %>">
+            <i class="bi bi-cpu"></i>
+          </div>
+          <div class="list-item-text">
+            <div class="item-title">
+              <% if (item.SerialNumber) { %>S/N: <%= item.SerialNumber %><% } else if (item.AssetTag) { %>Asset: <%= item.AssetTag %><% } else { %>Unit #<%= item.ItemID %><% } %>
+            </div>
+            <div class="item-sub">
+              <% if (item.StatusName) { %><%= item.StatusName %><% } %>
+              <% if (item.CurrentSiteName) { %> · <%= item.CurrentSiteName %><% } %>
+              <% if (item.StockLocationName && !item.CurrentSiteName) { %> · <%= item.StockLocationName %><% } %>
+              <% if (item.AssignedToUserName && !item.CurrentSiteName) { %> · <%= item.AssignedToUserName %><% } %>
+            </div>
+            <% if (item.WarrantyExpires) { %>
+              <% const expired = new Date(item.WarrantyExpires) < new Date(); %>
+              <div class="item-sub <%= expired ? 'text-danger' : '' %>">
+                Warranty: <%= new Date(item.WarrantyExpires).toLocaleDateString() %><% if (expired) { %> · Expired<% } %>
+              </div>
+            <% } %>
+          </div>
+          <i class="bi bi-chevron-right list-item-arrow"></i>
+        </a>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<style>
+  .detail-row {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--bs-border-color);
+    font-size: 0.85rem;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label {
+    flex-shrink: 0;
+    width: 90px;
+    color: var(--bs-secondary-color);
+    font-size: 0.78rem;
+  }
+  .detail-value { flex: 1; word-break: break-word; }
+</style>

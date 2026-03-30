@@ -1,0 +1,73 @@
+<div class="mb-3">
+  <a href="/mobile/maintenance/<%= item.MaintenanceID %>" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Maintenance #<%= item.MaintenanceID %>
+  </a>
+</div>
+
+<h6 class="text-secondary small text-uppercase fw-semibold mb-2">Edit Maintenance</h6>
+
+<div class="card mobile-card mb-3" style="border-color:var(--bs-info-border-subtle);background:var(--bs-info-bg-subtle)">
+  <div class="card-body py-2 px-3 small text-secondary">
+    <strong><%= item.SiteName %></strong>
+    <% if (item.MaintenanceTypeName) { %> · <%= item.MaintenanceTypeName %><% } %>
+  </div>
+</div>
+
+<form method="POST" action="/mobile/maintenance/<%= item.MaintenanceID %>/edit">
+  <div class="card mobile-card mb-3">
+    <div class="card-body">
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Site</label>
+        <select name="siteID" class="form-select form-select-sm">
+          <% for (const s of sites) { %>
+            <option value="<%= s.SiteID %>" <%= item.SiteID === s.SiteID ? 'selected' : '' %>><%= s.SiteName %></option>
+          <% } %>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Maintenance Type <span class="text-secondary fw-normal">(optional)</span></label>
+        <select name="maintenanceTypeID" class="form-select form-select-sm">
+          <option value="">— None —</option>
+          <% for (const t of maintenanceTypes) { %>
+            <option value="<%= t.MaintenanceTypeID %>" <%= item.MaintenanceTypeID === t.MaintenanceTypeID ? 'selected' : '' %>><%= t.TypeName %></option>
+          <% } %>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Assigned To <span class="text-secondary fw-normal">(optional)</span></label>
+        <select name="assignedToUserID" class="form-select form-select-sm">
+          <option value="">— Unassigned —</option>
+          <% for (const u of users) { %>
+            <option value="<%= u.UserID %>" <%= item.AssignedToUserID === u.UserID ? 'selected' : '' %>><%= u.DisplayName %></option>
+          <% } %>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Due Date <span class="text-secondary fw-normal">(optional)</span></label>
+        <input type="date" name="dueDate" class="form-control form-control-sm"
+               value="<%= item.DueDate ? new Date(item.DueDate).toISOString().split('T')[0] : '' %>" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">External Reference <span class="text-secondary fw-normal">(optional)</span></label>
+        <input type="text" name="externalReference" class="form-control form-control-sm"
+               value="<%= item.ExternalReference || '' %>" autocomplete="off" />
+      </div>
+
+      <div class="mb-1">
+        <label class="form-label small fw-semibold">Work to Complete <span class="text-secondary fw-normal">(optional)</span></label>
+        <textarea name="workToComplete" class="form-control form-control-sm" rows="4"
+                  placeholder="Describe the work to be performed..."><%= item.WorkToComplete || '' %></textarea>
+      </div>
+
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary w-100 fw-semibold">
+    <i class="bi bi-check-lg me-1"></i>Save Changes
+  </button>
+</form>

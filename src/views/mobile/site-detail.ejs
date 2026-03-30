@@ -114,8 +114,16 @@
 <% } %>
 
 <!-- Network Resources -->
+<div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+  <h6 class="text-secondary small text-uppercase fw-semibold mb-0">Network Resources</h6>
+  <% const canEditNetwork = user && (user.roles.includes('Admin') || user.roles.includes('NetworkMapUpdater')); %>
+  <% if (canEditNetwork) { %>
+    <a href="/mobile/sites/<%= site.SiteID %>/network-resources/new" class="btn btn-sm btn-outline-primary py-0 px-2">
+      <i class="bi bi-plus"></i> Add
+    </a>
+  <% } %>
+</div>
 <% if (networkResources && networkResources.length > 0) { %>
-  <h6 class="text-secondary small text-uppercase fw-semibold mb-2 mt-3">Network Resources</h6>
   <div class="card mobile-card">
     <div class="card-body px-3 py-2">
       <% for (const r of networkResources) { %>
@@ -135,9 +143,17 @@
               <div class="item-sub text-secondary"><%= r.Notes %></div>
             <% } %>
           </div>
-          <% if (r.AlertStatus) { %>
-            <i class="bi bi-bell-fill text-danger ms-2" title="Affects alert status" style="font-size:0.8rem"></i>
-          <% } %>
+          <div class="d-flex flex-column align-items-end gap-1 ms-2 flex-shrink-0">
+            <% if (r.AlertStatus) { %>
+              <i class="bi bi-bell-fill text-danger" title="Affects alert status" style="font-size:0.75rem"></i>
+            <% } %>
+            <% if (canEditNetwork) { %>
+              <a href="/mobile/sites/<%= site.SiteID %>/network-resources/<%= r.ResourceID %>/edit"
+                 class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem">
+                <i class="bi bi-pencil"></i>
+              </a>
+            <% } %>
+          </div>
         </div>
       <% } %>
     </div>
@@ -145,7 +161,15 @@
 <% } %>
 
 <!-- Inventory at this site -->
-<h6 class="text-secondary small text-uppercase fw-semibold mb-2 mt-3">Equipment at this site</h6>
+<div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+  <h6 class="text-secondary small text-uppercase fw-semibold mb-0">Equipment at this site</h6>
+  <% const canEditInventory = user && user.roles.includes('Admin'); %>
+  <% if (canEditInventory) { %>
+    <a href="/mobile/sites/<%= site.SiteID %>/inventory/install" class="btn btn-sm btn-outline-primary py-0 px-2">
+      <i class="bi bi-plus"></i> Install
+    </a>
+  <% } %>
+</div>
 
 <% if (!inventory || inventory.length === 0) { %>
   <div class="card mobile-card">
@@ -160,12 +184,32 @@
             <i class="bi bi-box-seam"></i>
           </div>
           <div class="list-item-text">
-            <div class="item-title"><%= item.CommonName || item.ModelNumber || item.SerialNumber || 'Unknown' %></div>
+            <div class="item-title">
+              <%= item.CommonName || item.ModelNumber || item.SerialNumber || 'Unknown' %>
+              <% if (item.TrackingType === 'bulk' && item.Quantity > 1) { %>
+                <span class="badge bg-secondary bg-opacity-25 text-secondary ms-1" style="font-size:0.65rem">×<%= item.Quantity %></span>
+              <% } %>
+            </div>
             <div class="item-sub">
               <% if (item.SerialNumber) { %>S/N: <%= item.SerialNumber %><% } %>
-              <% if (item.Manufacturer) { %> · <%= item.Manufacturer %><% } %>
+              <% if (item.Manufacturer) { %><%= item.SerialNumber ? ' · ' : '' %><%= item.Manufacturer %><% } %>
             </div>
           </div>
+          <% if (canEditInventory) { %>
+          <div class="d-flex gap-1 ms-2 flex-shrink-0">
+            <a href="/mobile/sites/<%= site.SiteID %>/inventory/<%= item.SiteInventoryID %>/swap"
+               class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem" title="Swap">
+              <i class="bi bi-arrow-left-right"></i>
+            </a>
+          <form method="POST" action="/mobile/sites/<%= site.SiteID %>/inventory/<%= item.SiteInventoryID %>/remove"
+                class="ms-2 flex-shrink-0"
+                onsubmit="return confirm('Remove <%= (item.CommonName || item.SerialNumber || 'this item').replace(/'/g, '') %> from site?')">
+            <button type="submit" class="btn btn-outline-danger py-0 px-1" style="font-size:0.7rem" title="Remove">
+              <i class="bi bi-box-arrow-up"></i>
+            </button>
+          </form>
+          </div>
+          <% } %>
         </div>
       <% } %>
     </div>

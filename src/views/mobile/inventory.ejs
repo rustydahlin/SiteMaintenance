@@ -2,47 +2,91 @@
 <div class="search-bar">
   <form method="GET" action="/mobile/inventory">
     <input type="search" name="q" class="form-control form-control-sm"
-           placeholder="Search by name, serial, model..." value="<%= typeof q !== 'undefined' ? q : '' %>"
+           placeholder="Filter by name, serial, model, manufacturer..." value="<%= q %>"
            autocomplete="off" />
   </form>
 </div>
 
-<% if (!q || q.trim() === '') { %>
-  <div class="text-center text-secondary py-5">
-    <i class="bi bi-search" style="font-size:2rem"></i>
-    <p class="mt-2 small">Enter a search term to find equipment.</p>
-  </div>
-<% } else if (items.length === 0) { %>
+<% const hasItems = bulkItems.length > 0 || serializedGroups.length > 0; %>
+
+<% if (!hasItems) { %>
   <div class="text-center text-secondary py-5">
     <i class="bi bi-box-seam" style="font-size:2rem"></i>
-    <p class="mt-2 small">No items match "<%= q %>".</p>
+    <p class="mt-2 small"><% if (q.trim()) { %>No items match "<%= q %>".<% } else { %>No inventory items found.<% } %></p>
   </div>
 <% } else { %>
-  <div class="card mobile-card">
-    <div class="card-body px-3 py-2">
-      <% for (const item of items) { %>
-        <div class="list-item-row" style="cursor:default">
-          <div class="list-item-icon bg-success bg-opacity-10 text-success">
-            <i class="bi bi-box-seam"></i>
-          </div>
-          <div class="list-item-text">
-            <div class="item-title"><%= item.CommonName || item.ModelNumber || item.SerialNumber || 'Unknown' %></div>
-            <div class="item-sub">
-              <% if (item.Manufacturer) { %><%= item.Manufacturer %><% } %>
-              <% if (item.ModelNumber) { %> · <%= item.ModelNumber %><% } %>
+
+  <% if (serializedGroups.length > 0) { %>
+    <h6 class="text-secondary small text-uppercase fw-semibold mb-2">Serialized Equipment</h6>
+    <div class="card mobile-card mb-3">
+      <div class="card-body px-3 py-2">
+        <% for (const g of serializedGroups) { %>
+          <a href="/mobile/inventory/serialized?name=<%= encodeURIComponent(g.name) %>" class="list-item-row">
+            <div class="list-item-icon bg-primary bg-opacity-10 text-primary">
+              <i class="bi bi-cpu"></i>
             </div>
-            <div class="item-sub">
-              <% if (item.SerialNumber) { %>S/N: <%= item.SerialNumber %> · <% } %>
-              <% if (item.CategoryName) { %><span class="badge bg-secondary bg-opacity-10 text-secondary" style="font-size:0.65rem"><%= item.CategoryName %></span><% } %>
-              <% if (item.StatusName) { %> <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:0.65rem"><%= item.StatusName %></span><% } %>
+            <div class="list-item-text">
+              <div class="item-title"><%= g.name %></div>
+              <div class="item-sub">
+                <% if (g.manufacturer) { %><%= g.manufacturer %><% } %>
+                <% if (g.modelNumber && g.name !== g.modelNumber) { %><%= g.manufacturer ? ' · ' : '' %><%= g.modelNumber %><% } %>
+                <% if (g.category) { %> · <%= g.category %><% } %>
+              </div>
+              <% if (Object.keys(g.statuses).length > 0) { %>
+                <div class="item-sub">
+                  <% for (const [status, cnt] of Object.entries(g.statuses)) { %>
+                    <%
+                      const sc = status === 'In-Stock'  ? 'bg-success' :
+                                 status === 'In-Repair'  ? 'bg-warning text-dark' :
+                                 status === 'Deployed'   ? 'bg-primary' : 'bg-secondary';
+                    %>
+                    <span class="badge <%= sc %> bg-opacity-10 me-1" style="font-size:0.62rem"><%= cnt %> <%= status %></span>
+                  <% } %>
+                </div>
+              <% } %>
             </div>
-          </div>
-        </div>
-      <% } %>
+            <span class="badge bg-secondary rounded-pill ms-2"><%= g.count %></span>
+            <i class="bi bi-chevron-right list-item-arrow ms-1"></i>
+          </a>
+        <% } %>
+      </div>
     </div>
-  </div>
+  <% } %>
+
+  <% if (bulkItems.length > 0) { %>
+    <h6 class="text-secondary small text-uppercase fw-semibold mb-2">Bulk Items</h6>
+    <div class="card mobile-card mb-3">
+      <div class="card-body px-3 py-2">
+        <% for (const item of bulkItems) { %>
+          <a href="/mobile/inventory/<%= item.ItemID %>" class="list-item-row">
+            <div class="list-item-icon bg-success bg-opacity-10 text-success">
+              <i class="bi bi-boxes"></i>
+            </div>
+            <div class="list-item-text">
+              <div class="item-title"><%= item.CommonName || item.ModelNumber || 'Unknown' %></div>
+              <div class="item-sub">
+                <% if (item.Manufacturer) { %><%= item.Manufacturer %><% } %>
+                <% if (item.CategoryName) { %> · <%= item.CategoryName %><% } %>
+              </div>
+              <div class="item-sub">
+                <span class="badge bg-secondary bg-opacity-10 text-secondary" style="font-size:0.62rem">
+                  qty <%= item.QuantityTotal %> total · <%= item.QuantityAvailable %> available
+                </span>
+              </div>
+            </div>
+            <i class="bi bi-chevron-right list-item-arrow"></i>
+          </a>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
 
   <div class="text-center mt-2 text-secondary small">
-    Showing <%= items.length %> of <%= total %> result<%= total !== 1 ? 's' : '' %>
+    <% if (q.trim()) { %>
+      <%= serializedGroups.length + bulkItems.length %> result<%= (serializedGroups.length + bulkItems.length) !== 1 ? 's' : '' %> for "<%= q %>"
+    <% } else { %>
+      <%= serializedGroups.length %> type<%= serializedGroups.length !== 1 ? 's' : '' %> · <%= bulkItems.length %> bulk item<%= bulkItems.length !== 1 ? 's' : '' %>
+    <% } %>
   </div>
+
 <% } %>

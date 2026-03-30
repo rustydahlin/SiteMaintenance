@@ -1,0 +1,91 @@
+<div class="mb-3">
+  <a href="/mobile/sites/<%= siteID %>" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> <%= siteName %>
+  </a>
+</div>
+
+<h6 class="text-secondary small text-uppercase fw-semibold mb-2">
+  <%= resource ? 'Edit Network Resource' : 'Add Network Resource' %>
+</h6>
+
+<form method="POST" action="<%= resource ? '/mobile/sites/' + siteID + '/network-resources/' + resource.ResourceID : '/mobile/sites/' + siteID + '/network-resources' %>">
+
+  <div class="card mobile-card mb-3">
+    <div class="card-body">
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Hostname <span class="text-danger">*</span></label>
+        <input type="text" name="hostname" class="form-control form-control-sm"
+               value="<%= resource ? resource.Hostname : '' %>" required autocomplete="off" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">IP Address <span class="text-secondary fw-normal">(optional)</span></label>
+        <input type="text" name="ipAddress" class="form-control form-control-sm"
+               value="<%= resource ? (resource.IPAddress || '') : '' %>"
+               placeholder="e.g. 192.168.1.1" autocomplete="off" inputmode="decimal" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Device Type <span class="text-danger">*</span></label>
+        <select name="deviceTypeID" class="form-select form-select-sm" required>
+          <option value="">— Select —</option>
+          <% for (const dt of deviceTypes) { %>
+            <option value="<%= dt.DeviceTypeID %>"
+              <%= resource && resource.DeviceTypeID === dt.DeviceTypeID ? 'selected' : '' %>>
+              <%= dt.TypeName %>
+            </option>
+          <% } %>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Circuit Type <span class="text-secondary fw-normal">(optional)</span></label>
+        <select name="circuitTypeID" class="form-select form-select-sm">
+          <option value="">— None —</option>
+          <% for (const ct of circuitTypes) { %>
+            <option value="<%= ct.CircuitTypeID %>"
+              <%= resource && resource.CircuitTypeID === ct.CircuitTypeID ? 'selected' : '' %>>
+              <%= ct.TypeName %>
+            </option>
+          <% } %>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Circuit ID <span class="text-secondary fw-normal">(optional)</span></label>
+        <input type="text" name="circuitID" class="form-control form-control-sm"
+               value="<%= resource ? (resource.CircuitID || '') : '' %>" autocomplete="off" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Notes <span class="text-secondary fw-normal">(optional)</span></label>
+        <textarea name="notes" class="form-control form-control-sm" rows="2"><%= resource ? (resource.Notes || '') : '' %></textarea>
+      </div>
+
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="alertStatus" value="1" id="alertStatus"
+               <%= (!resource || resource.AlertStatus) ? 'checked' : '' %> />
+        <label class="form-check-label small" for="alertStatus">
+          Affects alert status <span class="text-secondary">(triggers site alerts if down)</span>
+        </label>
+      </div>
+
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary w-100">
+    <i class="bi bi-<%= resource ? 'floppy' : 'plus-circle' %> me-1"></i>
+    <%= resource ? 'Save Changes' : 'Add Resource' %>
+  </button>
+
+</form>
+
+<% if (resource) { %>
+  <form method="POST" action="/mobile/sites/<%= siteID %>/network-resources/<%= resource.ResourceID %>/delete"
+        class="mt-3" onsubmit="return confirm('Delete <%= resource.Hostname %>?')">
+    <button type="submit" class="btn btn-outline-danger w-100 btn-sm">
+      <i class="bi bi-trash me-1"></i>Delete Resource
+    </button>
+  </form>
+<% } %>
