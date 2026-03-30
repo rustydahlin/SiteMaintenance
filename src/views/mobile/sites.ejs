@@ -1,0 +1,51 @@
+<!-- Search -->
+<div class="search-bar">
+  <form method="GET" action="/mobile/sites">
+    <input type="search" name="q" class="form-control form-control-sm"
+           placeholder="Search sites..." value="<%= typeof q !== 'undefined' ? q : '' %>" autocomplete="off" />
+  </form>
+</div>
+
+<% if (sites.length === 0) { %>
+  <div class="text-center text-secondary py-5">
+    <i class="bi bi-building" style="font-size:2rem"></i>
+    <p class="mt-2 small">No sites found.</p>
+  </div>
+<% } else { %>
+  <div class="card mobile-card">
+    <div class="card-body px-3 py-2">
+      <% for (const site of sites) { %>
+        <a href="/mobile/sites/<%= site.SiteID %>" class="list-item-row">
+          <div class="list-item-icon bg-primary bg-opacity-10 text-primary">
+            <i class="bi bi-building"></i>
+          </div>
+          <div class="list-item-text">
+            <div class="item-title"><%= site.SiteName %></div>
+            <div class="item-sub">
+              <% if (site.SiteNumber) { %>#<%= site.SiteNumber %> · <% } %>
+              <%= [site.City, site.State].filter(Boolean).join(', ') || 'No location' %>
+              <% if (site.SiteStatusName) { %> · <span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.65rem"><%= site.SiteStatusName %></span><% } %>
+            </div>
+          </div>
+          <i class="bi bi-chevron-right list-item-arrow"></i>
+        </a>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (totalPages > 1) { %>
+    <div class="d-flex justify-content-between align-items-center mt-3">
+      <% if (page > 1) { %>
+        <a href="/mobile/sites?q=<%= encodeURIComponent(q || '') %>&page=<%= page - 1 %>" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-chevron-left"></i> Prev
+        </a>
+      <% } else { %><span></span><% } %>
+      <small class="text-secondary">Page <%= page %> of <%= totalPages %></small>
+      <% if (page < totalPages) { %>
+        <a href="/mobile/sites?q=<%= encodeURIComponent(q || '') %>&page=<%= page + 1 %>" class="btn btn-sm btn-outline-secondary">
+          Next <i class="bi bi-chevron-right"></i>
+        </a>
+      <% } else { %><span></span><% } %>
+    </div>
+  <% } %>
+<% } %>

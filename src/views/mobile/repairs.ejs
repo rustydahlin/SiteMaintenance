@@ -1,0 +1,54 @@
+<!-- Filter tabs -->
+<div class="d-flex gap-2 mb-3">
+  <a href="/mobile/repairs?status=open" class="btn btn-sm <%= status === 'open' ? 'btn-primary' : 'btn-outline-secondary' %>">Open</a>
+  <a href="/mobile/repairs?status=in-progress" class="btn btn-sm <%= status === 'in-progress' ? 'btn-primary' : 'btn-outline-secondary' %>">In Progress</a>
+  <a href="/mobile/repairs?status=all" class="btn btn-sm <%= status === 'all' ? 'btn-primary' : 'btn-outline-secondary' %>">All</a>
+</div>
+
+<% if (repairs.length === 0) { %>
+  <div class="text-center text-secondary py-5">
+    <i class="bi bi-wrench" style="font-size:2rem"></i>
+    <p class="mt-2 small">No repairs found.</p>
+  </div>
+<% } else { %>
+  <div class="card mobile-card">
+    <div class="card-body px-3 py-2">
+      <% for (const r of repairs) { %>
+        <div class="list-item-row" style="cursor:default">
+          <div class="list-item-icon bg-warning bg-opacity-10 text-warning">
+            <i class="bi bi-wrench"></i>
+          </div>
+          <div class="list-item-text">
+            <div class="item-title"><%= r.CommonName || r.ModelNumber || r.SerialNumber || 'Unknown Item' %></div>
+            <div class="item-sub">
+              <% const statusMap = { 'open': 'Open', 'in-progress': 'In Progress', 'closed': 'Closed', 'cancelled': 'Cancelled' }; %>
+              <span class="badge <%= r.RepairStatus === 'open' ? 'bg-warning text-dark' : r.RepairStatus === 'in-progress' ? 'bg-info text-dark' : 'bg-secondary' %>" style="font-size:0.65rem">
+                <%= statusMap[r.RepairStatus] || r.RepairStatus %>
+              </span>
+              <% if (r.RMANumber) { %> · RMA: <%= r.RMANumber %><% } %>
+              <% if (r.AssignedUserName) { %> · <%= r.AssignedUserName %><% } %>
+            </div>
+            <% if (r.ExpectedReturnDate) { %>
+              <div class="item-sub">
+                Expected: <%= new Date(r.ExpectedReturnDate).toLocaleDateString() %>
+                <% if (new Date(r.ExpectedReturnDate) < new Date() && !r.ReceivedDate) { %>
+                  <span class="text-danger ms-1"><i class="bi bi-exclamation-circle"></i> Overdue</span>
+                <% } %>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="text-center mt-2 text-secondary small">
+    Showing <%= repairs.length %> repair<%= repairs.length !== 1 ? 's' : '' %>
+  </div>
+<% } %>
+
+<div class="text-center mt-3">
+  <a href="/repairs" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-up-right-square me-1"></i>Manage Repairs
+  </a>
+</div>

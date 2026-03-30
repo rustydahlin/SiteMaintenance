@@ -115,8 +115,15 @@ async function createApp() {
   app.use(require('./middleware/audit'));
 
   // ── Routes ────────────────────────────────────────────────────────────────
+  // Serve service worker with correct scope header
+  app.get('/sw.js', (req, res, next) => {
+    res.setHeader('Service-Worker-Allowed', '/');
+    next();
+  });
+
   // Public API (no session auth — uses X-API-Key header)
   app.use('/api', require('./routes/networkMapApiRoute'));
+  app.use('/api/push', require('./routes/pushRoutes'));
 
   app.use('/',           require('./routes/index'));
   app.use('/auth',       require('./routes/authRoutes'));
@@ -133,6 +140,7 @@ async function createApp() {
   app.use('/logs',         require('./routes/logsRoutes'));
   app.use('/admin',        require('./routes/adminRoutes'));
   app.use('/profile',    require('./routes/profileRoutes'));
+  app.use('/mobile',     require('./routes/mobileRoutes'));
 
   // ── Error handling (must be last) ─────────────────────────────────────────
   const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');

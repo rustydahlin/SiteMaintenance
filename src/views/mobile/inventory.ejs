@@ -1,0 +1,48 @@
+<!-- Search -->
+<div class="search-bar">
+  <form method="GET" action="/mobile/inventory">
+    <input type="search" name="q" class="form-control form-control-sm"
+           placeholder="Search by name, serial, model..." value="<%= typeof q !== 'undefined' ? q : '' %>"
+           autocomplete="off" />
+  </form>
+</div>
+
+<% if (!q || q.trim() === '') { %>
+  <div class="text-center text-secondary py-5">
+    <i class="bi bi-search" style="font-size:2rem"></i>
+    <p class="mt-2 small">Enter a search term to find equipment.</p>
+  </div>
+<% } else if (items.length === 0) { %>
+  <div class="text-center text-secondary py-5">
+    <i class="bi bi-box-seam" style="font-size:2rem"></i>
+    <p class="mt-2 small">No items match "<%= q %>".</p>
+  </div>
+<% } else { %>
+  <div class="card mobile-card">
+    <div class="card-body px-3 py-2">
+      <% for (const item of items) { %>
+        <div class="list-item-row" style="cursor:default">
+          <div class="list-item-icon bg-success bg-opacity-10 text-success">
+            <i class="bi bi-box-seam"></i>
+          </div>
+          <div class="list-item-text">
+            <div class="item-title"><%= item.CommonName || item.ModelNumber || item.SerialNumber || 'Unknown' %></div>
+            <div class="item-sub">
+              <% if (item.Manufacturer) { %><%= item.Manufacturer %><% } %>
+              <% if (item.ModelNumber) { %> · <%= item.ModelNumber %><% } %>
+            </div>
+            <div class="item-sub">
+              <% if (item.SerialNumber) { %>S/N: <%= item.SerialNumber %> · <% } %>
+              <% if (item.CategoryName) { %><span class="badge bg-secondary bg-opacity-10 text-secondary" style="font-size:0.65rem"><%= item.CategoryName %></span><% } %>
+              <% if (item.StatusName) { %> <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:0.65rem"><%= item.StatusName %></span><% } %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="text-center mt-2 text-secondary small">
+    Showing <%= items.length %> of <%= total %> result<%= total !== 1 ? 's' : '' %>
+  </div>
+<% } %>

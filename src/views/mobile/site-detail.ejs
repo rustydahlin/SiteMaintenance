@@ -1,0 +1,179 @@
+<div class="mb-3">
+  <a href="/mobile/sites" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Sites
+  </a>
+</div>
+
+<!-- Site info -->
+<div class="card mobile-card">
+  <div class="card-body">
+
+    <!-- Badges row -->
+    <div class="mb-2">
+      <% if (site.SiteTypeName) { %>
+        <span class="badge bg-primary bg-opacity-10 text-primary"><%= site.SiteTypeName %></span>
+      <% } %>
+      <% if (site.SiteStatusName) { %>
+        <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1"><%= site.SiteStatusName %></span>
+      <% } %>
+      <% if (site.MonitoringLocationTypeName) { %>
+        <span class="badge bg-info bg-opacity-10 text-info ms-1"><%= site.MonitoringLocationTypeName %></span>
+      <% } %>
+    </div>
+
+    <% if (site.ParentSiteName) { %>
+      <div class="detail-row">
+        <span class="detail-label">Parent Site</span>
+        <span class="detail-value"><a href="/mobile/sites/<%= site.ParentSiteID %>"><%= site.ParentSiteName %></a></span>
+      </div>
+    <% } %>
+    <% if (site.SiteNumber) { %>
+      <div class="detail-row">
+        <span class="detail-label">Site #</span>
+        <span class="detail-value"><%= site.SiteNumber %></span>
+      </div>
+    <% } %>
+    <% if (site.ContractNumber) { %>
+      <div class="detail-row">
+        <span class="detail-label">Contract #</span>
+        <span class="detail-value"><%= site.ContractNumber %></span>
+      </div>
+    <% } %>
+    <% if (site.Address || site.City || site.State) { %>
+      <div class="detail-row">
+        <span class="detail-label">Address</span>
+        <span class="detail-value"><%= [site.Address, site.City, site.State, site.ZipCode].filter(Boolean).join(', ') %></span>
+      </div>
+    <% } %>
+    <% if (site.Latitude && site.Longitude) { %>
+      <div class="detail-row">
+        <span class="detail-label">Coordinates</span>
+        <span class="detail-value">
+          <a href="https://maps.apple.com/?ll=<%= site.Latitude %>,<%= site.Longitude %>&q=<%= encodeURIComponent(site.SiteName) %>" target="_blank">
+            <%= parseFloat(site.Latitude).toFixed(5) %>, <%= parseFloat(site.Longitude).toFixed(5) %>
+            <i class="bi bi-box-arrow-up-right ms-1" style="font-size:0.7rem"></i>
+          </a>
+        </span>
+      </div>
+    <% } %>
+    <% if (site.WarrantyExpires) { %>
+      <div class="detail-row">
+        <span class="detail-label">Warranty</span>
+        <span class="detail-value"><%= new Date(site.WarrantyExpires).toLocaleDateString() %></span>
+      </div>
+    <% } %>
+    <% if (site.Description) { %>
+      <div class="detail-row align-items-start">
+        <span class="detail-label" style="padding-top:1px">Notes</span>
+        <span class="detail-value" style="white-space:pre-wrap"><%= site.Description %></span>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<style>
+  .detail-row {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--bs-border-color);
+    font-size: 0.85rem;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label {
+    flex-shrink: 0;
+    width: 90px;
+    color: var(--bs-secondary-color);
+    font-size: 0.78rem;
+  }
+  .detail-value { flex: 1; word-break: break-word; }
+</style>
+
+<!-- Sub-sites -->
+<% if (subsites && subsites.length > 0) { %>
+  <h6 class="text-secondary small text-uppercase fw-semibold mb-2 mt-3">Sub-sites</h6>
+  <div class="card mobile-card">
+    <div class="card-body px-3 py-2">
+      <% for (const sub of subsites) { %>
+        <a href="/mobile/sites/<%= sub.SiteID %>" class="list-item-row">
+          <div class="list-item-icon bg-primary bg-opacity-10 text-primary">
+            <i class="bi bi-building"></i>
+          </div>
+          <div class="list-item-text">
+            <div class="item-title"><%= sub.SiteName %></div>
+            <div class="item-sub">
+              <% if (sub.SiteTypeName) { %><%= sub.SiteTypeName %><% } %>
+              <% if (sub.StatusName) { %> · <span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.65rem"><%= sub.StatusName %></span><% } %>
+            </div>
+          </div>
+          <i class="bi bi-chevron-right list-item-arrow"></i>
+        </a>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<!-- Network Resources -->
+<% if (networkResources && networkResources.length > 0) { %>
+  <h6 class="text-secondary small text-uppercase fw-semibold mb-2 mt-3">Network Resources</h6>
+  <div class="card mobile-card">
+    <div class="card-body px-3 py-2">
+      <% for (const r of networkResources) { %>
+        <div class="list-item-row" style="cursor:default">
+          <div class="list-item-icon bg-warning bg-opacity-10 text-warning">
+            <i class="bi bi-hdd-network"></i>
+          </div>
+          <div class="list-item-text">
+            <div class="item-title"><%= r.Hostname %></div>
+            <div class="item-sub">
+              <% if (r.IPAddress) { %><code style="font-size:0.75rem"><%= r.IPAddress %></code><% } %>
+              <% if (r.DeviceTypeName) { %> · <%= r.DeviceTypeName %><% } %>
+              <% if (r.CircuitTypeName) { %> · <%= r.CircuitTypeName %><% } %>
+              <% if (r.CircuitID) { %> · <span class="text-secondary">CID: <%= r.CircuitID %></span><% } %>
+            </div>
+            <% if (r.Notes) { %>
+              <div class="item-sub text-secondary"><%= r.Notes %></div>
+            <% } %>
+          </div>
+          <% if (r.AlertStatus) { %>
+            <i class="bi bi-bell-fill text-danger ms-2" title="Affects alert status" style="font-size:0.8rem"></i>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<!-- Inventory at this site -->
+<h6 class="text-secondary small text-uppercase fw-semibold mb-2 mt-3">Equipment at this site</h6>
+
+<% if (!inventory || inventory.length === 0) { %>
+  <div class="card mobile-card">
+    <div class="card-body text-secondary small text-center py-3">No equipment assigned.</div>
+  </div>
+<% } else { %>
+  <div class="card mobile-card">
+    <div class="card-body px-3 py-2">
+      <% for (const item of inventory) { %>
+        <div class="list-item-row" style="cursor:default">
+          <div class="list-item-icon bg-success bg-opacity-10 text-success">
+            <i class="bi bi-box-seam"></i>
+          </div>
+          <div class="list-item-text">
+            <div class="item-title"><%= item.CommonName || item.ModelNumber || item.SerialNumber || 'Unknown' %></div>
+            <div class="item-sub">
+              <% if (item.SerialNumber) { %>S/N: <%= item.SerialNumber %><% } %>
+              <% if (item.Manufacturer) { %> · <%= item.Manufacturer %><% } %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<div class="text-center mt-3">
+  <a href="/sites/<%= site.SiteID %>" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-up-right-square me-1"></i>Full Site Details
+  </a>
+</div>
