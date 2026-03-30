@@ -11,6 +11,9 @@ const inventoryModel        = require('../models/inventoryModel');
 const { getPool, sql }    = require('../config/database');
 const lookupModel           = require('../models/lookupModel');
 const userModel             = require('../models/userModel');
+const vendorModel           = require('../models/vendorModel');
+const pmModel               = require('../models/pmModel');
+const logModel              = require('../models/logModel');
 const { isAuthenticated, isAdmin, canManageNetworkMap } = require('../middleware/auth');
 
 // All mobile routes require login
@@ -28,12 +31,38 @@ router.get('/', async (req, res, next) => {
     const today = new Date();
     const uid   = req.user.UserID;
 
-    const [sitesResult, repairsResult, maintenanceResult, myRepairsResult, myMaintenanceResult] = await Promise.all([
+    const myPMsPromise = (async () => {
+      const pool = await getPool();
+      const r = await pool.request()
+        .input('UserID', sql.Int, uid)
+        .query(`
+          SELECT pm.ScheduleID, pm.SiteID, pm.Title, pm.FrequencyDays,
+                 pm.LastPerformedAt, pm.AssignedUserID, pm.AssignedVendorID,
+                 s.SiteName,
+                 u.DisplayName AS AssignedUserName,
+                 v.VendorName  AS AssignedVendorName,
+                 DATEADD(day, pm.FrequencyDays, ISNULL(pm.LastPerformedAt, GETUTCDATE())) AS NextDueDate,
+                 DATEDIFF(day, GETUTCDATE(),
+                   DATEADD(day, pm.FrequencyDays, ISNULL(pm.LastPerformedAt, GETUTCDATE()))) AS DaysUntilDue
+          FROM PMSchedules pm
+          LEFT JOIN Sites   s ON s.SiteID   = pm.SiteID
+          LEFT JOIN Users   u ON u.UserID   = pm.AssignedUserID
+          LEFT JOIN Vendors v ON v.VendorID = pm.AssignedVendorID
+          WHERE pm.AssignedUserID = @UserID
+            AND DATEDIFF(day, GETUTCDATE(),
+                  DATEADD(day, pm.FrequencyDays, ISNULL(pm.LastPerformedAt, GETUTCDATE()))) <= 60
+          ORDER BY NextDueDate
+        `);
+      return r.recordset;
+    })();
+
+    const [sitesResult, repairsResult, maintenanceResult, myRepairsResult, myMaintenanceResult, myPMs] = await Promise.all([
       siteModel.getAll({ page: 1, pageSize: 1 }),
       repairModel.getAll({ status: 'open', page: 1, pageSize: 1 }),
       maintenanceModel.getAll({ open: true, page: 1, pageSize: 200 }),
       repairModel.getAll({ status: 'open', assignedUserID: uid, page: 1, pageSize: 50 }),
       maintenanceModel.getAll({ open: true, assignedToUserID: uid, page: 1, pageSize: 200 }),
+      myPMsPromise,
     ]);
 
     const siteCount    = sitesResult.total;
@@ -55,6 +84,7 @@ router.get('/', async (req, res, next) => {
       myRepairs,
       myMaintenance,
       myOverdue,
+      myPMs,
     });
   } catch (err) {
     next(err);
@@ -88,11 +118,12 @@ router.get('/sites', async (req, res, next) => {
 router.get('/sites/:id', async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
-    const [site, inventory, subsites, networkResources] = await Promise.all([
+    const [site, inventory, subsites, networkResources, pmSchedules] = await Promise.all([
       siteModel.getByID(siteID),
       siteInventoryModel.getCurrentItems(siteID),
       siteModel.getSubsites(siteID),
       networkResourceModel.getBySite(siteID),
+      pmModel.getBySite(siteID),
     ]);
 
     if (!site) return res.status(404).render('errors/404', { title: 'Not Found' });
@@ -103,10 +134,40 @@ router.get('/sites/:id', async (req, res, next) => {
       inventory,
       subsites,
       networkResources,
+      pmSchedules,
     });
   } catch (err) {
     next(err);
   }
+});
+
+// ── Site: complete PM schedule from site view ──────────────────────────────────
+router.post('/sites/:id/pm/:scheduleID/complete', async (req, res, next) => {
+  try {
+    const siteID     = parseInt(req.params.id, 10);
+    const scheduleID = parseInt(req.params.scheduleID, 10);
+    const { performedDate } = req.body;
+
+    const date = performedDate ? new Date(performedDate) : new Date();
+    await pmModel.markCompleted(scheduleID, date, req.auditContext);
+
+    // Create log entry matching desktop behaviour
+    const logTypeID = (await lookupModel.getLogTypeByName('Preventive Maintenance'))?.LogTypeID;
+    if (logTypeID) {
+      const schedule = await pmModel.getByID(scheduleID);
+      await logModel.create({
+        siteID, logTypeID,
+        entryDate:         date,
+        subject:           `PM Completed: ${schedule.Title}`,
+        performedByUserID: req.user.UserID,
+        performedBy:       req.user.DisplayName,
+        createdByUserID:   req.user.UserID,
+      }, req.auditContext);
+    }
+
+    req.flash('success', 'PM marked complete.');
+    res.redirect(`/mobile/sites/${siteID}`);
+  } catch (err) { next(err); }
 });
 
 // ── Repairs list ──────────────────────────────────────────────────────────────
@@ -776,6 +837,34 @@ router.post('/sites/:id/network-resources/:resID/delete', canManageNetworkMap, a
 
     req.flash('success', 'Network resource deleted.');
     res.redirect(`/mobile/sites/${siteID}`);
+  } catch (err) { next(err); }
+});
+
+// ── Vendors list ──────────────────────────────────────────────────────────────
+router.get('/vendors', async (req, res, next) => {
+  try {
+    const { q = '' } = req.query;
+    const vendors = await vendorModel.getAll({ search: q.trim() || '' });
+
+    res.render('mobile/vendors', {
+      title: 'Vendors',
+      vendors,
+      q,
+    });
+  } catch (err) { next(err); }
+});
+
+// ── Vendor detail ─────────────────────────────────────────────────────────────
+router.get('/vendors/:id', async (req, res, next) => {
+  try {
+    const vendorID = parseInt(req.params.id, 10);
+    const vendor = await vendorModel.getByID(vendorID);
+    if (!vendor) return res.status(404).render('errors/404', { title: 'Not Found' });
+
+    res.render('mobile/vendor-detail', {
+      title: vendor.VendorName,
+      vendor,
+    });
   } catch (err) { next(err); }
 });
 

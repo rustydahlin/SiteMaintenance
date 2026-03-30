@@ -216,6 +216,100 @@
   </div>
 <% } %>
 
+<!-- PM Schedules -->
+<div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+  <h6 class="text-secondary small text-uppercase fw-semibold mb-0">PM Schedules</h6>
+</div>
+
+<% if (!pmSchedules || pmSchedules.length === 0) { %>
+  <div class="card mobile-card">
+    <div class="card-body text-secondary small text-center py-3">No PM schedules for this site.</div>
+  </div>
+<% } else { %>
+  <div class="card mobile-card">
+    <div class="card-body px-3 py-0">
+      <% for (const pm of pmSchedules) { %>
+        <%
+          const nextDue   = pm.NextDueDate ? new Date(pm.NextDueDate) : null;
+          const isOverdue = pm.DaysUntilDue < 0;
+          const isDueSoon = !isOverdue && pm.DaysUntilDue <= 7;
+        %>
+        <div class="py-2" style="border-bottom:1px solid var(--bs-border-color)">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div style="flex:1;min-width:0">
+              <div class="fw-semibold" style="font-size:0.875rem"><%= pm.Title %></div>
+              <div class="small text-secondary mt-1">
+                Every <%= pm.FrequencyDays %> days
+                <% if (pm.AssignedUserName) { %> · <i class="bi bi-person me-1"></i><%= pm.AssignedUserName %><% } %>
+                <% if (pm.AssignedVendorName) { %> · <i class="bi bi-building me-1"></i><%= pm.AssignedVendorName %><% } %>
+              </div>
+              <div class="small mt-1">
+                <% if (pm.LastPerformedAt) { %>
+                  <span class="text-secondary">Last: <%= new Date(pm.LastPerformedAt).toLocaleDateString() %></span> ·
+                <% } %>
+                <% if (nextDue) { %>
+                  <span class="<%= isOverdue ? 'text-danger fw-semibold' : isDueSoon ? 'text-warning' : 'text-secondary' %>">
+                    <% if (isOverdue) { %><i class="bi bi-exclamation-circle me-1"></i>Overdue <%= Math.abs(pm.DaysUntilDue) %>d
+                    <% } else if (isDueSoon) { %>Due in <%= pm.DaysUntilDue %>d
+                    <% } else { %>Next: <%= nextDue.toLocaleDateString() %>
+                    <% } %>
+                  </span>
+                <% } %>
+              </div>
+            </div>
+            <!-- Quick complete -->
+            <button type="button"
+                    class="btn btn-outline-success py-0 px-2 flex-shrink-0"
+                    style="font-size:0.7rem"
+                    title="Mark Complete"
+                    data-pm-id="<%= pm.ScheduleID %>"
+                    data-pm-name="<%= pm.Title.replace(/'/g,'') %>"
+                    onclick="openCompleteModal(this)">
+              <i class="bi bi-check-lg"></i>
+            </button>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<!-- Complete PM modal -->
+<div class="modal fade" id="completePMModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title fw-semibold" id="completePMTitle">Mark Complete</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="completePMForm" method="POST">
+        <div class="modal-body py-2">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Date Performed</label>
+            <input type="date" name="performedDate" class="form-control form-control-sm"
+                   value="<%= new Date().toISOString().split('T')[0] %>" />
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check-lg me-1"></i>Mark Complete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function openCompleteModal(btn) {
+  var id   = btn.dataset.pmId;
+  var name = btn.dataset.pmName;
+  document.getElementById('completePMTitle').textContent = 'Complete: ' + name;
+  document.getElementById('completePMForm').action = '/mobile/sites/<%= site.SiteID %>/pm/' + id + '/complete';
+  var modal = new bootstrap.Modal(document.getElementById('completePMModal'));
+  modal.show();
+}
+</script>
+
 <div class="text-center mt-3">
   <a href="/sites/<%= site.SiteID %>" class="btn btn-sm btn-outline-secondary">
     <i class="bi bi-arrow-up-right-square me-1"></i>Full Site Details
