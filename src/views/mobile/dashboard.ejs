@@ -48,13 +48,15 @@
             <div class="list-item-text">
               <div class="item-title"><%= r.CommonName || r.ModelNumber || r.SerialNumber || 'Unknown' %></div>
               <div class="item-sub">
-                <% if (r.RMANumber) { %><span class="text-secondary">RMA: <%= r.RMANumber %></span><% } %>
-                <% if (r.ExpectedReturnDate) { %>
-                  <% const overdue = new Date(r.ExpectedReturnDate) < new Date() && !r.ReceivedDate; %>
-                  <span class="<%= overdue ? 'text-danger' : 'text-secondary' %> ms-1">
-                    <% if (overdue) { %><i class="bi bi-exclamation-circle me-1"></i>Overdue<% } else { %>Expected: <%= new Date(r.ExpectedReturnDate).toLocaleDateString() %><% } %>
-                  </span>
-                <% } %>
+                <%
+                  let dBadgeClass, dBadgeLabel;
+                  if (!r.SentDate)   { dBadgeClass = 'bg-secondary';         dBadgeLabel = 'Not Sent'; }
+                  else if (r.ExpectedReturnDate && new Date(r.ExpectedReturnDate) < new Date()) {
+                                       dBadgeClass = 'bg-danger';            dBadgeLabel = 'Overdue'; }
+                  else               { dBadgeClass = 'bg-warning text-dark'; dBadgeLabel = 'Open'; }
+                %>
+                <span class="badge <%= dBadgeClass %>" style="font-size:0.62rem"><%= dBadgeLabel %></span>
+                <% if (r.RMANumber) { %><span class="text-secondary ms-1">RMA: <%= r.RMANumber %></span><% } %>
               </div>
             </div>
             <i class="bi bi-chevron-right list-item-arrow"></i>

@@ -24,7 +24,20 @@
             <div class="item-sub">
               <% if (site.SiteNumber) { %>#<%= site.SiteNumber %> · <% } %>
               <%= [site.City, site.State].filter(Boolean).join(', ') || 'No location' %>
-              <% if (site.SiteStatusName) { %> · <span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.65rem"><%= site.SiteStatusName %></span><% } %>
+              <% if (site.SiteStatusName) { %>
+                <%
+                  const statusColors = {
+                    'Current':        'bg-success',
+                    'Maintenance':    'bg-warning text-dark',
+                    'Past-Due':       'bg-danger',
+                    'Active':         'bg-success',
+                    'Inactive':       'bg-secondary',
+                    'Decommissioned': 'bg-secondary',
+                  };
+                  const statusCls = statusColors[site.SiteStatusName] || 'bg-secondary';
+                %>
+                · <span class="badge <%= statusCls %>" style="font-size:0.65rem"><%= site.SiteStatusName %></span>
+              <% } %>
             </div>
           </div>
           <i class="bi bi-chevron-right list-item-arrow"></i>

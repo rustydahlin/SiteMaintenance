@@ -32,10 +32,16 @@
           <div class="list-item-text">
             <div class="item-title"><%= r.CommonName || r.ModelNumber || r.SerialNumber || 'Unknown Item' %></div>
             <div class="item-sub">
-              <% const statusMap = { 'open': 'Open', 'in-progress': 'In Progress', 'closed': 'Closed', 'cancelled': 'Cancelled', 'Sent': 'Sent', 'Returned-to-Inventory': 'Returned' }; %>
-              <span class="badge <%= r.ReceivedDate ? 'bg-secondary' : 'bg-warning text-dark' %>" style="font-size:0.65rem">
-                <%= statusMap[r.RepairStatus] || r.RepairStatus %>
-              </span>
+              <span class="text-secondary fw-semibold">#<%= r.RepairID %></span>
+              <%
+                let repairBadgeClass, repairBadgeLabel;
+                if (r.ReceivedDate)       { repairBadgeClass = 'bg-success';           repairBadgeLabel = 'Closed'; }
+                else if (!r.SentDate)     { repairBadgeClass = 'bg-secondary';          repairBadgeLabel = 'Not Sent'; }
+                else if (r.ExpectedReturnDate && new Date(r.ExpectedReturnDate) < new Date()) {
+                                            repairBadgeClass = 'bg-danger';             repairBadgeLabel = 'Overdue'; }
+                else                      { repairBadgeClass = 'bg-warning text-dark';  repairBadgeLabel = 'Open'; }
+              %>
+              · <span class="badge <%= repairBadgeClass %>" style="font-size:0.65rem"><%= repairBadgeLabel %></span>
               <% if (r.RMANumber) { %> · RMA: <%= r.RMANumber %><% } %>
               <% if (r.AssignedUserName) { %> · <%= r.AssignedUserName %><% } %>
             </div>

@@ -6,18 +6,16 @@
 
 <!-- Status banner -->
 <%
-  const statusLabel = { open: 'Open', 'in-progress': 'In Progress', closed: 'Closed', cancelled: 'Cancelled',
-                        'Sent': 'Sent', 'Returned-to-Inventory': 'Returned' };
-  const statusClass = repair.ReceivedDate ? 'bg-success' : (repair.RepairStatus === 'Cancelled' ? 'bg-secondary' : 'bg-warning text-dark');
-  const isOverdue   = repair.ExpectedReturnDate && !repair.ReceivedDate && new Date(repair.ExpectedReturnDate) < new Date();
+  let statusClass, statusLabel;
+  if (repair.ReceivedDate)       { statusClass = 'bg-success';           statusLabel = 'Closed'; }
+  else if (!repair.SentDate)     { statusClass = 'bg-secondary';          statusLabel = 'Not Sent'; }
+  else if (repair.ExpectedReturnDate && new Date(repair.ExpectedReturnDate) < new Date()) {
+                                   statusClass = 'bg-danger';             statusLabel = 'Overdue'; }
+  else                           { statusClass = 'bg-warning text-dark';  statusLabel = 'Open'; }
+  const isOverdue = repair.ExpectedReturnDate && !repair.ReceivedDate && new Date(repair.ExpectedReturnDate) < new Date();
 %>
 <div class="d-flex align-items-center gap-2 mb-3">
-  <span class="badge <%= statusClass %> fs-6">
-    <%= statusLabel[repair.RepairStatus] || repair.RepairStatus %>
-  </span>
-  <% if (isOverdue) { %>
-    <span class="badge bg-danger"><i class="bi bi-exclamation-circle me-1"></i>Overdue</span>
-  <% } %>
+  <span class="badge <%= statusClass %> fs-6"><%= statusLabel %></span>
 </div>
 
 <!-- Item info -->
