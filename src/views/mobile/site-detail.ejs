@@ -198,14 +198,14 @@
           <% if (canEditInventory) { %>
           <div class="d-flex gap-1 ms-2 flex-shrink-0">
             <a href="/mobile/sites/<%= site.SiteID %>/inventory/<%= item.SiteInventoryID %>/swap"
-               class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem" title="Swap">
+               class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem" title="Swap">
               <i class="bi bi-arrow-left-right"></i>
             </a>
           <form method="POST" action="/mobile/sites/<%= site.SiteID %>/inventory/<%= item.SiteInventoryID %>/remove"
                 class="ms-2 flex-shrink-0"
                 onsubmit="return confirm('Remove <%= (item.CommonName || item.SerialNumber || 'this item').replace(/'/g, '') %> from site?')">
             <button type="submit" class="btn btn-outline-danger py-0 px-1" style="font-size:0.7rem" title="Remove">
-              <i class="bi bi-box-arrow-up"></i>
+              <i class="bi bi-trash"></i>
             </button>
           </form>
           </div>
