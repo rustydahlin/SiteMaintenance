@@ -756,7 +756,7 @@ router.get('/sites/:id/network-resources/new', canManageNetworkMap, async (req, 
 router.post('/sites/:id/network-resources', canManageNetworkMap, async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
-    const { hostname, ipAddress, deviceTypeID, alertStatus, circuitTypeID, circuitID, notes, sortOrder } = req.body;
+    const { hostname, ipAddress, deviceTypeID, alertStatus, solarwindsNodeId, circuitTypeID, circuitID, notes, sortOrder } = req.body;
 
     if (!hostname || !deviceTypeID) {
       req.flash('error', 'Hostname and device type are required.');
@@ -765,13 +765,14 @@ router.post('/sites/:id/network-resources', canManageNetworkMap, async (req, res
 
     await networkResourceModel.create(siteID, {
       hostname,
-      ipAddress:       ipAddress       || null,
-      deviceTypeID:    parseInt(deviceTypeID, 10),
-      alertStatus:     alertStatus === '1',
-      circuitTypeID:   circuitTypeID   ? parseInt(circuitTypeID, 10) : null,
-      circuitID:       circuitID       || null,
-      notes:           notes           || null,
-      sortOrder:       sortOrder       ? parseInt(sortOrder, 10) : 0,
+      ipAddress:        ipAddress        || null,
+      deviceTypeID:     parseInt(deviceTypeID, 10),
+      alertStatus:      alertStatus === '1',
+      solarwindsNodeId: solarwindsNodeId || null,
+      circuitTypeID:    circuitTypeID    ? parseInt(circuitTypeID, 10) : null,
+      circuitID:        circuitID        || null,
+      notes:            notes            || null,
+      sortOrder:        sortOrder        ? parseInt(sortOrder, 10) : 0,
     }, req.auditContext);
 
     req.flash('success', 'Network resource added.');
@@ -811,7 +812,7 @@ router.post('/sites/:id/network-resources/:resID', canManageNetworkMap, async (r
   try {
     const siteID = parseInt(req.params.id, 10);
     const resID  = parseInt(req.params.resID, 10);
-    const { hostname, ipAddress, deviceTypeID, alertStatus, circuitTypeID, circuitID, notes, sortOrder } = req.body;
+    const { hostname, ipAddress, deviceTypeID, alertStatus, solarwindsNodeId, circuitTypeID, circuitID, notes, sortOrder } = req.body;
 
     if (!hostname || !deviceTypeID) {
       req.flash('error', 'Hostname and device type are required.');
@@ -820,13 +821,14 @@ router.post('/sites/:id/network-resources/:resID', canManageNetworkMap, async (r
 
     await networkResourceModel.update(resID, {
       hostname,
-      ipAddress:     ipAddress     || null,
-      deviceTypeID:  parseInt(deviceTypeID, 10),
-      alertStatus:   alertStatus === '1',
-      circuitTypeID: circuitTypeID ? parseInt(circuitTypeID, 10) : null,
-      circuitID:     circuitID     || null,
-      notes:         notes         || null,
-      sortOrder:     sortOrder     ? parseInt(sortOrder, 10) : 0,
+      ipAddress:        ipAddress        || null,
+      deviceTypeID:     parseInt(deviceTypeID, 10),
+      alertStatus:      alertStatus === '1',
+      solarwindsNodeId: solarwindsNodeId || null,
+      circuitTypeID:    circuitTypeID    ? parseInt(circuitTypeID, 10) : null,
+      circuitID:        circuitID        || null,
+      notes:            notes            || null,
+      sortOrder:        sortOrder        ? parseInt(sortOrder, 10) : 0,
     }, req.auditContext);
 
     req.flash('success', 'Network resource updated.');

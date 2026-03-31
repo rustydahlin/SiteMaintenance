@@ -40,6 +40,13 @@
       </div>
 
       <div class="mb-3">
+        <label class="form-label small fw-semibold">SolarWinds Node ID <span class="text-secondary fw-normal">(optional)</span></label>
+        <input type="number" name="solarwindsNodeId" class="form-control form-control-sm"
+               value="<%= resource ? (resource.SolarwindsNodeId || '') : '' %>"
+               placeholder="e.g. 12345" autocomplete="off" inputmode="numeric" />
+      </div>
+
+      <div class="mb-3">
         <label class="form-label small fw-semibold">Circuit Type <span class="text-secondary fw-normal">(optional)</span></label>
         <select name="circuitTypeID" class="form-select form-select-sm">
           <option value="">— None —</option>
