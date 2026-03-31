@@ -186,10 +186,12 @@ router.get('/repairs', async (req, res, next) => {
 
     let repairs = result.rows;
     const now = new Date();
+    const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const dateUtcMs = (d) => { const dt = new Date(d); return Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()); };
     if (filter === 'overdue') {
-      repairs = repairs.filter(r => r.SentDate && r.ExpectedReturnDate && new Date(r.ExpectedReturnDate) < now);
+      repairs = repairs.filter(r => r.SentDate && r.ExpectedReturnDate && dateUtcMs(r.ExpectedReturnDate) < todayUtc);
     } else if (filter === 'inprogress') {
-      repairs = repairs.filter(r => r.SentDate && (!r.ExpectedReturnDate || new Date(r.ExpectedReturnDate) >= now));
+      repairs = repairs.filter(r => r.SentDate && (!r.ExpectedReturnDate || dateUtcMs(r.ExpectedReturnDate) >= todayUtc));
     }
 
     res.render('mobile/repairs', {
@@ -299,7 +301,7 @@ router.get('/maintenance', async (req, res, next) => {
     const opts = { page: 1, pageSize: 100, sort: 'dueDate', dir: 'asc' };
 
     if (filter === 'overdue')   { opts.open = true; opts.overdueOnly = true; }
-    else if (filter === 'open') { opts.open = true; }
+    else if (filter === 'open') { opts.open = true; opts.notOverdue = true; }
     // 'all' — no filter
 
     if (scope === 'mine') opts.assignedToUserID = req.user.UserID;

@@ -7,7 +7,7 @@
 <!-- Status banner -->
 <%
   const isOpen    = !item.ClosedAt;
-  const isOverdue = isOpen && item.DueDate && new Date(item.DueDate) < new Date();
+  const isOverdue = isOpen && isDateOverdue(item.DueDate);
 %>
 <div class="d-flex align-items-center gap-2 mb-3">
   <% if (item.ClosedAt) { %>
@@ -31,7 +31,7 @@
       <div class="detail-row">
         <span class="detail-label">Due Date</span>
         <span class="detail-value <%= isOverdue ? 'text-danger fw-semibold' : '' %>">
-          <%= new Date(item.DueDate).toLocaleDateString() %>
+          <%= fmtDate(item.DueDate) %>
           <% if (isOverdue) { %> · <span class="text-danger"><%= item.DaysOverdue %> day<%= item.DaysOverdue !== 1 ? 's' : '' %> overdue</span><% } %>
         </span>
       </div>

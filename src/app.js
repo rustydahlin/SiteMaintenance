@@ -45,6 +45,17 @@ async function createApp() {
     res.locals.user        = null;
     res.locals.flash       = {};
     res.locals.currentPath = req.path;
+    res.locals.isDev       = process.env.NODE_ENV !== 'production';
+    // Format a SQL date-only field correctly (avoids UTC-midnight timezone shift)
+    res.locals.fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '';
+    // Returns true if a SQL date-only field is strictly before today (UTC date comparison)
+    res.locals.isDateOverdue = (d) => {
+      if (!d) return false;
+      const dt  = new Date(d);
+      const now = new Date();
+      return Date.UTC(dt.getUTCFullYear(),  dt.getUTCMonth(),  dt.getUTCDate()) <
+             Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    };
     next();
   });
 

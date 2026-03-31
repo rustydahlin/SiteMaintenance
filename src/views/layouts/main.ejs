@@ -21,6 +21,17 @@
 </head>
 <body>
 
+<% if (locals.isDev) { %>
+<div style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#dc3545;color:#fff;text-align:center;padding:6px 12px;font-size:.8rem;font-weight:600;letter-spacing:.05em">
+  &#9888; DEVELOPMENT MODE &mdash; Database is <u>not</u> production data
+</div>
+<style>
+  nav.navbar.fixed-top { top: 34px; }
+  body { padding-top: 90px; }
+  #sidebar { top: 90px; height: calc(100vh - 90px); }
+</style>
+<% } %>
+
 <%- include('../partials/navbar') %>
 
 <div id="sidebarBackdrop"></div>

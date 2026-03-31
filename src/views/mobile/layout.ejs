@@ -36,11 +36,6 @@
       padding-top: calc(12px + env(safe-area-inset-top));
     }
 
-    .mobile-header h1 {
-      font-size: 1.1rem;
-      font-weight: 600;
-      margin: 0;
-    }
 
     .bottom-nav {
       position: fixed;
@@ -191,10 +186,31 @@
 </head>
 <body>
 
+<% if (locals.isDev) { %>
+<div style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#dc3545;color:#fff;text-align:center;padding:6px 12px;font-size:.8rem;font-weight:600;letter-spacing:.05em">
+  &#9888; DEVELOPMENT MODE &mdash; Database is <u>not</u> production data
+</div>
+<style>
+  .mobile-header { top: 34px; }
+  body { padding-top: calc(env(safe-area-inset-top) + 34px); }
+</style>
+<% } %>
+
 <!-- Header -->
 <div class="mobile-header d-flex justify-content-between align-items-center">
-  <h1 class="bi bi-tools"> <%= typeof title !== 'undefined' ? title : (typeof appName !== 'undefined' ? appName : 'SiteMaintenance') %></h1>
-  <div class="d-flex gap-2 align-items-center">
+  <div class="d-flex align-items-center gap-2" style="min-width:0">
+    <img src="<%= typeof sidebarLogoUrl !== 'undefined' ? sidebarLogoUrl : '/images/publicsafetyteam.png' %>"
+         alt="Logo" style="height:34px;width:34px;object-fit:contain;border-radius:6px;flex-shrink:0">
+    <div style="min-width:0">
+      <div style="font-size:0.65rem;color:var(--bs-secondary-color);font-weight:500;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+        <%= typeof appName !== 'undefined' ? appName : 'SiteMaintenance' %>
+      </div>
+      <div style="font-size:1rem;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+        <%= typeof title !== 'undefined' ? title : '' %>
+      </div>
+    </div>
+  </div>
+  <div class="d-flex gap-2 align-items-center" style="flex-shrink:0">
     <button id="notifBtn" class="btn btn-sm btn-outline-secondary" title="Enable Notifications" style="display:none">
       <i class="bi bi-bell" id="notifIcon"></i>
     </button>

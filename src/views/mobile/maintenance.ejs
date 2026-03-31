@@ -24,12 +24,14 @@
 <% } else { %>
   <div class="card mobile-card">
     <div class="card-body px-3 py-2">
-      <% const today = new Date(); %>
+      <% const now = new Date(); %>
+      <% const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()); %>
       <% for (const item of items) { %>
         <%
-          const dueDate = item.DueDate ? new Date(item.DueDate) : null;
-          const isOverdue = dueDate && !item.ClosedAt && dueDate < today;
-          const isClosed = !!item.ClosedAt;
+          const dueDate   = item.DueDate ? new Date(item.DueDate) : null;
+          const dueDateMs = dueDate ? Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate()) : null;
+          const isOverdue = dueDateMs !== null && !item.ClosedAt && dueDateMs < todayUtc;
+          const isClosed  = !!item.ClosedAt;
         %>
         <a href="/mobile/maintenance/<%= item.MaintenanceID %>" class="list-item-row">
           <div class="list-item-icon <%= isOverdue ? 'bg-danger bg-opacity-10 text-danger' : isClosed ? 'bg-success bg-opacity-10 text-success' : 'bg-info bg-opacity-10 text-info' %>">
@@ -44,7 +46,7 @@
             <% if (dueDate) { %>
               <div class="item-sub <%= isOverdue ? 'text-danger fw-semibold' : '' %>">
                 <% if (isOverdue) { %><i class="bi bi-exclamation-circle me-1"></i>Overdue: <% } else { %>Due: <% } %>
-                <%= dueDate.toLocaleDateString() %>
+                <%= dueDate.toLocaleDateString('en-US', { timeZone: 'UTC' }) %>
               </div>
             <% } %>
           </div>

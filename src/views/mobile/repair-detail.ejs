@@ -9,10 +9,10 @@
   let statusClass, statusLabel;
   if (repair.ReceivedDate)       { statusClass = 'bg-success';           statusLabel = 'Closed'; }
   else if (!repair.SentDate)     { statusClass = 'bg-secondary';          statusLabel = 'Not Sent'; }
-  else if (repair.ExpectedReturnDate && new Date(repair.ExpectedReturnDate) < new Date()) {
+  else if (repair.ExpectedReturnDate && isDateOverdue(repair.ExpectedReturnDate)) {
                                    statusClass = 'bg-danger';             statusLabel = 'Overdue'; }
   else                           { statusClass = 'bg-warning text-dark';  statusLabel = 'Open'; }
-  const isOverdue = repair.ExpectedReturnDate && !repair.ReceivedDate && new Date(repair.ExpectedReturnDate) < new Date();
+  const isOverdue = repair.ExpectedReturnDate && !repair.ReceivedDate && isDateOverdue(repair.ExpectedReturnDate);
 %>
 <div class="d-flex align-items-center gap-2 mb-3">
   <span class="badge <%= statusClass %> fs-6"><%= statusLabel %></span>
@@ -44,14 +44,14 @@
     <% if (repair.SentDate) { %>
       <div class="detail-row">
         <span class="detail-label">Sent Date</span>
-        <span class="detail-value"><%= new Date(repair.SentDate).toLocaleDateString() %></span>
+        <span class="detail-value"><%= fmtDate(repair.SentDate) %></span>
       </div>
     <% } %>
     <% if (repair.ExpectedReturnDate) { %>
       <div class="detail-row">
         <span class="detail-label">Expected Return</span>
         <span class="detail-value <%= isOverdue ? 'text-danger fw-semibold' : '' %>">
-          <%= new Date(repair.ExpectedReturnDate).toLocaleDateString() %>
+          <%= fmtDate(repair.ExpectedReturnDate) %>
           <% if (isOverdue) { %><i class="bi bi-exclamation-circle ms-1"></i><% } %>
         </span>
       </div>
@@ -98,7 +98,7 @@
     <div class="card-body">
       <div class="detail-row">
         <span class="detail-label">Received</span>
-        <span class="detail-value"><%= new Date(repair.ReceivedDate).toLocaleDateString() %></span>
+        <span class="detail-value"><%= fmtDate(repair.ReceivedDate) %></span>
       </div>
       <% if (repair.ReturnCondition) { %>
         <div class="detail-row">

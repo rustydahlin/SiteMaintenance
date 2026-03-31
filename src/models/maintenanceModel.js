@@ -12,7 +12,7 @@ const SORT_COLUMNS = {
   status:     'm.ClosedAt',
 };
 
-async function getAll({ siteID, assignedToUserID, open, closed, overdueOnly, sort = 'dueDate', dir = 'asc', page = 1, pageSize = 50 } = {}) {
+async function getAll({ siteID, assignedToUserID, open, closed, overdueOnly, notOverdue, sort = 'dueDate', dir = 'asc', page = 1, pageSize = 50 } = {}) {
   const pool = await getPool();
   const req  = pool.request();
   const conditions = ['m.IsActive = 1'];
@@ -33,6 +33,9 @@ async function getAll({ siteID, assignedToUserID, open, closed, overdueOnly, sor
   }
   if (overdueOnly) {
     conditions.push('m.ClosedAt IS NULL AND m.DueDate IS NOT NULL AND m.DueDate < CAST(GETUTCDATE() AS DATE)');
+  }
+  if (notOverdue) {
+    conditions.push('(m.DueDate IS NULL OR m.DueDate >= CAST(GETUTCDATE() AS DATE))');
   }
 
   const orderCol = SORT_COLUMNS[sort] || 'm.DueDate';

@@ -21,9 +21,9 @@
               <div class="item-sub">
                 <% if (m.MaintenanceTypeName) { %><%= m.MaintenanceTypeName %><% } %>
                 <% if (m.DueDate) { %>
-                  <% const isOverdue = new Date(m.DueDate) < new Date(); %>
+                  <% const isOverdue = isDateOverdue(m.DueDate); %>
                   <span class="<%= isOverdue ? 'text-danger' : 'text-secondary' %> ms-1">
-                    <% if (isOverdue) { %><i class="bi bi-exclamation-circle me-1"></i>Overdue<% } else { %>Due: <%= new Date(m.DueDate).toLocaleDateString() %><% } %>
+                    <% if (isOverdue) { %><i class="bi bi-exclamation-circle me-1"></i>Overdue<% } else { %>Due: <%= fmtDate(m.DueDate) %><% } %>
                   </span>
                 <% } %>
               </div>
@@ -58,7 +58,7 @@
               <div class="item-sub <%= pmOverdue ? 'text-danger fw-semibold' : pmSoon ? 'text-warning' : '' %>">
                 <% if (pmOverdue) { %><i class="bi bi-exclamation-circle me-1"></i><%= Math.abs(pm.DaysUntilDue) %>d overdue
                 <% } else if (pmSoon) { %>Due in <%= pm.DaysUntilDue %>d
-                <% } else { %>Next: <%= new Date(pm.NextDueDate).toLocaleDateString() %>
+                <% } else { %>Next: <%= fmtDate(pm.NextDueDate) %>
                 <% } %>
               </div>
             </div>
@@ -85,7 +85,7 @@
                 <%
                   let dBadgeClass, dBadgeLabel;
                   if (!r.SentDate)   { dBadgeClass = 'bg-secondary';         dBadgeLabel = 'Not Sent'; }
-                  else if (r.ExpectedReturnDate && new Date(r.ExpectedReturnDate) < new Date()) {
+                  else if (r.ExpectedReturnDate && isDateOverdue(r.ExpectedReturnDate)) {
                                        dBadgeClass = 'bg-danger';            dBadgeLabel = 'Overdue'; }
                   else               { dBadgeClass = 'bg-warning text-dark'; dBadgeLabel = 'Open'; }
                 %>

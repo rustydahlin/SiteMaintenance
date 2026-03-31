@@ -41,7 +41,7 @@
                 let repairBadgeClass, repairBadgeLabel;
                 if (r.ReceivedDate)       { repairBadgeClass = 'bg-success';           repairBadgeLabel = 'Closed'; }
                 else if (!r.SentDate)     { repairBadgeClass = 'bg-secondary';          repairBadgeLabel = 'Not Sent'; }
-                else if (r.ExpectedReturnDate && new Date(r.ExpectedReturnDate) < new Date()) {
+                else if (r.ExpectedReturnDate && isDateOverdue(r.ExpectedReturnDate)) {
                                             repairBadgeClass = 'bg-danger';             repairBadgeLabel = 'Overdue'; }
                 else                      { repairBadgeClass = 'bg-warning text-dark';  repairBadgeLabel = 'Open'; }
               %>
@@ -52,8 +52,8 @@
             <div class="item-sub">
               Created: <%= new Date(r.CreatedAt).toLocaleDateString() %>
               <% if (r.ExpectedReturnDate) { %>
-                · Expected: <%= new Date(r.ExpectedReturnDate).toLocaleDateString() %>
-                <% if (new Date(r.ExpectedReturnDate) < new Date() && !r.ReceivedDate) { %>
+                · Expected: <%= fmtDate(r.ExpectedReturnDate) %>
+                <% if (isDateOverdue(r.ExpectedReturnDate) && !r.ReceivedDate) { %>
                   <span class="text-danger ms-1"><i class="bi bi-exclamation-circle"></i> Overdue</span>
                 <% } %>
               <% } %>
