@@ -1,19 +1,23 @@
 <!-- Scope toggle -->
 <div class="d-flex gap-2 mb-2">
-  <a href="/mobile/repairs?status=<%= status %>&scope=mine"
+  <a href="/mobile/repairs?filter=<%= filter %>&scope=mine"
      class="btn btn-sm <%= scope === 'mine' ? 'btn-primary' : 'btn-outline-secondary' %>">Mine</a>
-  <a href="/mobile/repairs?status=<%= status %>&scope=all"
+  <a href="/mobile/repairs?filter=<%= filter %>&scope=all"
      class="btn btn-sm <%= scope === 'all' ? 'btn-primary' : 'btn-outline-secondary' %>">All</a>
 </div>
 
-<!-- Status filter tabs -->
-<div class="d-flex gap-2 mb-3">
-  <a href="/mobile/repairs?status=open&scope=<%= scope %>"
-     class="btn btn-sm <%= status === 'open' ? 'btn-primary' : 'btn-outline-secondary' %>">Open</a>
-  <a href="/mobile/repairs?status=in-progress&scope=<%= scope %>"
-     class="btn btn-sm <%= status === 'in-progress' ? 'btn-primary' : 'btn-outline-secondary' %>">In Progress</a>
-  <a href="/mobile/repairs?status=all&scope=<%= scope %>"
-     class="btn btn-sm <%= status === 'all' ? 'btn-primary' : 'btn-outline-secondary' %>">All</a>
+<!-- Filter tabs -->
+<div class="d-flex gap-1 mb-3 flex-wrap">
+  <a href="/mobile/repairs?filter=unsent&scope=<%= scope %>"
+     class="btn btn-sm <%= filter === 'unsent' ? 'btn-secondary' : 'btn-outline-secondary' %>">Unsent</a>
+  <a href="/mobile/repairs?filter=overdue&scope=<%= scope %>"
+     class="btn btn-sm <%= filter === 'overdue' ? 'btn-danger' : 'btn-outline-secondary' %>">Overdue</a>
+  <a href="/mobile/repairs?filter=inprogress&scope=<%= scope %>"
+     class="btn btn-sm <%= filter === 'inprogress' ? 'btn-warning text-dark' : 'btn-outline-secondary' %>">In Progress</a>
+  <a href="/mobile/repairs?filter=closed&scope=<%= scope %>"
+     class="btn btn-sm <%= filter === 'closed' ? 'btn-success' : 'btn-outline-secondary' %>">Closed</a>
+  <a href="/mobile/repairs?filter=all&scope=<%= scope %>"
+     class="btn btn-sm <%= filter === 'all' ? 'btn-primary' : 'btn-outline-secondary' %>">All</a>
 </div>
 
 <% if (repairs.length === 0) { %>

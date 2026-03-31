@@ -173,22 +173,29 @@ router.post('/sites/:id/pm/:scheduleID/complete', async (req, res, next) => {
 // ── Repairs list ──────────────────────────────────────────────────────────────
 router.get('/repairs', async (req, res, next) => {
   try {
-    const { status = 'open', scope = 'mine' } = req.query;
-    const opts = {
-      status: status === 'all' ? undefined : status,
-      page: 1,
-      pageSize: 50,
-      sort: 'sentDate',
-      dir: 'desc',
-    };
-    if (scope === 'mine') opts.assignedUserID = req.user.UserID;
+    const { filter = 'inprogress', scope = 'mine' } = req.query;
+    let statusParam;
+    if (filter === 'unsent')                     statusParam = 'notsent';
+    else if (filter === 'closed')                statusParam = 'closed';
+    else if (filter === 'overdue' || filter === 'inprogress') statusParam = 'open';
+    // 'all' → statusParam stays undefined
 
+    const opts = { status: statusParam, page: 1, pageSize: 100, sort: 'sentDate', dir: 'desc' };
+    if (scope === 'mine') opts.assignedUserID = req.user.UserID;
     const result = await repairModel.getAll(opts);
+
+    let repairs = result.rows;
+    const now = new Date();
+    if (filter === 'overdue') {
+      repairs = repairs.filter(r => r.SentDate && r.ExpectedReturnDate && new Date(r.ExpectedReturnDate) < now);
+    } else if (filter === 'inprogress') {
+      repairs = repairs.filter(r => r.SentDate && (!r.ExpectedReturnDate || new Date(r.ExpectedReturnDate) >= now));
+    }
 
     res.render('mobile/repairs', {
       title: 'Repairs',
-      repairs: result.rows,
-      status,
+      repairs,
+      filter,
       scope,
     });
   } catch (err) {
