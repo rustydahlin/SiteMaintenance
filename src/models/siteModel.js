@@ -362,4 +362,22 @@ async function getAllForImportDiff() {
   return result.recordset;
 }
 
-module.exports = { getAll, getByID, getSubsites, getSimpleList, getAllForImportDiff, create, update, softDelete, findByImportKey, updateSiteStatus };
+async function findTopLevelBySiteName(siteName) {
+  if (!siteName) return null;
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('SiteName', sql.NVarChar(200), siteName)
+    .query(`SELECT TOP 1 SiteID FROM Sites WHERE SiteName = @SiteName AND ParentSiteID IS NULL AND IsActive = 1`);
+  return r.recordset.length ? r.recordset[0].SiteID : null;
+}
+
+async function findBySiteNumber(siteNumber) {
+  if (!siteNumber) return null;
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('SiteNumber', sql.NVarChar(100), siteNumber)
+    .query(`SELECT TOP 1 SiteID FROM Sites WHERE SiteNumber = @SiteNumber AND IsActive = 1`);
+  return r.recordset.length ? r.recordset[0].SiteID : null;
+}
+
+module.exports = { getAll, getByID, getSubsites, getSimpleList, getAllForImportDiff, create, update, softDelete, findByImportKey, findBySiteNumber, findTopLevelBySiteName, updateSiteStatus };

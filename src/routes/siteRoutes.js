@@ -76,8 +76,9 @@ router.get('/export', canImportExport, async (req, res, next) => {
 
     const sheetData = rows.map(s => ({
       SiteID:        s.SiteID,
-      ParentSiteID:  s.ParentSiteID   || '',
-      ParentSiteName: s.ParentSiteName || '',
+      ParentSiteID:     s.ParentSiteID     || '',
+      ParentSiteName:   s.ParentSiteName   || '',
+      ParentSiteNumber: s.ParentSiteNumber || '',
       SiteNumber:             s.SiteNumber                  || '',
       SiteName:               s.SiteName                    || '',
       SiteType:               s.SiteTypeName                || '',
@@ -168,6 +169,7 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
       const siteName         = (row['SiteName']        || '').toString().trim();
       const siteNumber       = (row['SiteNumber']      || '').toString().trim() || null;
       const parentSiteNumber = (row['ParentSiteNumber'] || '').toString().trim();
+      const parentSiteName   = (row['ParentSiteName']   || '').toString().trim();
       const csvSiteID        = parseInt(row['SiteID']       || '', 10) || null;
       const csvParentSiteID  = parseInt(row['ParentSiteID'] || '', 10) || null;
 
@@ -211,8 +213,8 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
 
       // Match by SiteID (from export) first; fall back to name/number matching for new rows
       const existingID = csvSiteID || await siteModel.findByImportKey(siteNumber, siteName, parentSiteNumber);
-      if (existingID) {
-        const existing = await siteModel.getByID(existingID);
+      const existing = existingID ? await siteModel.getByID(existingID) : null;
+      if (existing) {
         const diff = [
           ['Site Name',    norm(existing.SiteName),        norm(siteData.siteName)],
           ['Site #',       norm(existing.SiteNumber),       norm(siteData.siteNumber)],
@@ -239,7 +241,7 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
         }
       } else {
         summary.created++;
-        plan.push({ action: 'create', rowNum, display: { siteName, siteNumber, siteType: siteTypeName }, data: siteData });
+        plan.push({ action: 'create', rowNum, display: { siteName, siteNumber, siteType: siteTypeName }, data: siteData, parentSiteNumber, parentSiteName });
       }
     }
 
@@ -274,30 +276,58 @@ router.post('/import/confirm', canImportExport, async (req, res, next) => {
     const plan = JSON.parse(req.body.importPlan || '[]');
     const results = { total: plan.length, created: 0, updated: 0, skipped: 0, errors: 0, rows: [] };
 
-    for (const entry of plan) {
-      if (entry.action === 'skip' || entry.action === 'remove') {
-        results.skipped++;
-        continue;
-      }
-      if (entry.action === 'error') {
-        results.errors++;
-        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: entry.message });
-        continue;
-      }
-      try {
-        if (entry.action === 'update') {
-          await siteModel.update(entry.existingID, entry.data, req.auditContext);
-          results.updated++;
-          results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'updated', siteID: entry.existingID });
-        } else {
-          const site = await siteModel.create(entry.data, req.auditContext);
-          results.created++;
-          results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'created', siteID: site.SiteID });
+    // Track newly created sites by their site number so subsites can resolve parent IDs
+    // even when the parent was also created in this same import batch.
+    const createdByNumber = new Map();
+
+    // Process in two passes: top-level creates first, then subsites.
+    // This ensures parents exist before children regardless of CSV row order.
+    const passes = [
+      plan.filter(e => e.action === 'create' && !e.parentSiteNumber),
+      plan.filter(e => e.action !== 'create' || e.parentSiteNumber),
+    ];
+
+    for (const entries of passes) {
+      for (const entry of entries) {
+        if (entry.action === 'skip' || entry.action === 'remove') {
+          results.skipped++;
+          continue;
         }
-      } catch (err) {
-        results.errors++;
-        const msg = err.number === 2627 ? 'Duplicate site name' : (err.message || 'Database error');
-        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: msg });
+        if (entry.action === 'error') {
+          results.errors++;
+          results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: entry.message });
+          continue;
+        }
+        try {
+          if (entry.action === 'update') {
+            await siteModel.update(entry.existingID, entry.data, req.auditContext);
+            results.updated++;
+            results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'updated', siteID: entry.existingID });
+          } else {
+            // Always re-resolve parent so stale CSV IDs never reach the DB.
+            // Priority: site number (new exports) → site name (old exports) → null.
+            if (entry.parentSiteNumber) {
+              entry.data.parentSiteID = createdByNumber.get(entry.parentSiteNumber)
+                ?? await siteModel.findBySiteNumber(entry.parentSiteNumber)
+                ?? null;
+            } else if (entry.parentSiteName) {
+              entry.data.parentSiteID = createdByNumber.get(entry.parentSiteName + '_name')
+                ?? await siteModel.findTopLevelBySiteName(entry.parentSiteName)
+                ?? null;
+            } else {
+              entry.data.parentSiteID = null;
+            }
+            const site = await siteModel.create(entry.data, req.auditContext);
+            if (entry.data.siteNumber) createdByNumber.set(entry.data.siteNumber, site.SiteID);
+            if (!entry.data.parentSiteID) createdByNumber.set(entry.display.siteName + '_name', site.SiteID);
+            results.created++;
+            results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'created', siteID: site.SiteID });
+          }
+        } catch (err) {
+          results.errors++;
+          const msg = err.number === 2627 ? 'Duplicate site name' : (err.message || 'Database error');
+          results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: msg });
+        }
       }
     }
 
