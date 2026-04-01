@@ -231,7 +231,7 @@ async function getOpenForReminders(intervalDays) {
     .input('IntervalDays', sql.Int, intervalDays)
     .query(`
       SELECT
-        m.MaintenanceID, m.SiteID, m.DueDate, m.ExternalReference, m.WorkToComplete,
+        m.MaintenanceID, m.SiteID, m.AssignedToUserID, m.DueDate, m.ExternalReference, m.WorkToComplete,
         s.SiteName,
         t.TypeName    AS MaintenanceTypeName,
         u.DisplayName AS AssignedToUserName,
@@ -259,7 +259,7 @@ async function getOverdueForReminders(intervalDays) {
     .input('IntervalDays', sql.Int, intervalDays)
     .query(`
       SELECT
-        m.MaintenanceID, m.SiteID, m.DueDate, m.ExternalReference, m.WorkToComplete,
+        m.MaintenanceID, m.SiteID, m.AssignedToUserID, m.DueDate, m.ExternalReference, m.WorkToComplete,
         s.SiteName,
         t.TypeName    AS MaintenanceTypeName,
         u.DisplayName AS AssignedToUserName,

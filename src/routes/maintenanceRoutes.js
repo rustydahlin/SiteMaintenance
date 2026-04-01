@@ -8,6 +8,7 @@ const siteModel        = require('../models/siteModel');
 const lookupModel      = require('../models/lookupModel');
 const userModel        = require('../models/userModel');
 const email            = require('../services/emailService');
+const push             = require('../services/pushService');
 
 // Block access entirely when the Maintenance section is disabled
 router.use((_req, res, next) => {
@@ -134,6 +135,14 @@ router.post('/', canManageMaintenance, async (req, res, next) => {
       await email.sendMaintenanceAssigned(item);
     }
 
+    if (item.AssignedToUserID && item.AssignedToUserID !== req.user.UserID) {
+      push.sendToUser(item.AssignedToUserID, {
+        title: 'Maintenance Assigned',
+        body: `${item.SiteName}${item.DueDate ? ' — due ' + new Date(item.DueDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) : ''}`,
+        url: `/mobile/maintenance/${item.MaintenanceID}`,
+      }).catch(() => {});
+    }
+
     req.flash('success', 'Maintenance item created.');
     res.redirect(`/maintenance/${item.MaintenanceID}`);
   } catch (err) { next(err); }
@@ -204,6 +213,7 @@ router.post('/:id', canManageMaintenance, async (req, res, next) => {
       return res.redirect(`/maintenance/${maintenanceID}/edit`);
     }
 
+    const existing = await maintenanceModel.getByID(maintenanceID);
     const item = await maintenanceModel.update(maintenanceID, {
       siteID:            parseInt(siteID, 10),
       assignedToUserID:  assignedToUserID  ? parseInt(assignedToUserID, 10)  : null,
@@ -214,6 +224,15 @@ router.post('/:id', canManageMaintenance, async (req, res, next) => {
     }, req.auditContext);
 
     await siteModel.updateSiteStatus(item.SiteID);
+
+    const newAssignedID = assignedToUserID ? parseInt(assignedToUserID, 10) : null;
+    if (newAssignedID && newAssignedID !== existing.AssignedToUserID && newAssignedID !== req.user.UserID) {
+      push.sendToUser(newAssignedID, {
+        title: 'Maintenance Assigned',
+        body: `${item.SiteName}${item.DueDate ? ' — due ' + new Date(item.DueDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) : ''}`,
+        url: `/mobile/maintenance/${maintenanceID}`,
+      }).catch(() => {});
+    }
 
     req.flash('success', 'Maintenance item updated.');
     res.redirect(`/maintenance/${maintenanceID}`);

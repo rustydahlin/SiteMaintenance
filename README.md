@@ -407,3 +407,54 @@ SiteMaintenance/
 **Email not sending**
 - Verify SMTP settings in Admin → Settings or in `.env`
 - Check the application log for SMTP error messages
+
+---
+
+## Push Notifications
+
+Push notifications are delivered via each browser vendor's cloud relay service, not directly from your server to the device. Your server sends a HTTPS request to the vendor's push endpoint, which then forwards the notification to the user's device — even when the app is closed.
+
+### Firewall Requirements (Outbound)
+
+The server must be able to reach the following endpoints on **port 443 (HTTPS)**:
+
+| Browser / Platform | Endpoint |
+|--------------------|----------|
+| Chrome / Android (FCM) | `fcm.googleapis.com` |
+| Firefox | `updates.push.services.mozilla.com` |
+| iOS (Safari PWA) | `api.push.apple.com` |
+| Edge / Windows | `*.notify.windows.com`, `*.wns.windows.com` |
+
+On RHEL, allow outbound HTTPS with:
+```bash
+firewall-cmd --permanent --direct --add-rule ipv4 filter OUTPUT 0 -p tcp --dport 443 -j ACCEPT
+firewall-cmd --reload
+```
+
+Or if you use a perimeter firewall, ensure the server's IP can reach those hostnames on port 443. The actual push endpoint URL for each subscriber is logged at subscription time if needed for allowlisting specific hosts.
+
+> **HTTPS requirement:** Web Push subscriptions require the site to be served over HTTPS (or `localhost`). Notifications will not work over plain HTTP in production.
+
+### VAPID Keys
+
+VAPID keys identify your server to push relays. Generate them once and store in `.env`:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_MAILTO` (e.g. `mailto:admin@example.com`) in your `.env` file.
+
+### Development Testing
+
+Two dev-only endpoints are available when `NODE_ENV=development`:
+
+- `POST /admin/dev/test-push` — sends a test push to the currently logged-in user
+- `POST /admin/dev/run-cron` — manually triggers the daily cron job (PM/maintenance/repair reminders)
+
+These endpoints are disabled in production.
+
+**Push troubleshooting**
+- Subscriptions are linked to the logged-in user. If a user subscribes on multiple devices, notifications are sent to all of them.
+- If `VAPID_*` environment variables are not set, the `/api/push/vapid-public-key` endpoint returns 503 and subscriptions will fail silently.
+- Check the application log for `push:` prefixed lines to see delivery attempts and errors.

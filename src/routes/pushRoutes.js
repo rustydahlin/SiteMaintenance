@@ -23,7 +23,7 @@ router.post('/subscribe', async (req, res, next) => {
     if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
       return res.status(400).json({ error: 'Invalid subscription object' });
     }
-    await pushModel.upsertSubscription(req.user.id, {
+    await pushModel.upsertSubscription(req.user.UserID, {
       endpoint,
       p256dh: keys.p256dh,
       auth:   keys.auth,

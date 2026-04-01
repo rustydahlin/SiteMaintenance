@@ -183,8 +183,32 @@ async function getUpcomingDue(daysAhead = 7) {
   return result.recordset;
 }
 
+async function getOverdueForReminders(intervalDays = 1) {
+  if (intervalDays <= 0) return [];
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('IntervalDays', sql.Int, Math.max(1, intervalDays))
+    .query(`
+      SELECT
+        pm.ScheduleID, pm.SiteID, pm.Title, pm.FrequencyDays,
+        pm.AssignedUserID, pm.Notes,
+        s.SiteName,
+        u.DisplayName AS AssignedUserName,
+        u.Email       AS AssignedUserEmail,
+        ${NEXT_DUE_EXPR}                       AS NextDueDate,
+        ABS(${DAYS_UNTIL_DUE_EXPR})            AS DaysOverdue
+      FROM PMSchedules pm
+      LEFT JOIN Sites   s ON s.SiteID   = pm.SiteID
+      LEFT JOIN Users   u ON u.UserID   = pm.AssignedUserID
+      WHERE pm.AssignedUserID IS NOT NULL
+        AND ${NEXT_DUE_EXPR} < CAST(GETUTCDATE() AS DATE)
+        AND (ABS(${DAYS_UNTIL_DUE_EXPR}) % @IntervalDays) = 0
+    `);
+  return result.recordset;
+}
+
 module.exports = {
   getBySite, getByID, create, update,
   markCompleted, delete: hardDelete,
-  getUpcomingDue,
+  getUpcomingDue, getOverdueForReminders,
 };

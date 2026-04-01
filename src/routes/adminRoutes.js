@@ -1122,4 +1122,33 @@ router.post('/network-resources-import/confirm', express.urlencoded({ extended: 
   } catch (err) { next(err); }
 });
 
+// ── DEV ONLY: manually trigger the daily cron ─────────────────────────────────
+if (process.env.NODE_ENV !== 'production') {
+  router.post('/dev/run-cron', async (req, res) => {
+    try {
+      const { runDailyChecks } = require('../jobs/dailyCron');
+      await runDailyChecks();
+      req.flash('success', 'Daily cron ran successfully — check server logs for details.');
+    } catch (err) {
+      req.flash('error', `Cron failed: ${err.message}`);
+    }
+    res.redirect('/admin');
+  });
+
+  router.post('/dev/test-push', async (req, res) => {
+    try {
+      const push = require('../services/pushService');
+      await push.sendToUser(req.user.UserID, {
+        title: 'Test Notification',
+        body: 'Push notifications are working!',
+        url: '/mobile',
+      });
+      req.flash('success', 'Test push sent to your account — check your device.');
+    } catch (err) {
+      req.flash('error', `Push failed: ${err.message}`);
+    }
+    res.redirect('/admin');
+  });
+}
+
 module.exports = router;

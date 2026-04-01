@@ -15,6 +15,7 @@ const vendorModel           = require('../models/vendorModel');
 const pmModel               = require('../models/pmModel');
 const logModel              = require('../models/logModel');
 const { isAuthenticated, isAdmin, canManageNetworkMap } = require('../middleware/auth');
+const push                  = require('../services/pushService');
 
 // All mobile routes require login
 router.use(isAuthenticated);
@@ -371,6 +372,15 @@ router.post('/maintenance/:id/edit', async (req, res, next) => {
       externalReference: externalReference || null,
       workToComplete:    workToComplete    || null,
     }, req.auditContext);
+
+    const newAssignedID = assignedToUserID ? parseInt(assignedToUserID, 10) : null;
+    if (newAssignedID && newAssignedID !== item.AssignedToUserID && newAssignedID !== req.user.UserID) {
+      push.sendToUser(newAssignedID, {
+        title: 'Maintenance Assigned',
+        body: `${item.SiteName}${dueDate ? ' — due ' + new Date(dueDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) : ''}`,
+        url: `/mobile/maintenance/${maintenanceID}`,
+      }).catch(() => {});
+    }
 
     req.flash('success', 'Maintenance item updated.');
     res.redirect(`/mobile/maintenance/${maintenanceID}`);

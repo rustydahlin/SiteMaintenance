@@ -28,25 +28,14 @@ async function runDailyChecks() {
     return;
   }
 
-  let pmCount = 0, repairCount = 0, maintCount = 0;
-  try { pmCount     = await checkPMsDue();             } catch (e) { logger.error('Cron PM check failed:', e.message); }
-  try {               await checkUnsentRmas();         } catch (e) { logger.error('Cron unsent RMA check failed:', e.message); }
-  try { repairCount = await checkRepairOverdue();      } catch (e) { logger.error('Cron repair overdue failed:', e.message); }
-  try {               await checkWarranties();         } catch (e) { logger.error('Cron warranty check failed:', e.message); }
-  try {               await checkSystemKeyExpiry();    } catch (e) { logger.error('Cron system key expiry failed:', e.message); }
-  try { maintCount  = await checkMaintenanceDue();     } catch (e) { logger.error('Cron maintenance due check failed:', e.message); }
-  try { maintCount += await checkMaintenanceOverdue(); } catch (e) { logger.error('Cron maintenance overdue check failed:', e.message); }
-
-  // Send a single daily summary push notification if anything needs attention
-  try {
-    const parts = [];
-    if (pmCount    > 0) parts.push(`${pmCount} PM${pmCount !== 1 ? 's' : ''} due`);
-    if (repairCount > 0) parts.push(`${repairCount} repair${repairCount !== 1 ? 's' : ''} overdue`);
-    if (maintCount  > 0) parts.push(`${maintCount} maintenance item${maintCount !== 1 ? 's' : ''}`);
-    if (parts.length > 0) {
-      await push.sendToAll({ title: 'SiteMaintenance', body: parts.join(', '), url: '/mobile' });
-    }
-  } catch (e) { logger.error('Cron push notification failed:', e.message); }
+  try { await checkPMsDue();             } catch (e) { logger.error('Cron PM check failed:', e.message); }
+  try { await checkUnsentRmas();         } catch (e) { logger.error('Cron unsent RMA check failed:', e.message); }
+  try { await checkRepairOverdue();      } catch (e) { logger.error('Cron repair overdue failed:', e.message); }
+  try { await checkWarranties();         } catch (e) { logger.error('Cron warranty check failed:', e.message); }
+  try { await checkSystemKeyExpiry();    } catch (e) { logger.error('Cron system key expiry failed:', e.message); }
+  try { await checkMaintenanceDue();     } catch (e) { logger.error('Cron maintenance due check failed:', e.message); }
+  try { await checkMaintenanceOverdue(); } catch (e) { logger.error('Cron maintenance overdue check failed:', e.message); }
+  try { await checkPMsOverdue();         } catch (e) { logger.error('Cron PM overdue push failed:', e.message); }
 
   logger.info('Daily cron: completed');
 }
@@ -95,6 +84,13 @@ async function checkPMsDue() {
   for (const s of schedules) {
     const daysUntilDue = s.DaysUntilDue !== undefined ? s.DaysUntilDue : 0;
     await email.sendPMReminder({ SiteID: s.SiteID, SiteName: s.SiteName }, s, daysUntilDue);
+    if (s.AssignedUserID && daysUntilDue === 0) {
+      push.sendToUser(s.AssignedUserID, {
+        title: 'PM Due Today',
+        body: `${s.Title} at ${s.SiteName}`,
+        url: `/mobile/sites/${s.SiteID}?tab=pm`,
+      }).catch(() => {});
+    }
   }
   if (schedules.length) logger.info(`Daily cron: sent ${schedules.length} PM reminder(s)`);
   return schedules.length;
@@ -116,6 +112,13 @@ async function checkRepairOverdue() {
   const repairs = await repairModel.getOverdueExpected(intervalDays);
   for (const r of repairs) {
     await email.sendRepairOverdue(r);
+    if (r.AssignedUserID) {
+      push.sendToUser(r.AssignedUserID, {
+        title: 'Repair Overdue',
+        body: `Repair #${r.RepairID} — ${r.CommonName || r.ModelNumber || 'Item'} is past expected return`,
+        url: `/mobile/repairs/${r.RepairID}`,
+      }).catch(() => {});
+    }
   }
   if (repairs.length) logger.info(`Daily cron: sent ${repairs.length} repair overdue alert(s) (interval: every ${intervalDays}d)`);
   return repairs.length;
@@ -181,6 +184,13 @@ async function checkMaintenanceDue() {
   const items = await maintenanceModel.getOpenForReminders(intervalDays);
   for (const item of items) {
     await email.sendMaintenanceReminder(item);
+    if (item.AssignedToUserID && item.DaysUntilDue === 0) {
+      push.sendToUser(item.AssignedToUserID, {
+        title: 'Maintenance Due Today',
+        body: `${item.SiteName}${item.WorkToComplete ? ' — ' + item.WorkToComplete.substring(0, 60) : ''}`,
+        url: `/mobile/maintenance/${item.MaintenanceID}`,
+      }).catch(() => {});
+    }
   }
   if (items.length) logger.info(`Daily cron: sent ${items.length} maintenance reminder(s) (interval: every ${intervalDays}d)`);
   return items.length;
@@ -193,9 +203,33 @@ async function checkMaintenanceOverdue() {
   const items = await maintenanceModel.getOverdueForReminders(intervalDays);
   for (const item of items) {
     await email.sendMaintenanceOverdue(item);
+    if (item.AssignedToUserID) {
+      push.sendToUser(item.AssignedToUserID, {
+        title: 'Maintenance Overdue',
+        body: `${item.SiteName} — ${item.DaysOverdue} day${item.DaysOverdue !== 1 ? 's' : ''} overdue`,
+        url: `/mobile/maintenance/${item.MaintenanceID}`,
+      }).catch(() => {});
+    }
   }
   if (items.length) logger.info(`Daily cron: sent ${items.length} maintenance overdue alert(s) (interval: every ${intervalDays}d)`);
   return items.length;
+}
+
+async function checkPMsOverdue() {
+  const pmModel      = require('../models/pmModel');
+  const intervalDays = parseInt(await settingsModel.getSetting('email.pmOverdueIntervalDays') || '1', 10);
+  if (intervalDays <= 0) return;
+  const items = await pmModel.getOverdueForReminders(intervalDays);
+  for (const pm of items) {
+    if (pm.AssignedUserID) {
+      push.sendToUser(pm.AssignedUserID, {
+        title: 'PM Overdue',
+        body: `${pm.Title} at ${pm.SiteName} — ${pm.DaysOverdue} day${pm.DaysOverdue !== 1 ? 's' : ''} overdue`,
+        url: `/mobile/sites/${pm.SiteID}?tab=pm`,
+      }).catch(() => {});
+    }
+  }
+  if (items.length) logger.info(`Daily cron: sent ${items.length} PM overdue push(es) (interval: every ${intervalDays}d)`);
 }
 
 function start() {

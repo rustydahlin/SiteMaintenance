@@ -5,6 +5,7 @@ const { isAuthenticated, isAdmin, canWrite } = require('../middleware/auth');
 const pmModel   = require('../models/pmModel');
 const logModel  = require('../models/logModel');
 const lookupModel = require('../models/lookupModel');
+const push        = require('../services/pushService');
 const router    = express.Router();
 
 router.use(isAuthenticated);
@@ -48,6 +49,13 @@ router.post('/sites/:siteID/pm', isAdmin, async (req, res, next) => {
     }, req.auditContext);
 
     req.flash('success', 'PM schedule created.');
+    if (assignedUserID && assignedUserID !== req.user.UserID) {
+      push.sendToUser(assignedUserID, {
+        title: 'PM Schedule Assigned',
+        body: `${title.trim()} has been assigned to you`,
+        url: `/mobile/sites/${siteID}?tab=pm`,
+      }).catch(() => {});
+    }
     res.redirect(`/sites/${siteID}?tab=pm`);
   } catch (err) { next(err); }
 });
@@ -88,6 +96,7 @@ router.post('/sites/:siteID/pm/:scheduleID', isAdmin, async (req, res, next) => 
         d.setDate(d.getDate() - freqDays);
         lastPerformedAt = d;
       }
+      const existingPM = await pmModel.getByID(scheduleID);
       const { assignedUserID, assignedVendorID } = parseAssignedTo(assignedTo);
       await pmModel.update(scheduleID, {
         title: title?.trim(), frequencyDays: freqDays,
@@ -97,6 +106,14 @@ router.post('/sites/:siteID/pm/:scheduleID', isAdmin, async (req, res, next) => 
         notes: notes || null,
       }, req.auditContext);
       req.flash('success', 'PM schedule updated.');
+      const newPMAssignedID = assignedUserID;
+      if (newPMAssignedID && newPMAssignedID !== (existingPM && existingPM.AssignedUserID) && newPMAssignedID !== req.user.UserID) {
+        push.sendToUser(newPMAssignedID, {
+          title: 'PM Schedule Assigned',
+          body: `${title?.trim() || (existingPM && existingPM.Title) || 'PM'} has been assigned to you`,
+          url: `/mobile/sites/${siteID}?tab=pm`,
+        }).catch(() => {});
+      }
     }
 
     res.redirect(`/sites/${siteID}?tab=pm`);

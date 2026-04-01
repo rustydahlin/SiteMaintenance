@@ -8,6 +8,7 @@ const siteInventoryModel   = require('../models/siteInventoryModel');
 const lookupModel          = require('../models/lookupModel');
 const userModel            = require('../models/userModel');
 const { isAuthenticated, isAdmin } = require('../middleware/auth');
+const push                         = require('../services/pushService');
 
 // All routes require authentication
 router.use(isAuthenticated);
@@ -191,6 +192,14 @@ router.post('/', isAdmin, async (req, res, next) => {
     }, req.auditContext);
 
     req.flash('success', 'Repair record created successfully.');
+    const assignedID = req.body.assignedUserID ? parseInt(req.body.assignedUserID, 10) : null;
+    if (assignedID && assignedID !== req.user.UserID) {
+      push.sendToUser(assignedID, {
+        title: 'Repair Assigned',
+        body: `Repair #${repair.RepairID} has been assigned to you`,
+        url: `/mobile/repairs/${repair.RepairID}`,
+      }).catch(() => {});
+    }
     res.redirect(`/repairs/${repair.RepairID}`);
   } catch (err) {
     next(err);
@@ -271,6 +280,7 @@ router.post('/:id', isAdmin, async (req, res, next) => {
       return res.redirect(`/repairs/${repairID}/edit`);
     }
 
+    const existing = await repairModel.getByID(repairID);
     await repairModel.update(repairID, {
       itemID:              req.body.itemID              || null,
       sentDate,
@@ -283,6 +293,14 @@ router.post('/:id', isAdmin, async (req, res, next) => {
     }, req.auditContext);
 
     req.flash('success', 'Repair record updated successfully.');
+    const newAssignedID = req.body.assignedUserID ? parseInt(req.body.assignedUserID, 10) : null;
+    if (newAssignedID && existing && newAssignedID !== existing.AssignedUserID && newAssignedID !== req.user.UserID) {
+      push.sendToUser(newAssignedID, {
+        title: 'Repair Assigned',
+        body: `Repair #${repairID} has been assigned to you`,
+        url: `/mobile/repairs/${repairID}`,
+      }).catch(() => {});
+    }
     res.redirect(`/repairs/${repairID}`);
   } catch (err) {
     next(err);
@@ -318,6 +336,13 @@ router.post('/:id/receive', isAdmin, async (req, res, next) => {
     }
 
     req.flash('success', 'Item marked as received.');
+    if (repair && repair.AssignedUserID) {
+      push.sendToUser(repair.AssignedUserID, {
+        title: 'Repair Returned',
+        body: `Repair #${repairID} — ${repair.CommonName || repair.ModelNumber || repair.SerialNumber || 'Item'} has been received back`,
+        url: `/mobile/repairs/${repairID}`,
+      }).catch(() => {});
+    }
     res.redirect(`/repairs/${repairID}`);
   } catch (err) {
     next(err);
