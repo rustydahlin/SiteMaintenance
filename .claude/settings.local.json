@@ -39,7 +39,8 @@
       "Bash(Get-Content \"C:\\\\SiteMaintenance\\\\src\\\\routes\\\\adminRoutes.js\")",
       "Bash(Measure-Object -Line)",
       "Bash(dir \"C:\\\\SIRNnetworkmap\\\\src\\\\frontend\" /b)",
-      "Bash(dir \"C:\\\\SIRNnetworkmap\\\\src\\\\frontend\\\\images\\\\icons\" /b)"
+      "Bash(dir \"C:\\\\SIRNnetworkmap\\\\src\\\\frontend\\\\images\\\\icons\" /b)",
+      "Bash(node -e ':*)"
     ]
   }
 }

@@ -157,7 +157,7 @@ router.post('/import', canImportExport, importUpload.single('importFile'), async
     const fmtDate = v => {
       if (!v && v !== 0) return null;
       const d = typeof v === 'number'
-        ? new Date(Math.round((v - 25569) * 86400 * 1000))  // Excel serial
+        ? new Date((Math.round(v) - 25569) * 86400 * 1000)  // Excel serial — round serial, not ms
         : (v instanceof Date ? v : new Date(String(v).trim()));
       return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
     };
