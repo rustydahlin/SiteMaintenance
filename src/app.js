@@ -42,10 +42,16 @@ async function createApp() {
 
   // ── Safe view-local defaults (set early so error views never blow up) ─────
   app.use((req, res, next) => {
-    res.locals.user        = null;
-    res.locals.flash       = {};
-    res.locals.currentPath = req.path;
-    res.locals.isDev       = process.env.NODE_ENV !== 'production';
+    res.locals.user               = null;
+    res.locals.flash              = {};
+    res.locals.currentPath        = req.path;
+    res.locals.isDev              = process.env.NODE_ENV !== 'production';
+    res.locals.appName            = 'SiteMaintenance';
+    res.locals.systemKeysEnabled  = false;
+    res.locals.vendorsEnabled     = false;
+    res.locals.maintenanceEnabled = false;
+    res.locals.sidebarLogoUrl     = '/images/publicsafetyteam.png';
+    res.locals.sidebarFooterHtml  = 'Call Darron. (701) 328-6974';
     // Format a SQL date-only field correctly (avoids UTC-midnight timezone shift)
     res.locals.fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '';
     // Returns true if a SQL date-only field is strictly before today (UTC date comparison)
@@ -60,7 +66,7 @@ async function createApp() {
   });
 
   // ── Body parsing ──────────────────────────────────────────────────────────
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.urlencoded({ extended: true, limit: '5mb' }));
   app.use(express.json());
 
   // ── Static assets ─────────────────────────────────────────────────────────

@@ -1,0 +1,126 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Import Site Equipment</h1>
+  <a href="/sites" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back to Sites
+  </a>
+</div>
+
+<% if (!results) { %>
+<!-- ── Upload form ─────────────────────────────────────────────────────────── -->
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-header"><strong>Upload Excel / CSV File</strong></div>
+      <div class="card-body">
+        <form method="POST" action="/sites/equipment/import" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label">Excel / CSV File <span class="text-danger">*</span></label>
+            <input type="file" name="importFile" class="form-control" accept=".xlsx,.csv" required />
+            <div class="form-text">Accepted formats: .xlsx, .csv — max 10 MB</div>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-upload me-1"></i>Preview Import
+          </button>
+          <a href="/sites/equipment/import/template" class="btn btn-outline-secondary ms-2">
+            <i class="bi bi-download me-1"></i>Download Template
+          </a>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-header"><strong>Column Reference</strong></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr><th>Column</th><th>Required</th><th>Notes</th></tr>
+          </thead>
+          <tbody class="small">
+            <tr><td><code>SiteInventoryID</code></td><td><span class="badge bg-secondary">No</span></td><td>Exported ID — leave blank for new installations</td></tr>
+            <tr><td><code>SiteID</code></td><td><span class="badge bg-secondary">No*</span></td><td>Exported site ID — used for accurate matching</td></tr>
+            <tr><td><code>SiteName</code></td><td><span class="badge bg-secondary">No*</span></td><td>Used to find site if SiteID is blank</td></tr>
+            <tr><td><code>SiteNumber</code></td><td><span class="badge bg-secondary">No*</span></td><td>Used to find site if SiteID is blank</td></tr>
+            <tr><td><code>ItemID</code></td><td><span class="badge bg-secondary">No*</span></td><td>Exported inventory ID — used for accurate item matching</td></tr>
+            <tr><td><code>TrackingType</code></td><td><span class="badge bg-secondary">No</span></td><td><code>serialized</code> or <code>bulk</code> — inferred if blank</td></tr>
+            <tr><td><code>SerialNumber</code></td><td><span class="badge bg-secondary">No*</span></td><td>Used to find serialized items if ItemID is blank</td></tr>
+            <tr><td><code>CommonName</code></td><td><span class="badge bg-secondary">No*</span></td><td>Used to find bulk items if ItemID is blank</td></tr>
+            <tr><td><code>ModelNumber</code></td><td><span class="badge bg-secondary">No</span></td><td>Narrows bulk item lookup when CommonName matches multiple</td></tr>
+            <tr><td><code>Manufacturer</code></td><td><span class="badge bg-secondary">No</span></td><td>Informational — not used for matching</td></tr>
+            <tr><td><code>Category</code></td><td><span class="badge bg-secondary">No</span></td><td>Informational — not used for matching</td></tr>
+            <tr><td><code>Quantity</code></td><td><span class="badge bg-secondary">No</span></td><td>Bulk items only — defaults to 1</td></tr>
+            <tr><td><code>InstallNotes</code></td><td><span class="badge bg-secondary">No</span></td><td></td></tr>
+          </tbody>
+        </table>
+        <div class="p-3 text-muted small border-top">* At least one site identifier (SiteID, SiteNumber, or SiteName) and one item identifier (ItemID or SerialNumber/CommonName) are required per row. Rows with no item info are treated as site-only template rows and skipped.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% } else { %>
+<!-- ── Import results ──────────────────────────────────────────────────────── -->
+<div class="d-flex gap-3 mb-4 flex-wrap">
+  <div class="card text-center px-4 py-3 border-success">
+    <div class="fs-2 fw-bold text-success"><%= results.created %></div>
+    <div class="small text-muted">Installed</div>
+  </div>
+  <div class="card text-center px-4 py-3 border-primary">
+    <div class="fs-2 fw-bold text-primary"><%= results.updated %></div>
+    <div class="small text-muted">Updated</div>
+  </div>
+  <div class="card text-center px-4 py-3 border-warning">
+    <div class="fs-2 fw-bold text-warning"><%= results.skipped %></div>
+    <div class="small text-muted">Skipped</div>
+  </div>
+  <div class="card text-center px-4 py-3 border-danger">
+    <div class="fs-2 fw-bold text-danger"><%= results.errors %></div>
+    <div class="small text-muted">Errors</div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong>Row-by-Row Results</strong>
+    <div class="d-flex gap-2">
+      <a href="/sites/equipment/import" class="btn btn-sm btn-outline-secondary">Import Another File</a>
+      <a href="/sites" class="btn btn-sm btn-primary">View Sites</a>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th style="width:3rem">Row</th>
+          <th>Site</th>
+          <th>Item</th>
+          <th>Result</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% results.rows.forEach(row => { %>
+        <tr>
+          <td class="text-muted small"><%= row.rowNum %></td>
+          <td class="small fw-semibold"><%= row.siteName || '—' %><% if (row.siteNumber) { %> <span class="text-muted">#<%= row.siteNumber %></span><% } %></td>
+          <td class="small text-muted"><%= row.label || '—' %></td>
+          <td>
+            <% if (row.result === 'created') { %>
+              <span class="badge bg-success">Installed</span>
+            <% } else if (row.result === 'updated') { %>
+              <span class="badge bg-primary">Updated</span>
+            <% } else if (row.result === 'skipped') { %>
+              <span class="badge bg-warning text-dark">Skipped</span>
+              <span class="small text-muted ms-1"><%= row.message %></span>
+            <% } else { %>
+              <span class="badge bg-danger">Error</span>
+              <span class="small text-danger ms-1"><%= row.message %></span>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>

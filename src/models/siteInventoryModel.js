@@ -460,4 +460,83 @@ async function getByID(siteInventoryID) {
   return result.recordset[0] || null;
 }
 
-module.exports = { getCurrentItems, getHistory, getItemHistory, getByID, installItem, removeItem, removeBulkQuantity };
+// All active installations across all sites, joined to site + item info (for export)
+async function getAllInstallations() {
+  const pool = await getPool();
+  const result = await pool.request().query(`
+    SELECT
+      si.SiteInventoryID, si.SiteID, si.ItemID, si.Quantity,
+      si.InstalledAt, si.InstallNotes,
+      s.SiteName, s.SiteNumber,
+      i.TrackingType, i.SerialNumber, i.CommonName, i.ModelNumber, i.Manufacturer,
+      c.CategoryName
+    FROM SiteInventory si
+    JOIN Sites s ON s.SiteID = si.SiteID
+    JOIN Inventory i ON i.ItemID = si.ItemID
+    LEFT JOIN InventoryCategories c ON c.CategoryID = i.CategoryID
+    WHERE si.RemovedAt IS NULL
+    ORDER BY s.SiteName, si.InstalledAt DESC
+  `);
+  return result.recordset;
+}
+
+async function findBySiteAndItem(siteID, itemID) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('SiteID', sql.Int, siteID)
+    .input('ItemID', sql.Int, itemID)
+    .query(`SELECT TOP 1 SiteInventoryID FROM SiteInventory WHERE SiteID = @SiteID AND ItemID = @ItemID AND RemovedAt IS NULL`);
+  return r.recordset.length ? r.recordset[0].SiteInventoryID : null;
+}
+
+// Lightweight install for import — inserts the record and marks serialized items Deployed.
+// Does NOT deduct bulk stock (import is a data-restore scenario, not a live pull).
+async function createInstallRecord(siteID, itemID, { installNotes, quantity, installedByUserID } = {}, auditContext = {}) {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('SiteID',            sql.Int,               siteID)
+    .input('ItemID',            sql.Int,               itemID)
+    .input('Quantity',          sql.Int,               quantity || 1)
+    .input('InstalledByUserID', sql.Int,               installedByUserID || null)
+    .input('InstallNotes',      sql.NVarChar(sql.MAX), installNotes || null)
+    .query(`
+      INSERT INTO SiteInventory (SiteID, ItemID, Quantity, InstalledAt, InstalledByUserID, InstallNotes)
+      VALUES (@SiteID, @ItemID, @Quantity, GETUTCDATE(), @InstalledByUserID, @InstallNotes);
+      SELECT SCOPE_IDENTITY() AS NewID
+    `);
+  const newID = result.recordset[0].NewID;
+
+  const item = await inventoryModel.getByID(itemID);
+  if (item && item.TrackingType !== 'bulk') {
+    const sr = await pool.request().query(`SELECT TOP 1 StatusID FROM InventoryStatuses WHERE StatusName = 'Deployed'`);
+    if (sr.recordset.length) {
+      await pool.request()
+        .input('StatusID', sql.Int, sr.recordset[0].StatusID)
+        .input('ItemID',   sql.Int, itemID)
+        .query(`UPDATE Inventory SET StatusID = @StatusID, StockLocationID = NULL, AssignedToUserID = NULL WHERE ItemID = @ItemID`);
+    }
+  }
+
+  await writeAudit({
+    tableName: 'SiteInventory', recordID: newID, action: 'INSERT',
+    newValues: { siteID, itemID, quantity, installNotes },
+    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent,
+  });
+  return newID;
+}
+
+async function updateInstallation(siID, { installNotes, quantity } = {}, auditContext = {}) {
+  const pool = await getPool();
+  await pool.request()
+    .input('SiteInventoryID', sql.Int,               siID)
+    .input('InstallNotes',    sql.NVarChar(sql.MAX), installNotes ?? null)
+    .input('Quantity',        sql.Int,               quantity || 1)
+    .query(`UPDATE SiteInventory SET InstallNotes = @InstallNotes, Quantity = @Quantity WHERE SiteInventoryID = @SiteInventoryID`);
+  await writeAudit({
+    tableName: 'SiteInventory', recordID: siID, action: 'UPDATE',
+    newValues: { installNotes, quantity },
+    userID: auditContext.userID, ip: auditContext.ip, userAgent: auditContext.userAgent,
+  });
+}
+
+module.exports = { getCurrentItems, getHistory, getItemHistory, getByID, getAllInstallations, findBySiteAndItem, createInstallRecord, updateInstallation, installItem, removeItem, removeBulkQuantity };

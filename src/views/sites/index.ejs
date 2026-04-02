@@ -63,11 +63,17 @@
       exportParts.push(`sort=${encodeURIComponent(curSort)}`, `dir=${encodeURIComponent(curDir)}`);
     %>
     <a href="/sites/export?<%= exportParts.join('&') %>" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-file-earmark-arrow-down me-1"></i>Export
+      <i class="bi bi-file-earmark-arrow-down me-1"></i>Export Sites
+    </a>
+    <a href="/sites/equipment/export" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-file-earmark-arrow-down me-1"></i>Export Equipment
     </a>
     <% if (user && user.roles && user.roles.includes('Admin')) { %>
     <a href="/sites/import" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-file-earmark-spreadsheet me-1"></i>Import
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i>Import Sites
+    </a>
+    <a href="/sites/equipment/import" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i>Import Equipment
     </a>
     <% } %>
     <% if (user && user.roles && (user.roles.includes('Admin') || user.roles.includes('NetworkMapUpdater'))) { %>

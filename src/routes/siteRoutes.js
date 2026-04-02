@@ -26,6 +26,15 @@ const importUpload = multer({
   },
 });
 
+const equipmentImportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (/\.(csv|xlsx)$/i.test(file.originalname)) cb(null, true);
+    else cb(new Error('Only .xlsx or .csv files are accepted'));
+  },
+});
+
 // All routes require authentication
 router.use(isAuthenticated);
 
@@ -394,6 +403,239 @@ router.post('/', canManageNetworkMap, async (req, res, next) => {
 
     req.flash('success', `Site "${site.SiteName}" created successfully.`);
     res.redirect(`/sites/${site.SiteID}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /equipment/export — download all sites + installed equipment as XLSX ──
+router.get('/equipment/export', canImportExport, async (req, res, next) => {
+  try {
+    const [allSites, installations] = await Promise.all([
+      siteModel.getAll({ page: 1, pageSize: 100000, includeSubsites: true }).then(r => r.rows),
+      siteInventoryModel.getAllInstallations(),
+    ]);
+
+    // Index installations by SiteID for quick lookup
+    const installsBySite = new Map();
+    for (const row of installations) {
+      if (!installsBySite.has(row.SiteID)) installsBySite.set(row.SiteID, []);
+      installsBySite.get(row.SiteID).push(row);
+    }
+
+    const sheetData = [];
+    for (const site of allSites) {
+      const items = installsBySite.get(site.SiteID) || [];
+      if (items.length === 0) {
+        // Site with no equipment — one blank row so it appears as a template
+        sheetData.push({
+          SiteInventoryID: '',
+          SiteID:          site.SiteID,
+          SiteName:        site.SiteName        || '',
+          SiteNumber:      site.SiteNumber      || '',
+          ItemID:          '',
+          TrackingType:    '',
+          SerialNumber:    '',
+          CommonName:      '',
+          ModelNumber:     '',
+          Manufacturer:    '',
+          Category:        '',
+          Quantity:        '',
+          InstallNotes:    '',
+        });
+      } else {
+        for (const inst of items) {
+          sheetData.push({
+            SiteInventoryID: inst.SiteInventoryID,
+            SiteID:          site.SiteID,
+            SiteName:        site.SiteName        || '',
+            SiteNumber:      site.SiteNumber      || '',
+            ItemID:          inst.ItemID,
+            TrackingType:    inst.TrackingType    || '',
+            SerialNumber:    inst.SerialNumber    || '',
+            CommonName:      inst.CommonName      || '',
+            ModelNumber:     inst.ModelNumber     || '',
+            Manufacturer:    inst.Manufacturer    || '',
+            Category:        inst.CategoryName    || '',
+            Quantity:        inst.TrackingType === 'bulk' ? (inst.Quantity ?? '') : '',
+            InstallNotes:    inst.InstallNotes    || '',
+          });
+        }
+      }
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheetData), 'SiteEquipment');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="site-equipment-export-${date}.xlsx"`);
+    res.send(buf);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /equipment/import/template — blank XLSX template ─────────────────────
+router.get('/equipment/import/template', canImportExport, (_req, res) => {
+  const headers = [
+    'SiteID', 'SiteName', 'SiteNumber',
+    'ItemID', 'TrackingType', 'SerialNumber', 'CommonName', 'ModelNumber', 'Manufacturer',
+    'Category', 'Quantity', 'InstallNotes',
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers]), 'SiteEquipment');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Disposition', 'attachment; filename="site-equipment-import-template.xlsx"');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buf);
+});
+
+// ── GET /equipment/import — upload form ───────────────────────────────────────
+router.get('/equipment/import', canImportExport, (_req, res) => {
+  res.render('sites/equipment-import', { title: 'Import Site Equipment', results: null });
+});
+
+// ── POST /equipment/import — dry-run preview ──────────────────────────────────
+router.post('/equipment/import', canImportExport, equipmentImportUpload.single('importFile'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      req.flash('error', 'Please select a file to upload.');
+      return res.redirect('/sites/equipment/import');
+    }
+
+    const wb   = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    if (rows.length === 0) {
+      req.flash('error', 'The file appears to be empty.');
+      return res.redirect('/sites/equipment/import');
+    }
+
+    const norm = v => (v == null || v === '') ? null : String(v).trim();
+
+    const plan    = [];
+    const summary = { total: 0, created: 0, updated: 0, skipped: 0, errors: 0 };
+
+    for (let i = 0; i < rows.length; i++) {
+      const row    = rows[i];
+      const rowNum = i + 2;
+
+      // Resolve site — prefer SiteID, fall back to SiteNumber then SiteName
+      const csvSiteID   = parseInt(row['SiteID']   || '', 10) || null;
+      const csvSiteName = norm(row['SiteName']);
+      const csvSiteNum  = norm(row['SiteNumber']);
+
+      let site = null;
+      if (csvSiteID) site = await siteModel.getByID(csvSiteID);
+      if (!site && csvSiteNum) {
+        const found = await siteModel.findByImportKey(csvSiteNum, csvSiteName || csvSiteNum, '');
+        if (found) site = await siteModel.getByID(found);
+      }
+      if (!site && csvSiteName) {
+        const found = await siteModel.findByImportKey(null, csvSiteName, '');
+        if (found) site = await siteModel.getByID(found);
+      }
+
+      if (!site) {
+        // Row with no site info at all — template blank row, skip silently
+        if (!csvSiteID && !csvSiteName && !csvSiteNum) { summary.skipped++; continue; }
+        summary.errors++;
+        plan.push({ action: 'error', rowNum, display: { siteName: csvSiteName || csvSiteNum || String(csvSiteID) }, message: 'Site not found' });
+        continue;
+      }
+
+      // Rows with no item info are template placeholders — skip silently
+      const csvItemID      = parseInt(row['ItemID']       || '', 10) || null;
+      const csvSerial      = norm(row['SerialNumber']);
+      const csvCommonName  = norm(row['CommonName']);
+      const csvModelNumber = norm(row['ModelNumber']);
+      const csvTrackingRaw = norm(row['TrackingType']);
+      const trackingType   = csvTrackingRaw ? csvTrackingRaw.toLowerCase() : (csvSerial ? 'serialized' : (csvCommonName ? 'bulk' : null));
+
+      if (!csvItemID && !csvSerial && !csvCommonName) {
+        summary.skipped++;
+        continue;
+      }
+
+      summary.total++;
+
+      // Resolve inventory item
+      let item = null;
+      if (csvItemID) item = await inventoryModel.getByID(csvItemID);
+      if (!item) item = await inventoryModel.findByImportKey(trackingType, csvSerial, csvCommonName, csvModelNumber)
+        .then(id => id ? inventoryModel.getByID(id) : null);
+
+      if (!item) {
+        summary.errors++;
+        plan.push({ action: 'error', rowNum, display: { siteName: site.SiteName, siteNumber: site.SiteNumber, serialNumber: csvSerial, commonName: csvCommonName }, message: 'Inventory item not found' });
+        continue;
+      }
+
+      const csvNotes    = norm(row['InstallNotes']);
+      const csvQuantity = parseInt(row['Quantity'] || '', 10) || (item.TrackingType === 'bulk' ? 1 : null);
+
+      // Check if already installed at this site
+      const existingSiID = await siteInventoryModel.findBySiteAndItem(site.SiteID, item.ItemID);
+
+      if (existingSiID) {
+        // Compare notes and quantity for bulk
+        const existing = await siteInventoryModel.getByID(existingSiID);
+        const diff = [];
+        if (norm(existing.InstallNotes) !== csvNotes) diff.push({ field: 'Install Notes', from: existing.InstallNotes, to: csvNotes });
+        if (item.TrackingType === 'bulk' && existing.Quantity !== csvQuantity) diff.push({ field: 'Quantity', from: existing.Quantity, to: csvQuantity });
+
+        if (diff.length === 0) {
+          summary.skipped++;
+          plan.push({ action: 'skip', rowNum, display: { siteName: site.SiteName, siteNumber: site.SiteNumber, label: item.SerialNumber || item.CommonName }, message: 'No changes' });
+        } else {
+          summary.updated++;
+          plan.push({ action: 'update', rowNum, display: { siteName: site.SiteName, siteNumber: site.SiteNumber, label: item.SerialNumber || item.CommonName }, existingSiID, data: { installNotes: csvNotes, quantity: csvQuantity }, diff });
+        }
+      } else {
+        summary.created++;
+        plan.push({ action: 'create', rowNum, display: { siteName: site.SiteName, siteNumber: site.SiteNumber, label: item.SerialNumber || item.CommonName }, siteID: site.SiteID, itemID: item.ItemID, data: { installNotes: csvNotes, quantity: csvQuantity } });
+      }
+    }
+
+    res.render('sites/equipment-import-preview', { title: 'Import Site Equipment — Preview', summary, plan, importPlan: JSON.stringify(plan) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── POST /equipment/import/confirm — execute plan ─────────────────────────────
+router.post('/equipment/import/confirm', canImportExport, async (req, res, next) => {
+  try {
+    const plan    = JSON.parse(req.body.importPlan || '[]');
+    const results = { total: 0, created: 0, updated: 0, skipped: 0, errors: 0, rows: [] };
+
+    for (const entry of plan) {
+      if (entry.action === 'skip') { results.skipped++; continue; }
+      if (entry.action === 'error') {
+        results.errors++;
+        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: entry.message });
+        continue;
+      }
+      results.total++;
+      try {
+        if (entry.action === 'update') {
+          await siteInventoryModel.updateInstallation(entry.existingSiID, entry.data, req.auditContext);
+          results.updated++;
+          results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'updated' });
+        } else {
+          await siteInventoryModel.createInstallRecord(entry.siteID, entry.itemID, entry.data, req.auditContext);
+          results.created++;
+          results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'created' });
+        }
+      } catch (err) {
+        results.errors++;
+        results.rows.push({ rowNum: entry.rowNum, ...entry.display, result: 'error', message: err.message || 'Database error' });
+      }
+    }
+
+    res.render('sites/equipment-import', { title: 'Import Site Equipment', results });
   } catch (err) {
     next(err);
   }
