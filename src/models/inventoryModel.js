@@ -420,16 +420,24 @@ async function adjustStock(itemID, locationID, userID, delta) {
   if (locationID) {
     req.input('LocationID', sql.Int, locationID);
     await req.query(`
-      UPDATE InventoryStock
-      SET Quantity = Quantity + @Delta, UpdatedAt = GETUTCDATE()
-      WHERE ItemID = @ItemID AND LocationID = @LocationID
+      IF EXISTS (SELECT 1 FROM InventoryStock WHERE ItemID = @ItemID AND LocationID = @LocationID)
+        UPDATE InventoryStock
+        SET Quantity = Quantity + @Delta, UpdatedAt = GETUTCDATE()
+        WHERE ItemID = @ItemID AND LocationID = @LocationID
+      ELSE
+        INSERT INTO InventoryStock (ItemID, LocationID, Quantity)
+        VALUES (@ItemID, @LocationID, @Delta)
     `);
   } else {
     req.input('UserID', sql.Int, userID);
     await req.query(`
-      UPDATE InventoryStock
-      SET Quantity = Quantity + @Delta, UpdatedAt = GETUTCDATE()
-      WHERE ItemID = @ItemID AND UserID = @UserID
+      IF EXISTS (SELECT 1 FROM InventoryStock WHERE ItemID = @ItemID AND UserID = @UserID)
+        UPDATE InventoryStock
+        SET Quantity = Quantity + @Delta, UpdatedAt = GETUTCDATE()
+        WHERE ItemID = @ItemID AND UserID = @UserID
+      ELSE
+        INSERT INTO InventoryStock (ItemID, UserID, Quantity)
+        VALUES (@ItemID, @UserID, @Delta)
     `);
   }
 }
