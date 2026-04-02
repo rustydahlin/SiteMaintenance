@@ -404,7 +404,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
 
-    const [site, inventory, recentLogs, documents, pmSchedules, inStockItems, categories, stockLocations, allUsers, pmVendors, networkResources, networkDeviceTypes, circuitTypes] = await Promise.all([
+    const [site, inventory, recentLogs, documents, pmSchedules, inStockItems, categories, stockLocations, allUsers, pmVendors, networkResources, networkDeviceTypes, circuitTypes, commonNames, modelNumbers, manufacturers, inventoryStatuses, installableSystems] = await Promise.all([
       siteModel.getByID(siteID),
       siteInventoryModel.getCurrentItems(siteID),
       logModel.getBySite(siteID, { pageSize: 10 }).then(r => r.rows),
@@ -418,6 +418,11 @@ router.get('/:id', async (req, res, next) => {
       networkResourceModel.getBySite(siteID),
       lookupModel.getNetworkDeviceTypes(),
       lookupModel.getCircuitTypes(),
+      lookupModel.getInventoryCommonNames(),
+      lookupModel.getInventoryModelNumbers(),
+      lookupModel.getInventoryManufacturers(),
+      lookupModel.getInventoryStatuses(),
+      inventoryModel.getSystemsList(),
     ]);
 
     // Fetch subsites for parent sites; subsites themselves get an empty array
@@ -474,6 +479,11 @@ router.get('/:id', async (req, res, next) => {
       subsiteNetworkResources,
       networkDeviceTypes,
       circuitTypes,
+      commonNames,
+      modelNumbers,
+      manufacturers,
+      inventoryStatuses,
+      installableSystems,
       isAdminUser:          isAdmin,
       isNetworkMapUpdater:  isNetworkMapUpdater,
       canWrite:             canWriteFlag,
@@ -571,7 +581,7 @@ router.post('/:id/delete', isAdmin, async (req, res, next) => {
 router.post('/:id/inventory/install', isAdmin, async (req, res, next) => {
   try {
     const siteID = parseInt(req.params.id, 10);
-    const { mode, itemID, installNotes, quantity, pulledFrom, serialNumber, modelNumber, manufacturer, categoryID, purchaseDate, warrantyExpires } = req.body;
+    const { mode, itemID, installNotes, quantity, pulledFrom, trackingType, serialNumber, assetTag, partNumber, commonName, modelNumber, manufacturer, categoryID, statusID, purchaseDate, warrantyExpires, description, notes, relatedSystemID } = req.body;
 
     // Parse pulledFrom: "location:123" | "user:456" | "" (unallocated)
     let pulledFromLocationID = null;
@@ -585,19 +595,32 @@ router.post('/:id/inventory/install', isAdmin, async (req, res, next) => {
     let targetItemID;
 
     if (mode === 'new') {
-      if (!serialNumber?.trim()) {
+      const isBulk = trackingType === 'bulk';
+      if (!isBulk && !serialNumber?.trim()) {
         req.flash('error', 'Serial number is required.');
         return res.redirect(`/sites/${siteID}#equipment`);
       }
+      if (isBulk && !commonName?.trim()) {
+        req.flash('error', 'Common name is required for bulk items.');
+        return res.redirect(`/sites/${siteID}#equipment`);
+      }
       const deployedStatus = await lookupModel.getInventoryStatusByName('Deployed');
+      const resolvedStatusID = statusID || deployedStatus?.StatusID || null;
       const newItem = await inventoryModel.create({
-        serialNumber:    serialNumber.trim(),
+        trackingType:    isBulk ? 'bulk' : 'serialized',
+        commonName:      commonName      || null,
+        serialNumber:    isBulk ? null : serialNumber.trim(),
+        assetTag:        assetTag        || null,
+        partNumber:      partNumber      || null,
         modelNumber:     modelNumber     || null,
         manufacturer:    manufacturer    || null,
         categoryID:      categoryID      || null,
-        statusID:        deployedStatus?.StatusID || null,
+        statusID:        resolvedStatusID,
         purchaseDate:    purchaseDate    || null,
         warrantyExpires: warrantyExpires || null,
+        description:     description     || null,
+        notes:           notes           || null,
+        relatedSystemID: relatedSystemID || null,
       }, req.auditContext);
       targetItemID = newItem.ItemID;
     } else {

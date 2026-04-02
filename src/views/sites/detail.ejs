@@ -984,36 +984,116 @@ async function deleteResource(resID) {
           <div class="tab-pane fade" id="tabNew">
             <form method="POST" action="/sites/<%= site.SiteID %>/inventory/install">
               <input type="hidden" name="mode" value="new" />
-              <div class="row g-3">
-                <div class="col-md-4">
-                  <label class="form-label">Serial Number <span class="text-danger">*</span></label>
-                  <input type="text" name="serialNumber" class="form-control" required maxlength="100" />
+
+              <!-- Item Type -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Item Type</label>
+                <div class="d-flex gap-4">
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="trackingType" id="newInstallTypeSerial" value="serialized" checked />
+                    <label class="form-check-label" for="newInstallTypeSerial">
+                      <strong>Serialized / Asset-Tracked</strong>
+                      <div class="text-muted small">Tracked individually by serial number and asset tag</div>
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="trackingType" id="newInstallTypeBulk" value="bulk" />
+                    <label class="form-check-label" for="newInstallTypeBulk">
+                      <strong>Bulk / FRU</strong>
+                      <div class="text-muted small">Field Replaceable Unit — tracked by quantity</div>
+                    </label>
+                  </div>
                 </div>
+              </div>
+
+              <div class="row g-3">
+                <!-- Common Name -->
+                <div class="col-md-4">
+                  <label class="form-label">Common Name <span class="text-danger">*</span></label>
+                  <select name="commonName" id="newInstallCommonName" class="form-select">
+                    <option value="">— Select Common Name —</option>
+                    <% (commonNames || []).forEach(n => { %>
+                    <option value="<%= n.Name %>"><%= n.Name %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <!-- Serial Number (serialized only) -->
+                <div class="col-md-4" id="newInstallFieldSN">
+                  <label class="form-label">Serial Number <span class="text-danger">*</span></label>
+                  <input type="text" name="serialNumber" id="newInstallSerialNumber" class="form-control" maxlength="100" />
+                </div>
+                <!-- Asset Tag (serialized only) -->
+                <div class="col-md-4" id="newInstallFieldAT">
+                  <label class="form-label">Asset Tag #</label>
+                  <input type="text" name="assetTag" class="form-control" maxlength="100" />
+                </div>
+                <!-- Part # -->
+                <div class="col-md-4">
+                  <label class="form-label">Part #</label>
+                  <input type="text" name="partNumber" class="form-control" maxlength="100" />
+                </div>
+                <!-- Model Number -->
                 <div class="col-md-4">
                   <label class="form-label">Model Number</label>
-                  <input type="text" name="modelNumber" class="form-control" maxlength="100" />
+                  <select name="modelNumber" class="form-select">
+                    <option value="">— Select Model Number —</option>
+                    <% (modelNumbers || []).forEach(n => { %>
+                    <option value="<%= n.Name %>"><%= n.Name %></option>
+                    <% }) %>
+                  </select>
                 </div>
+                <!-- Manufacturer -->
                 <div class="col-md-4">
                   <label class="form-label">Manufacturer</label>
-                  <input type="text" name="manufacturer" class="form-control" maxlength="150" />
+                  <select name="manufacturer" class="form-select">
+                    <option value="">— Select Manufacturer —</option>
+                    <% (manufacturers || []).forEach(n => { %>
+                    <option value="<%= n.Name %>"><%= n.Name %></option>
+                    <% }) %>
+                  </select>
                 </div>
+                <!-- Related System -->
                 <div class="col-md-4">
-                  <label class="form-label">Category</label>
-                  <select name="categoryID" class="form-select">
+                  <label class="form-label">Related System</label>
+                  <select name="relatedSystemID" class="form-select">
                     <option value="">— None —</option>
+                    <% (installableSystems || []).forEach(s => { %>
+                    <option value="<%= s.ItemID %>"><%= s.CommonName || s.ModelNumber || s.SerialNumber %><% if (s.Manufacturer) { %> (<%= s.Manufacturer %>)<% } %></option>
+                    <% }) %>
+                  </select>
+                  <div class="form-text">Optional — link this item to a parent system.</div>
+                </div>
+                <!-- Category -->
+                <div class="col-md-4">
+                  <label class="form-label">Category <span class="text-danger">*</span></label>
+                  <select name="categoryID" class="form-select">
+                    <option value="">— Select Category —</option>
                     <% categories.forEach(cat => { %>
                     <option value="<%= cat.CategoryID %>"><%= cat.CategoryName %></option>
                     <% }) %>
                   </select>
                 </div>
+                <!-- Purchase Date -->
                 <div class="col-md-4">
                   <label class="form-label">Purchase Date</label>
                   <input type="date" name="purchaseDate" class="form-control" />
                 </div>
+                <!-- Warranty Expires -->
                 <div class="col-md-4">
                   <label class="form-label">Warranty Expires</label>
                   <input type="date" name="warrantyExpires" class="form-control" />
                 </div>
+                <!-- Description -->
+                <div class="col-12">
+                  <label class="form-label">Description</label>
+                  <textarea name="description" class="form-control" rows="2"></textarea>
+                </div>
+                <!-- Item Notes -->
+                <div class="col-12">
+                  <label class="form-label">Item Notes</label>
+                  <textarea name="notes" class="form-control" rows="2"></textarea>
+                </div>
+                <!-- Install Notes -->
                 <div class="col-12">
                   <label class="form-label">Install Notes</label>
                   <textarea name="installNotes" class="form-control" rows="2" placeholder="Optional notes about this installation"></textarea>
@@ -1524,6 +1604,20 @@ async function deleteResource(resID) {
       }
     });
   }
+
+  // Create New Item tab — toggle serial/asset tag fields based on tracking type
+  function updateNewInstallForm() {
+    var isBulk = document.getElementById('newInstallTypeBulk').checked;
+    var fieldSN = document.getElementById('newInstallFieldSN');
+    var fieldAT = document.getElementById('newInstallFieldAT');
+    var snInput = document.getElementById('newInstallSerialNumber');
+    if (fieldSN) fieldSN.style.display = isBulk ? 'none' : 'block';
+    if (fieldAT) fieldAT.style.display = isBulk ? 'none' : 'block';
+    if (snInput) snInput.required = !isBulk;
+  }
+  document.getElementById('newInstallTypeSerial').addEventListener('change', updateNewInstallForm);
+  document.getElementById('newInstallTypeBulk').addEventListener('change', updateNewInstallForm);
+  updateNewInstallForm();
 
   // Activate tab from URL hash on load
   const hash = window.location.hash;
