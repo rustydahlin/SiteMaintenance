@@ -101,9 +101,16 @@
         <!-- Model Number -->
         <div class="col-md-4">
           <label for="modelNumber" class="form-label">Model Number</label>
+          <%
+            const mnList = (typeof modelNumbers !== 'undefined' ? modelNumbers : []);
+            const mnMatch = item && item.ModelNumber && mnList.some(n => n.Name === item.ModelNumber);
+          %>
           <select id="modelNumber" name="modelNumber" class="form-select">
             <option value="">— Select Model Number —</option>
-            <% (typeof modelNumbers !== 'undefined' ? modelNumbers : []).forEach(n => { %>
+            <% if (item && item.ModelNumber && !mnMatch) { %>
+              <option value="<%= item.ModelNumber %>" selected><%= item.ModelNumber %> (renamed — please reselect)</option>
+            <% } %>
+            <% mnList.forEach(n => { %>
               <option value="<%= n.Name %>"
                 <%= (item && item.ModelNumber === n.Name) ? 'selected' : '' %>>
                 <%= n.Name %>
@@ -115,9 +122,16 @@
         <!-- Manufacturer -->
         <div class="col-md-4">
           <label for="manufacturer" class="form-label">Manufacturer</label>
+          <%
+            const mfrList = (typeof manufacturers !== 'undefined' ? manufacturers : []);
+            const mfrMatch = item && item.Manufacturer && mfrList.some(n => n.Name === item.Manufacturer);
+          %>
           <select id="manufacturer" name="manufacturer" class="form-select">
             <option value="">— Select Manufacturer —</option>
-            <% (typeof manufacturers !== 'undefined' ? manufacturers : []).forEach(n => { %>
+            <% if (item && item.Manufacturer && !mfrMatch) { %>
+              <option value="<%= item.Manufacturer %>" selected><%= item.Manufacturer %> (renamed — please reselect)</option>
+            <% } %>
+            <% mfrList.forEach(n => { %>
               <option value="<%= n.Name %>"
                 <%= (item && item.Manufacturer === n.Name) ? 'selected' : '' %>>
                 <%= n.Name %>
@@ -165,14 +179,25 @@
           </label>
           <select id="statusID" name="statusID" class="form-select" required>
             <option value="">— Select Status —</option>
-            <% statuses.filter(s => s.StatusName !== 'Checked-Out' && s.StatusName !== 'Deployed').forEach(s => { %>
+            <%
+              const systemStatuses = ['Checked-Out', 'Deployed'];
+              // If item currently has a system-managed status, show it as a read-only option
+              const currentIsSystem = item && systemStatuses.includes(item.StatusName);
+            %>
+            <% if (currentIsSystem) { %>
+              <option value="<%= item.StatusID %>" selected disabled><%= item.StatusName %> (system managed)</option>
+            <% } %>
+            <% statuses.filter(s => !systemStatuses.includes(s.StatusName)).forEach(s => { %>
               <option value="<%= s.StatusID %>"
                 data-name="<%= s.StatusName %>"
-                <%= (item && item.StatusID == s.StatusID) ? 'selected' : '' %>>
+                <%= (!currentIsSystem && item && item.StatusID == s.StatusID) ? 'selected' : '' %>>
                 <%= s.StatusName %>
               </option>
             <% }) %>
           </select>
+          <% if (currentIsSystem) { %>
+          <div class="form-text">Status is managed automatically while the item is <%= item.StatusName.toLowerCase() %>.</div>
+          <% } %>
         </div>
 
         <!-- Stock Holder (shown when In-Stock, serialized only) -->

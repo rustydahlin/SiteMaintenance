@@ -654,7 +654,10 @@ router.post('/:id', isAdmin, async (req, res, next) => {
     const itemID = parseInt(req.params.id, 10);
     const existing = await inventoryModel.getByID(itemID);
     const isBulk = existing && existing.TrackingType === 'bulk';
-    const { serialNumber, categoryID, statusID } = req.body;
+    const { serialNumber, categoryID } = req.body;
+    // System-managed statuses (Deployed, Checked-Out) render as disabled options and won't
+    // submit a value — fall back to the existing status so we never write NULL.
+    const statusID = req.body.statusID || existing?.StatusID || null;
 
     if (!req.body.commonName || !req.body.commonName.trim()) {
       req.flash('error', 'Common Name is required.');
