@@ -248,8 +248,28 @@ body {
 }
 #sidebarBackdrop.show { display: block; }
 
+/* ── Report table headers (readable in both light and dark mode) ─────────── */
+.report-thead th {
+  background-color: rgba(0, 0, 0, 0.08);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+[data-bs-theme="dark"] .report-thead th {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 /* ── Print adjustments ────────────────────────────────────────────────────── */
 @media print {
   #sidebar, nav.navbar { display: none !important; }
   main { margin: 0 !important; padding: 0 !important; }
+  .report-table { page-break-inside: auto; font-size: 10pt; border-collapse: collapse !important; }
+  .report-table tr { page-break-inside: avoid; }
+  .report-category-section { page-break-inside: avoid; }
+  .report-thead th { background: #e9ecef !important; color: #000 !important; }
+  /* Force all report text to solid black — PDFs wash out gray tones */
+  .report-table td, .report-table th,
+  .report-table .text-muted, .report-table small,
+  .report-print-header .text-muted { color: #000 !important; }
 }

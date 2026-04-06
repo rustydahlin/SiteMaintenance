@@ -60,9 +60,14 @@ function canManageNetworkMap(req, res, next) {
   return hasRole('Admin', 'NetworkMapUpdater')(req, res, next);
 }
 
+// canAccessReports — Admin or Reports role
+function canAccessReports(req, res, next) {
+  return hasRole('Admin', 'Reports')(req, res, next);
+}
+
 module.exports = {
   isAuthenticated, isAdmin, hasRole,
   canWrite, canAccessSystemKeys, canManageNotifications,
   canAccessMaintenance, canManageMaintenance, canImportExport,
-  canManageNetworkMap,
+  canManageNetworkMap, canAccessReports,
 };

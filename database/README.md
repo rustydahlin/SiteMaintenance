@@ -33,6 +33,7 @@ Migrations in `migrations/` apply incremental changes to an existing database. R
 | 021_network_map_updater_role.sql | NetworkMapUpdater role |
 | 022_session_timeout.sql | Configurable session timeout setting |
 | 023_push_subscriptions.sql | PWA push notification subscriptions |
+| 024_reports.sql | Reports role and reports.enabled feature flag |
 
 ## PWA Push Notifications (Migration 023)
 

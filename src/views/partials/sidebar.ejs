@@ -87,6 +87,15 @@
       </li>
       <% } %>
 
+      <% if (reportsEnabled && user.roles && (user.roles.includes('Admin') || user.roles.includes('Reports'))) { %>
+      <li class="nav-item">
+        <a class="nav-link <%= currentPath.startsWith('/reports') ? 'active' : '' %>" href="/reports" title="Reports">
+          <i class="bi bi-file-earmark-bar-graph"></i>
+          <span class="nav-label">Reports</span>
+        </a>
+      </li>
+      <% } %>
+
       <% if (user.roles && (user.roles.includes('Admin') || isNMUpdater)) { %>
       <li class="nav-item">
         <a class="nav-link <%= currentPath.startsWith('/admin') ? 'active' : '' %>" href="/admin" title="Administration">

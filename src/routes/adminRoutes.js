@@ -372,7 +372,7 @@ router.get('/settings', async (_req, res, next) => {
 router.post('/settings', async (req, res, next) => {
   try {
     // Checkbox fields: if absent from body they were unchecked — save '0' explicitly
-    const checkboxKeys = ['ldap.enabled', 'ldap.starttls', 'ldap.rejectUnauthorized', 'oidc.enabled', 'email.enabled', 'systemKeys.enabled', 'vendors.enabled', 'maintenance.enabled'];
+    const checkboxKeys = ['ldap.enabled', 'ldap.starttls', 'ldap.rejectUnauthorized', 'oidc.enabled', 'email.enabled', 'systemKeys.enabled', 'vendors.enabled', 'maintenance.enabled', 'reports.enabled'];
     for (const ck of checkboxKeys) {
       if (!(ck in req.body)) req.body[ck] = '0';
     }

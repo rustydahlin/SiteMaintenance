@@ -118,6 +118,7 @@
                 <th class="text-center">SystemKeys</th>
                 <th class="text-center">Import&#8209;Export</th>
                 <th class="text-center">Notifications</th>
+                <th class="text-center">Reports</th>
               </tr>
             </thead>
             <tbody>
@@ -126,7 +127,7 @@
                 function n() { return '<span class="text-danger opacity-50">&#8212;</span>'; }
                 function p(t) { return '<span class="text-warning small">' + t + '</span>'; }
               %>
-              <tr class="table-secondary"><td colspan="10" class="fw-semibold px-3 py-1">Sites &amp; Inventory</td></tr>
+              <tr class="table-secondary"><td colspan="11" class="fw-semibold px-3 py-1">Sites &amp; Inventory</td></tr>
               <tr>
                 <td class="ps-3">View sites &amp; inventory</td>
                 <td class="text-center"><%- y() %></td>
@@ -138,6 +139,7 @@
                 <td class="text-center"><%- y() %></td>
                 <td class="text-center"><%- y() %></td>
                 <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
               </tr>
               <tr>
                 <td class="ps-3">Create / edit log entries</td>
@@ -150,11 +152,13 @@
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
               </tr>
               <tr>
                 <td class="ps-3">Install / remove inventory at sites</td>
                 <td class="text-center"><%- y() %></td>
                 <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
@@ -174,6 +178,7 @@
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
               </tr>
               <tr>
                 <td class="ps-3">Manage sites &amp; inventory (create/edit/delete)</td>
@@ -186,9 +191,10 @@
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
               </tr>
 
-              <tr class="table-secondary"><td colspan="10" class="fw-semibold px-3 py-1">Maintenance</td></tr>
+              <tr class="table-secondary"><td colspan="11" class="fw-semibold px-3 py-1">Maintenance</td></tr>
               <tr>
                 <td class="ps-3">View maintenance items</td>
                 <td class="text-center"><%- y() %></td>
@@ -200,6 +206,7 @@
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
               </tr>
               <tr>
                 <td class="ps-3">Create / edit maintenance items</td>
@@ -208,6 +215,7 @@
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
@@ -224,9 +232,10 @@
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
               </tr>
 
-              <tr class="table-secondary"><td colspan="10" class="fw-semibold px-3 py-1">System Keys</td></tr>
+              <tr class="table-secondary"><td colspan="11" class="fw-semibold px-3 py-1">System Keys</td></tr>
               <tr>
                 <td class="ps-3">View &amp; manage system keys</td>
                 <td class="text-center"><%- y() %></td>
@@ -238,9 +247,10 @@
                 <td class="text-center"><%- y() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
               </tr>
 
-              <tr class="table-secondary"><td colspan="10" class="fw-semibold px-3 py-1">Data Management</td></tr>
+              <tr class="table-secondary"><td colspan="11" class="fw-semibold px-3 py-1">Data Management</td></tr>
               <tr>
                 <td class="ps-3">Import &amp; export data</td>
                 <td class="text-center"><%- y() %></td>
@@ -252,12 +262,29 @@
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- y() %></td>
                 <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
               </tr>
 
-              <tr class="table-secondary"><td colspan="10" class="fw-semibold px-3 py-1">Administration</td></tr>
+              <tr class="table-secondary"><td colspan="11" class="fw-semibold px-3 py-1">Reports</td></tr>
+              <tr>
+                <td class="ps-3">Run &amp; print reports</td>
+                <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- y() %></td>
+              </tr>
+
+              <tr class="table-secondary"><td colspan="11" class="fw-semibold px-3 py-1">Administration</td></tr>
               <tr>
                 <td class="ps-3">Manage users, roles &amp; settings</td>
                 <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
@@ -278,6 +305,7 @@
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
+                <td class="text-center"><%- n() %></td>
               </tr>
               <tr>
                 <td class="ps-3">Email notification preferences</td>
@@ -290,6 +318,7 @@
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- n() %></td>
                 <td class="text-center"><%- y() %></td>
+                <td class="text-center"><%- n() %></td>
               </tr>
             </tbody>
           </table>

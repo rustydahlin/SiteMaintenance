@@ -51,6 +51,14 @@
           <div class="form-text">Show / hide the Maintenance section in the navigation.</div>
         </div>
         <div class="col-md-3">
+          <label class="form-label">Enable Reports Section</label>
+          <select name="reports.enabled" class="form-select">
+            <option value="0" <%= settings['reports.enabled'] === '1' ? '' : 'selected' %>>Disabled</option>
+            <option value="1" <%= settings['reports.enabled'] === '1' ? 'selected' : '' %>>Enabled</option>
+          </select>
+          <div class="form-text">Show the Reports section in navigation.</div>
+        </div>
+        <div class="col-md-3">
           <label class="form-label">Session Timeout (hours)</label>
           <input type="number" name="session.timeoutHours" class="form-control"
                  value="<%= settings['session.timeoutHours'] || '8' %>" min="1" max="168" />

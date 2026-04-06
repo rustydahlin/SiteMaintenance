@@ -40,7 +40,8 @@
       "Bash(Measure-Object -Line)",
       "Bash(dir \"C:\\\\SIRNnetworkmap\\\\src\\\\frontend\" /b)",
       "Bash(dir \"C:\\\\SIRNnetworkmap\\\\src\\\\frontend\\\\images\\\\icons\" /b)",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Bash(grep -E \"\\\\.js$\")"
     ]
   }
 }

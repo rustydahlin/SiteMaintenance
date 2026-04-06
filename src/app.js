@@ -50,6 +50,7 @@ async function createApp() {
     res.locals.systemKeysEnabled  = false;
     res.locals.vendorsEnabled     = false;
     res.locals.maintenanceEnabled = false;
+    res.locals.reportsEnabled     = false;
     res.locals.sidebarLogoUrl     = '/images/publicsafetyteam.png';
     res.locals.sidebarFooterHtml  = 'Call Darron. (701) 328-6974';
     // Format a SQL date-only field correctly (avoids UTC-midnight timezone shift)
@@ -103,11 +104,12 @@ async function createApp() {
     res.locals.sidebarLogoUrl     = '/images/publicsafetyteam.png';
     res.locals.sidebarFooterHtml  = 'Call Darron. (701) 328-6974';
     try {
-      const [appName, sysKeys, vendors, maintenance, sidebarLogoUrl, sidebarFooterHtml] = await Promise.all([
+      const [appName, sysKeys, vendors, maintenance, reports, sidebarLogoUrl, sidebarFooterHtml] = await Promise.all([
         settingsModel.getSetting('app.name', null),
         settingsModel.getSetting('systemKeys.enabled', null),
         settingsModel.getSetting('vendors.enabled', null),
         settingsModel.getSetting('maintenance.enabled', null),
+        settingsModel.getSetting('reports.enabled', null),
         settingsModel.getSetting('sidebar.logoUrl', null),
         settingsModel.getSetting('sidebar.footerHtml', null),
       ]);
@@ -115,6 +117,7 @@ async function createApp() {
       res.locals.systemKeysEnabled   = sysKeys      === '1';
       res.locals.vendorsEnabled      = vendors      === '1';
       res.locals.maintenanceEnabled  = maintenance  === '1';
+      res.locals.reportsEnabled      = reports      === '1';
       res.locals.sidebarLogoUrl      = sidebarLogoUrl  || '/images/publicsafetyteam.png';
       res.locals.sidebarFooterHtml   = sidebarFooterHtml !== null ? sidebarFooterHtml : 'Call Darron. (701) 328-6974';
     } catch (_) {
@@ -122,6 +125,7 @@ async function createApp() {
       res.locals.systemKeysEnabled   = false;
       res.locals.vendorsEnabled      = false;
       res.locals.maintenanceEnabled  = false;
+      res.locals.reportsEnabled      = false;
       res.locals.sidebarLogoUrl      = '/images/publicsafetyteam.png';
       res.locals.sidebarFooterHtml   = 'Call Darron. (701) 328-6974';
     }
@@ -156,6 +160,7 @@ async function createApp() {
   app.use('/maintenance',  require('./routes/maintenanceRoutes'));
   app.use('/logs',         require('./routes/logsRoutes'));
   app.use('/admin',        require('./routes/adminRoutes'));
+  app.use('/reports',      require('./routes/reportsRoutes'));
   app.use('/profile',    require('./routes/profileRoutes'));
   app.use('/mobile',     require('./routes/mobileRoutes'));
 

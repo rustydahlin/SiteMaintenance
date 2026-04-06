@@ -1,0 +1,159 @@
+<%
+  // Location display for serialized items
+  function itemLocation(item) {
+    if (item.CurrentSiteName)     return item.CurrentSiteName;
+    if (item.AssignedToUserName)  return item.AssignedToUserName;
+    if (item.StockLocationName)   return item.StockLocationName;
+    return '—';
+  }
+%>
+
+<!-- ── Print-only header ────────────────────────────────────────────────────── -->
+<div class="d-none d-print-block mb-3 report-print-header">
+  <h4 class="mb-0">Inventory Report</h4>
+  <div class="text-muted small"><%= filterDesc %> &mdash; Run: <%= runDate %></div>
+  <hr />
+</div>
+
+<!-- ── Screen-only controls ─────────────────────────────────────────────────── -->
+<div class="d-print-none">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0"><i class="bi bi-box-seam me-2"></i>Inventory Report</h1>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+        <i class="bi bi-printer me-1"></i>Print / Save PDF
+      </button>
+      <a href="/reports" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Reports
+      </a>
+    </div>
+  </div>
+
+  <div class="card mb-4 shadow-sm">
+    <div class="card-body py-2">
+      <form method="GET" action="/reports/inventory" class="row g-2 align-items-end">
+        <div class="col-sm-3">
+          <label class="form-label small mb-1">Show</label>
+          <select name="inStockOnly" class="form-select form-select-sm">
+            <option value=""  <%= filters.inStockOnly !== '1' ? 'selected' : '' %>>All Inventory</option>
+            <option value="1" <%= filters.inStockOnly === '1' ? 'selected' : '' %>>In-Stock / Available Only</option>
+          </select>
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label small mb-1">Category</label>
+          <select name="categoryID" class="form-select form-select-sm">
+            <option value="">All Categories</option>
+            <% categories.forEach(c => { %>
+            <option value="<%= c.CategoryID %>" <%= filters.categoryID == c.CategoryID ? 'selected' : '' %>><%= c.CategoryName %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label small mb-1">Stock Location</label>
+          <select name="locationID" class="form-select form-select-sm">
+            <option value="">All Locations</option>
+            <% locations.forEach(l => { %>
+            <option value="<%= l.LocationID %>" <%= filters.locationID == l.LocationID ? 'selected' : '' %>><%= l.LocationName %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-search me-1"></i>Run Report
+          </button>
+          <a href="/reports/inventory" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <% if (Object.keys(grouped).length === 0) { %>
+  <div class="alert alert-info">No inventory items match the selected filters.</div>
+  <% } %>
+</div>
+
+<!-- ── Report body ───────────────────────────────────────────────────────────── -->
+<% Object.keys(grouped).sort().forEach(cat => { %>
+<%   const items = grouped[cat]; %>
+<%   const serialized = items.filter(i => i.TrackingType === 'serialized'); %>
+<%   const bulk       = items.filter(i => i.TrackingType === 'bulk'); %>
+
+<div class="report-category-section mb-4">
+  <h5 class="border-bottom pb-1 mb-2"><%= cat %></h5>
+
+  <!-- Serialized items -->
+  <% if (serialized.length > 0) { %>
+  <table class="table table-sm table-bordered align-middle mb-2 report-table">
+    <thead class="report-thead">
+      <tr>
+        <th>Item</th>
+        <th>Serial #</th>
+        <th>Asset Tag</th>
+        <th>Model</th>
+        <th>Manufacturer</th>
+        <th>Status</th>
+        <th>Location / Assigned To / Site</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% serialized.forEach(item => { %>
+      <tr>
+        <td class="small"><%= item.CommonName || '—' %></td>
+        <td class="small text-muted"><%= item.SerialNumber || '—' %></td>
+        <td class="small text-muted"><%= item.AssetTag || '—' %></td>
+        <td class="small text-muted"><%= item.ModelNumber || '—' %></td>
+        <td class="small text-muted"><%= item.Manufacturer || '—' %></td>
+        <td class="small"><%= item.StatusName || '—' %></td>
+        <td class="small"><%= itemLocation(item) %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+
+  <!-- Bulk items -->
+  <% if (bulk.length > 0) { %>
+  <table class="table table-sm table-bordered align-middle mb-2 report-table">
+    <thead class="report-thead">
+      <tr>
+        <th>Item</th>
+        <th>Model</th>
+        <th>Manufacturer</th>
+        <th>Total Qty</th>
+        <th>Available</th>
+        <th>Stock Distribution</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% bulk.forEach(item => { %>
+      <tr>
+        <td class="small"><%= item.CommonName || item.ModelNumber || '—' %></td>
+        <td class="small text-muted"><%= item.ModelNumber || '—' %></td>
+        <td class="small text-muted"><%= item.Manufacturer || '—' %></td>
+        <td class="small text-center"><%= item.QuantityTotal ?? 0 %></td>
+        <td class="small text-center"><%= item.QuantityAvailable ?? 0 %></td>
+        <td class="small">
+          <% const stock = stockMap[item.ItemID] || []; %>
+          <% if (stock.length === 0) { %>
+          <span class="text-muted">—</span>
+          <% } else { %>
+          <ul class="list-unstyled mb-0">
+            <% stock.forEach(s => { %>
+            <li><span class="text-muted"><%= s.LocationName || s.UserDisplayName || '—' %>:</span> <%= s.Quantity %></li>
+            <% }) %>
+          </ul>
+          <% } %>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>
+<% }) %>
+
+<!-- ── Print footer ──────────────────────────────────────────────────────────── -->
+<div class="d-none d-print-block mt-4 report-print-header">
+  <hr />
+  <div class="text-muted small"><%= filterDesc %> &mdash; Run: <%= runDate %></div>
+</div>
