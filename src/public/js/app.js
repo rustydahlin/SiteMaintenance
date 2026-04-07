@@ -133,6 +133,50 @@ document.addEventListener('DOMContentLoaded', () => {
     new bootstrap.Tooltip(el);
   });
 
+  // ── Filter card active indicator ─────────────────────────────────────────
+  // Adds an orange border to the filter card when any filter has a value set.
+  // Works on page load and updates in real-time as the user changes inputs.
+  function isFilterActive(form) {
+    for (const el of form.elements) {
+      if (el.type === 'hidden') continue;
+      if (el.type === 'checkbox' && el.checked) return true;
+      if (el.type !== 'checkbox' && el.value.trim() !== '') return true;
+    }
+    return false;
+  }
+
+  document.querySelectorAll('form[method="GET"][action]').forEach(form => {
+    const card = form.closest('.card');
+    if (!card) return;
+    const update = () => card.classList.toggle('filter-card-active', isFilterActive(form));
+    update();
+    form.addEventListener('input', update);
+    form.addEventListener('change', update);
+  });
+
+  // ── List filter persistence ───────────────────────────────────────────────
+  // On list pages: save current search params so detail pages can restore them
+  document.querySelectorAll('form[method="GET"][action]').forEach(form => {
+    const action = form.getAttribute('action');
+    if (action && location.pathname === action) {
+      sessionStorage.setItem('listFilters:' + action, location.search);
+    }
+  });
+
+  // On detail pages: update [data-back-list] links to restore saved filters
+  document.querySelectorAll('a[data-back-list]').forEach(link => {
+    const basePath = link.getAttribute('data-back-list');
+    const saved = sessionStorage.getItem('listFilters:' + basePath);
+    if (saved) link.href = basePath + saved;
+  });
+
+  // Sidebar nav links: restore saved filters when navigating to a list page
+  document.querySelectorAll('#sidebar a.nav-link[href]').forEach(link => {
+    const href = link.getAttribute('href');
+    const saved = sessionStorage.getItem('listFilters:' + href);
+    if (saved) link.href = href + saved;
+  });
+
   // ── Tab persistence ───────────────────────────────────────────────────────
   // Save active tab to sessionStorage on change, restore on load
   const tabKey = 'activeTab:' + location.pathname;

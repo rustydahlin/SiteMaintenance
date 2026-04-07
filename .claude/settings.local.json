@@ -41,7 +41,9 @@
       "Bash(dir \"C:\\\\SIRNnetworkmap\\\\src\\\\frontend\" /b)",
       "Bash(dir \"C:\\\\SIRNnetworkmap\\\\src\\\\frontend\\\\images\\\\icons\" /b)",
       "Bash(node -e ':*)",
-      "Bash(grep -E \"\\\\.js$\")"
+      "Bash(grep -E \"\\\\.js$\")",
+      "Bash(xargs ls:*)",
+      "Bash(xargs grep:*)"
     ]
   }
 }
